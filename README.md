@@ -36,7 +36,7 @@ Thirteen tools, callable from any MCP-compatible agent over stdio (npx) or as a 
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Plain-English front door for one AI decision: resolves the five scoring inputs, tests the work architecture, asks one question when something is missing, then returns the verdict. |
+| `assess_ai_initiative` | Plain-English front door for one AI decision: resolves the five scoring inputs, tests the work architecture, asks once for every unresolved input, then returns the verdict. |
 | `score_initiative` | Four-pillar score plus a work architecture gate returns Accelerate, Fix, or Stop with EUR value range, decision confidence, applied modules and reasoning. |
 | `score_portfolio` | Scores every initiative in a BVF portfolio in one call and returns the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision confidence, top initiative by value, highest-risk initiative. |
 | `assemble_portfolio` | Assembles a valid BVF v1.0 portfolio document from loose inputs: names, plain-language functions and tiers, and whatever pillar scores exist. Aliases resolved, ids generated, missing pillars estimated with the estimation reported per initiative, document validated before return. Nothing stored, nothing edited. |

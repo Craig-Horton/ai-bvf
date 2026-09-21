@@ -15,6 +15,21 @@ const QUESTIONS: Record<AssessField, string> = {
   readiness: 'How does the organisation work today: agile, traditional, or siloed?',
 };
 
+const QUESTION_PARTS: Record<AssessField, string> = {
+  industry: 'industry',
+  revenue_eur: 'approximate annual revenue in EUR',
+  function: 'owning business function',
+  ai_tier: 'AI type (automation, GenAI, or agentic)',
+  readiness: 'current operating model (agile, traditional, or siloed)',
+};
+
+function nextQuestion(missing: AssessField[]): string {
+  if (missing.length === 1) return QUESTIONS[missing[0]];
+  const parts = missing.map((field) => QUESTION_PARTS[field]);
+  const final = parts.pop();
+  return `To return a provisional verdict in one more step, what are the ${parts.join(', ')}, and ${final}?`;
+}
+
 const MULTIPLIER: Record<string, number> = {
   k: 1_000, thousand: 1_000,
   m: 1_000_000, mn: 1_000_000, million: 1_000_000,
@@ -98,7 +113,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (missing.length) {
     return {
       status: 'needs_input', proposal, resolved_inputs: resolved, resolutions,
-      missing_fields: missing, next_question: QUESTIONS[missing[0]],
+      missing_fields: missing, next_question: nextQuestion(missing),
       ...(firstSuggestions ? { suggestions: firstSuggestions } : {}),
     };
   }

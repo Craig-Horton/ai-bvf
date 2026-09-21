@@ -53,6 +53,19 @@ test('provided values override proposal resolution', () => {
   assert.equal(result.status, 'verdict');
 });
 
+test('asks for every unresolved input in one clarification', () => {
+  const result = assessInitiative({
+    proposal: 'We want to use AI to improve an internal process.',
+  });
+  assert.equal(result.status, 'needs_input');
+  assert.deepEqual(result.missing_fields, ['industry', 'revenue_eur', 'function', 'ai_tier', 'readiness']);
+  assert.match(result.next_question ?? '', /industry/);
+  assert.match(result.next_question ?? '', /annual revenue in EUR/);
+  assert.match(result.next_question ?? '', /owning business function/);
+  assert.match(result.next_question ?? '', /automation, GenAI, or agentic/);
+  assert.match(result.next_question ?? '', /agile, traditional, or siloed/);
+});
+
 test('hyphenated industry aliases resolve inside a full proposal', () => {
   const nonprofit = assessInitiative({
     proposal: 'A traditional non-profit with EUR 100m revenue wants a GenAI assistant for recruiting.',

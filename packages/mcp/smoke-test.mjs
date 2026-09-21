@@ -105,7 +105,7 @@ for (const r of responses) {
     const parsed = JSON.parse(r.result?.content?.[0]?.text);
     if (parsed.classification !== 'Fix'
       || parsed.feedback?.question !== 'Did this change what you will do next, what should AI BVF do more of, and what should it stop doing?'
-      || parsed.feedback?.url !== 'https://www.aibvf.com/feedback?classification=Fix&route=mcp') {
+      || parsed.feedback?.url !== 'https://www.aibvf.com/feedback?classification=Fix&route=mcp&industry=manufacturing') {
       console.error('Fix verdict did not carry the expected feedback route.');
       process.exitCode = 1;
     } else {
