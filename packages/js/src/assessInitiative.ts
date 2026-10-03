@@ -36,26 +36,78 @@ const MULTIPLIER: Record<string, number> = {
   b: 1_000_000_000, bn: 1_000_000_000, billion: 1_000_000_000,
 };
 
-function amount(value: string, scale?: string): number {
-  const base = Number(value.replace(/,/g, ''));
-  return Math.round(base * (scale ? MULTIPLIER[scale.toLowerCase()] ?? 1 : 1));
+const SCALE = 'billion|million|thousand|bn|mn|[kmb]';
+const CURRENCY = 'EUR|euros?|USD|dollars?|GBP|pounds?|CHF|AUD|CAD|NZD|SEK|NOK|DKK|JPY|CNY|INR|[€$£¥]';
+
+function amount(value: string, scale?: string): number | undefined {
+  const compact = value.replace(/ /g, '');
+  let normalized = compact;
+  if (compact.includes(',') && compact.includes('.')) {
+    if (/^\d{1,3}(?:,\d{3})+\.\d+$/.test(compact)) {
+      normalized = compact.replace(/,/g, '');
+    } else if (/^\d{1,3}(?:\.\d{3})+,\d+$/.test(compact)) {
+      normalized = compact.replace(/\./g, '').replace(',', '.');
+    } else return undefined;
+  } else if (/[,.]/.test(compact)) {
+    const parts = compact.split(/[,.]/);
+    const grouped = /^\d{1,3}(?:[,.]\d{3})+$/.test(compact);
+    // A scaled value such as "1,200 million" has two plausible readings.
+    if (scale && grouped) return undefined;
+    if (grouped) normalized = compact.replace(/[,.]/g, '');
+    else if (parts.length === 2) normalized = compact.replace(',', '.');
+    else return undefined;
+  }
+  const result = Math.round(Number(normalized) * (scale ? MULTIPLIER[scale.toLowerCase()] : 1));
+  return Number.isSafeInteger(result) && result >= 0 ? result : undefined;
 }
 
-/** Extracts EUR revenue only; it never converts another currency silently. */
+/**
+ * Reads revenue-labelled amounts and explicit EUR company-size descriptions.
+ * Costs, foreign currencies and conflicting amounts require a revenue answer.
+ * Unmarked revenue/turnover retains the EUR default used by the assessment.
+ */
 export function extractRevenueEur(proposal: string): number | undefined {
-  const text = proposal.replace(/\u00a0/g, ' ');
-  const scale = '(k|thousand|m|mn|million|b|bn|billion)?';
-  const value = '([0-9]+(?:[,.][0-9]+)?)';
-  const patterns = [
-    new RegExp(`(?:EUR|€)\\s*${value}\\s*${scale}`, 'i'),
-    new RegExp(`${value}\\s*${scale}\\s*(?:EUR|euros?|euro)\\b`, 'i'),
-    new RegExp(`(?:annual\\s+)?(?:revenue|turnover)\\s*(?:of|is|around|about|approximately|approx\\.?|:)??\\s*(?:EUR|€)?\\s*${value}\\s*${scale}`, 'i'),
-  ];
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return amount(match[1], match[2]);
+  const text = proposal.replace(/[\u00a0\u202f]/g, ' ');
+  const number = '(?:[0-9]{1,3}(?: [0-9]{3})+(?:[.,][0-9]+)?|[0-9]+(?:[.,][0-9]+)*)';
+  const monetaryAmount = new RegExp(
+    String.raw`(?<![\w.,])(?:(?<before>${CURRENCY})\s*)?(?<value>${number})\s*(?<scale>${SCALE})?(?![\w]|[.,][0-9])(?:\s*(?<after>${CURRENCY})(?!\w|\s*[0-9]))?`,
+    'gi',
+  );
+  const revenueBefore = /\b(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const revenueAfter = /^\s*(?:(?:in|of)\s+)?(?:annual\s+)?(?:revenue|turnover)\b/i;
+  const nonRevenueBefore = /\b(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\s*(?:(?:of|is|are|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const nonRevenueAfter = /^\s*(?:(?:in|of|for|annual|projected|expected|implementation|operating)\s+)*(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\b/i;
+  const projectRevenueBefore = /\b(?:project|pilot|incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const projectRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\b/i;
+  const companyAfter = /^\s*(?:(?:global|international|European)\s+)?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit)\b/i;
+  const revenues: number[] = [];
+  const otherAmounts: number[] = [];
+  let unresolved = false;
+
+  for (const match of text.matchAll(monetaryAmount)) {
+    const { before: currencyBefore, after: currencyAfter, value, scale } = match.groups!;
+    const before = text.slice(0, match.index).slice(-100);
+    const after = text.slice(match.index! + match[0].length, match.index! + match[0].length + 100);
+    const labelled = revenueBefore.test(before) || revenueAfter.test(after);
+    if (projectRevenueBefore.test(before) || projectRevenueAfter.test(after)) continue;
+    if (!labelled && (nonRevenueBefore.test(before) || nonRevenueAfter.test(after))) continue;
+    const currencies = [currencyBefore, currencyAfter].filter(Boolean);
+    const euro = currencies.length > 0 && currencies.every((currency) => /^(?:EUR|euros?|€)$/i.test(currency));
+    const companySize = euro && companyAfter.test(after);
+    if (!labelled && !companySize && !currencies.length) continue;
+    const parsed = amount(value, scale);
+    if ((currencies.length && !euro) || /[-−]\s*$/.test(before) || parsed === undefined) {
+      if (labelled || companySize) unresolved = true;
+      continue;
+    }
+    if (labelled || companySize) revenues.push(parsed);
+    else otherAmounts.push(parsed);
   }
-  return undefined;
+
+  const distinct = new Set(revenues);
+  if (unresolved || distinct.size !== 1) return undefined;
+  const revenue = revenues[0];
+  return otherAmounts.some((value) => value !== revenue) ? undefined : revenue;
 }
 
 function proposalFor(field: Exclude<AssessField, 'revenue_eur'>, proposal: string): string {

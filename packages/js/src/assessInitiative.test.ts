@@ -137,3 +137,105 @@ test('evidenced work architecture allows the four pillars to return Accelerate',
   assert.deepEqual(result.verdict?.work_architecture.unknowns, []);
   assert.equal(result.verdict?.work_architecture.next_question, undefined);
 });
+
+
+test('revenue extraction separates company revenue from initiative costs and benefits', () => {
+  for (const proposal of [
+    'A EUR 250k pilot for a retailer with EUR 300m annual revenue.',
+    'Pilot EUR 250k; company annual revenue EUR 300m.',
+    'Company revenue EUR 300 million; implementation costs EUR 250k.',
+    'Project adds EUR 2m incremental revenue; company revenue is EUR 300m.',
+    'Project revenue EUR 2m; company turnover EUR 300m.',
+  ]) {
+    assert.equal(extractRevenueEur(proposal), 300_000_000, proposal);
+  }
+  for (const proposal of [
+    'Pilot cost EUR 250k; annual operating cost EUR 50k.',
+    'Company revenue is undisclosed; project budget EUR 250k.',
+    'We expect EUR 2m incremental revenue from the project.',
+    'An investment of EUR 2m in a traditional retailer.',
+    'Annual revenue USD 300m; project budget EUR 250k.',
+    'Revenue 300 million dollars; a EUR 250k pilot.',
+  ]) {
+    assert.equal(extractRevenueEur(proposal), undefined, proposal);
+  }
+});
+
+test('conflicting amounts require clarification while repeated equivalent revenue resolves', () => {
+  for (const proposal of [
+    'Annual revenue EUR 300m; annual revenue EUR 400m.',
+    'Revenue EUR 300m in 2024 and EUR 350m in 2025.',
+    'Revenue EUR 300m EUR 400m.',
+    'An EUR 300m retailer and an EUR 400m bank.',
+    'Revenue EUR 300m and an unexplained EUR 250k.',
+  ]) {
+    assert.equal(extractRevenueEur(proposal), undefined, proposal);
+  }
+  assert.equal(
+    extractRevenueEur('Annual revenue EUR 300m, also reported as EUR 300,000,000.'),
+    300_000_000,
+  );
+});
+
+test('revenue extraction handles full scales, decimal commas and grouped EUR amounts', () => {
+  for (const [proposal, expected] of [
+    ['A EUR300m retailer.', 300_000_000],
+    ['Annual revenue EUR 1.5 billion.', 1_500_000_000],
+    ['Annual revenue EUR 1,5 million.', 1_500_000],
+    ['Annual revenue EUR 1,500,000.50.', 1_500_001],
+    ['Annual revenue EUR 1.500.000,50.', 1_500_001],
+    ['Annual revenue EUR 1 500 000.', 1_500_000],
+    ['Annual revenue EUR\u202f1\u202f500\u202f000.', 1_500_000],
+    ['Annual turnover: 2bn.', 2_000_000_000],
+    ['Annual turnover: EUR 250 thousand.', 250_000],
+    ['Annual revenue EUR 0.', 0],
+    ['Annual revenue EUR 300 monthly.', 300],
+  ] as const) {
+    assert.equal(extractRevenueEur(proposal), expected, proposal);
+  }
+  for (const proposal of [
+    'Annual revenue EUR 1,200 million.',
+    'Annual revenue EUR 1,20,000.',
+    'Annual revenue EUR 300m2.',
+    'Annual revenue -EUR 300m.',
+    'Annual revenue EUR 999999999999999999999 billion.',
+  ]) {
+    assert.equal(extractRevenueEur(proposal), undefined, proposal);
+  }
+});
+
+test('assessment asks for company revenue when the only amount is a project budget', () => {
+  const result = assessInitiative({
+    proposal: 'A traditional retailer wants a GenAI assistant for customer service with a project budget of EUR 250k.',
+  });
+  assert.equal(result.status, 'needs_input');
+  assert.deepEqual(result.missing_fields, ['revenue_eur']);
+  assert.equal(result.next_question, "What is the organisation's approximate annual revenue in EUR?");
+  assert.equal(result.verdict, undefined);
+});
+
+test('an explicit revenue answer resolves an ambiguous proposal', () => {
+  const proposal = 'A traditional retailer wants a GenAI assistant for customer service. Annual revenue EUR 300m in 2024 and EUR 350m in 2025.';
+  const ambiguous = assessInitiative({ proposal });
+  assert.equal(ambiguous.status, 'needs_input');
+  assert.deepEqual(ambiguous.missing_fields, ['revenue_eur']);
+  assert.equal(ambiguous.verdict, undefined);
+
+  const answered = assessInitiative({ proposal, revenue_eur: 350_000_000 });
+  assert.equal(answered.status, 'verdict');
+  assert.equal(answered.resolved_inputs.revenue_eur, 350_000_000);
+  assert.ok(answered.resolutions.includes('revenue_eur resolved as 350000000 from provided value.'));
+});
+
+test('a proposal with a cost before revenue uses company revenue in the verdict', () => {
+  const result = assessInitiative({
+    proposal: 'A traditional retailer wants a EUR 250k GenAI assistant for customer service. Its annual revenue is EUR 300m.',
+  });
+  // An unlabelled spend still needs clarification rather than silently becoming revenue.
+  assert.equal(result.status, 'needs_input');
+  const clear = assessInitiative({
+    proposal: 'A traditional retailer wants a GenAI assistant for customer service. Pilot cost EUR 250k; annual revenue EUR 300m.',
+  });
+  assert.equal(clear.status, 'verdict');
+  assert.equal(clear.resolved_inputs.revenue_eur, 300_000_000);
+});
