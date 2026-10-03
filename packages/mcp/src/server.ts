@@ -15,7 +15,7 @@ import {
   BASE_RATES, BENCHMARK_EVIDENCE_REGISTER, IND_MULT,
   INDUSTRIES, FUNCTIONS, AI_TIERS, READINESS, BVF_VERSION,
 } from '@aibvf/core';
-import type { Classification } from '@aibvf/core';
+import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
 export const VERSION = '0.14.13';
@@ -189,7 +189,7 @@ export async function flushTelemetry(timeoutMs = 1200): Promise<void> {
 
 const workArchitectureInputSchema = {
   type: 'object',
-  description: 'Optional evidence that the work around the AI has been redesigned. Pass only what is known. Any explicit false value blocks Accelerate until the gap is closed; omitted checks remain visible as unknown.',
+  description: 'Evidence that workflows, roles, decision rights and measures are ready. Pass only what is known. Explicit gaps and omitted checks block Accelerate until all four checks are evidenced.',
   properties: {
     workflow_redesigned: { type: 'boolean', description: 'True only when the end-to-end workflow has been redesigned around the AI and retained human judgement, false when the existing workflow remains.' },
     roles_redesigned: { type: 'boolean', description: 'True only when affected roles, accountabilities and capability expectations have been rewritten, false when roles remain unchanged.' },
@@ -209,7 +209,7 @@ const scoreInputSchema = {
     readiness:   { type: 'string', enum: READINESS, description: 'Organisational readiness, honest self-assessment: agile = cross-functional, fast decisions; traditional = functional hierarchy; siloed = rigid, hand-off heavy. Sets the value-capture rate and, paired with ai_tier, the pace-layer drag — lower readiness against a higher tier reduces the captured value. Self-report is gameable: when the user has real process numbers, call infer_readiness first and pass its measured classification here instead.' },
     scores: {
       type: 'object',
-      description: 'OPTIONAL, and each pillar inside it is optional. The four AI BVF pillars, each an honest 0–100 self-assessment, combining deterministically into the verdict: governance_risk ≥ 70 OR financial_return ≤ 20 returns Stop; strategic_alignment, financial_return and change_enablement all ≥ 60 with governance_risk ≤ 40 returns Accelerate; everything else returns Fix. Pass ONLY the pillars the user has real evidence for — do NOT invent numbers for the rest. Missing pillars are estimated deterministically by the engine from disclosed AI BVF planning assumptions, the response reports which via pillar_basis and scores_used, decision confidence is haircut by how much was estimated, and a fully-estimated pass can never return Accelerate (it returns Fix pending confirmation). So call immediately with whatever the user gave you, then ask for evidence on the estimated pillars and re-call to firm the verdict up.',
+      description: 'OPTIONAL, and each pillar inside it is optional. The four AI BVF pillars, each an honest 0–100 self-assessment, combining deterministically into the verdict: governance_risk ≥ 70 OR financial_return ≤ 20 returns Stop; strategic_alignment, financial_return and change_enablement all ≥ 60 with governance_risk ≤ 40 returns Accelerate; everything else returns Fix. Pass ONLY the pillars the user has real evidence for — do NOT invent numbers for the rest. Missing pillars are estimated deterministically by the engine from disclosed AI BVF planning assumptions, the response reports which via pillar_basis and scores_used, decision score is haircut by how much was estimated, and a fully-estimated pass can never return Accelerate (it returns Fix pending confirmation). So call immediately with whatever the user gave you, then ask for evidence on the estimated pillars and re-call to firm the verdict up.',
       properties: {
         strategic_alignment: { type: 'number', minimum: 0, maximum: 100, description: 'Optional; estimated at 50 (unproven) when omitted, since alignment to a board KPI cannot be read from context. How clearly this moves a board-level KPI (0–100, higher is better). Must be ≥ 60 — together with financial_return ≥ 60, change_enablement ≥ 60 and governance_risk ≤ 40 — for an Accelerate verdict.' },
         financial_return:    { type: 'number', minimum: 0, maximum: 100, description: 'Optional; when omitted, estimated from the disclosed AI BVF planning range for the function (40–52, never enough to clear 60 unmodelled, never low enough to force a Stop). Strength of the modelled return (0–100, higher is better). A value ≤ 20 forces a Stop on its own; ≥ 60 is one of the four conditions required for Accelerate.' },
@@ -230,7 +230,7 @@ const scoreInitiativeInputSchema = {
     ...scoreInputSchema.properties,
     signal_completeness: {
       type: 'number', minimum: 0, maximum: 1,
-      description: 'Optional 0–1. How grounded the four pillar scores are in real evidence versus estimated from context. Defaults to 1 (treated as measured). If the organisation lacks formal change-readiness or risk metadata, estimate the pillars from what you know AND set this lower to say so — decision confidence is reduced proportionally and a caveat is attached, instead of returning a falsely confident verdict on soft inputs.',
+      description: 'Optional 0 to 1 input-quality factor. The default ranges from 0.5 when all pillars are estimated to 1 when all are supplied. Supplied values still require evidence review. Lower this factor when the supplied pillars rest on weak evidence.',
     },
   },
 };
@@ -302,6 +302,62 @@ const eurRange = (low: number, high: number) => ({ low: roundEur(low), high: rou
 const pillarValue = (s: unknown): number | undefined =>
   typeof s === 'number' ? s : (s && typeof (s as any).value === 'number' ? (s as any).value : undefined);
 
+const PILLARS = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
+
+// Compatibility field names stay stable; their interpretation is explicit on the wire.
+const SCORE_INTERPRETATION = {
+  decision_confidence: 'Heuristic decision score, 0 to 100, adjusted for input quality. This score has no probability calibration.',
+  net_value_eur: 'Readiness-adjusted benefit hypothesis before project build, run and change costs. Replace planning rates with scoped economics before funding.',
+  applied_modules: 'Scoring-rule and sector-context labels. Sector labels do not certify clinical validation or regulatory compliance.',
+};
+const PORTFOLIO_INTERPRETATION = {
+  ...SCORE_INTERPRETATION,
+  aggregate_net_value_eur: 'Arithmetic sum of benefit hypotheses. Reconcile overlapping scope, double counting and project costs before using this as a portfolio business case.',
+  pillar_basis: 'Given means supplied by the caller. It does not assert that source evidence has been verified. Estimated values are recalculated for the scoring context.',
+};
+const interpretationSchema = {
+  type: 'object',
+  additionalProperties: { type: 'string' },
+  description: 'Meaning and limits of compatibility fields. Present these labels when explaining the result.',
+};
+
+function portfolioScoreInput(
+  initiative: any,
+  context: Pick<ScoreInput, 'industry' | 'revenue_eur' | 'function' | 'ai_tier' | 'readiness'>,
+): ScoreInput {
+  const scores: Partial<PillarScores> = {};
+  const qualities: number[] = [];
+  let givenCount = 0;
+  for (const pillar of PILLARS) {
+    const raw = initiative.scores[pillar];
+    const basis = initiative.pillar_basis?.[pillar];
+    if (basis !== undefined && basis !== 'given' && basis !== 'estimated') {
+      throw new Error(`Invalid pillar_basis for ${pillar}.`);
+    }
+    const estimated = basis === 'estimated';
+    const value = pillarValue(raw);
+    if (!estimated && value !== undefined) {
+      scores[pillar] = value;
+      givenCount += 1;
+    }
+    const reported = typeof raw === 'object' && raw !== null ? raw.confidence : undefined;
+    qualities.push(typeof reported === 'number' ? Math.max(0, Math.min(1, reported / 100)) : estimated ? 0.5 : 1);
+  }
+  const explicitSignal = initiative.signal_completeness;
+  if (explicitSignal !== undefined && (typeof explicitSignal !== 'number' || !Number.isFinite(explicitSignal) || explicitSignal < 0 || explicitSignal > 1)) {
+    throw new Error('signal_completeness must be a number from 0 to 1.');
+  }
+  // A supplied quality value can lower the default, but cannot erase known estimates.
+  const defaultSignal = 0.5 + 0.125 * givenCount;
+  const reportedSignal = qualities.reduce((sum, quality) => sum + quality, 0) / PILLARS.length;
+  return {
+    ...context,
+    scores,
+    work_architecture: initiative.work_architecture,
+    signal_completeness: Math.min(defaultSignal, reportedSignal, explicitSignal ?? 1),
+  };
+}
+
 const auditSchema = {
   type: 'object',
   description: 'Reproducibility record: engine version, the rules that fired, and the resolved inputs. Deterministic, no timestamps. If the verdict is challenged months later, the same inputs on the same engine version reproduce it exactly.',
@@ -320,9 +376,10 @@ const scoreOutputSchema = {
     bvf_version:         { type: 'string', description: 'AI BVF protocol version used.' },
     classification:      { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'], description: 'The verdict for this initiative.' },
     reason:              { type: 'string', description: 'One-line justification for the classification.' },
-    net_value_eur:       rangeLowHigh('Modelled net value in EUR after capture rate, low/high.'),
+    net_value_eur:       rangeLowHigh(SCORE_INTERPRETATION.net_value_eur),
+    interpretation: interpretationSchema,
     gross_value_eur:     rangeLowHigh('Modelled gross value in EUR before capture, low/high.'),
-    decision_confidence: { type: 'number', description: 'Confidence in the verdict, 0-100.' },
+    decision_confidence: { type: 'number', description: SCORE_INTERPRETATION.decision_confidence },
     multipliers: {
       type: 'object', description: 'Factors applied to the base rates.',
       required: ['industry', 'tier', 'capture_low', 'capture_high'],
@@ -354,14 +411,14 @@ const scoreOutputSchema = {
       type: 'object',
       description: 'What moves this verdict, computed deterministically: the value if readiness were one notch worse, the value at revenue minus 20 percent, and the nearest single-pillar movements that flip the classification. Boards trust ranges with visible assumptions over point estimates; show this.',
       properties: {
-        readiness_one_notch_down: { type: 'object', description: 'Null when readiness is already siloed.' },
+        readiness_one_notch_down: { type: ['object', 'null'], description: 'Null when readiness is already siloed.' },
         revenue_minus_20pct: { type: 'object' },
         verdict_flips: { type: 'array', items: { type: 'string' } },
       },
     },
     audit: auditSchema,
     benchmark_source:   { type: 'string', description: 'Provenance and evidence status for the AI BVF planning rates applied.' },
-    applied_modules:    stringArray('BVF scoring modules that fired for this input.'),
+    applied_modules:    stringArray(SCORE_INTERPRETATION.applied_modules),
     caveat:             { type: 'string', description: 'Present only when signal_completeness was low: warns the verdict rests on soft inputs and confidence was reduced.' },
     work_architecture: {
       type: 'object',
@@ -426,7 +483,8 @@ const recommendOutputSchema = {
         },
       },
     },
-    projected_decision_confidence: { type: 'number', description: 'Confidence in the verdict if the recommendations land, 0-100.' },
+    projected_decision_confidence: { type: 'number', description: 'Projected heuristic decision score, 0 to 100. The target remains conditional on work architecture and evidence review.' },
+    interpretation: interpretationSchema,
     notes:              stringArray('Caveats or context on the recommendation set.'),
     audit: auditSchema,
     change_plan: {
@@ -537,7 +595,7 @@ const scorePortfolioInputSchema = {
   properties: {
     portfolio: {
       type: 'object',
-      description: 'A portfolio document conforming to the AI BVF v1.0 schema: bvf_version, organization (name, industry, optional revenue_eur), and a non-empty initiatives array. Each initiative carries id, name, function, ai_tier, and a scores object whose four pillars are each either a bare number (0–100) or an object { value: 0–100 }; both shapes are accepted everywhere. Every initiative is run through the same rule as score_initiative — governance_risk ≥ 70 OR financial_return ≤ 20 → Stop; all of strategic_alignment/financial_return/change_enablement ≥ 60 with governance_risk ≤ 40 → Accelerate; else Fix — and the verdicts are aggregated into portfolio counts. organization.revenue_eur is required to model EUR value; initiatives that cannot be scored (missing revenue, unknown function/ai_tier) appear in skipped_initiatives rather than scored_initiatives. Validate first with validate_portfolio if the document may be malformed. Schema: https://www.aibvf.com/protocol.',
+      description: 'AI BVF v1.0 portfolio with organization and initiatives. Each initiative carries id, name, function, ai_tier and four scores, supplied as numbers or { value, confidence } objects. Retain each initiative\'s work_architecture, pillar_basis and optional signal_completeness. pillar_basis marks given or estimated values; estimated pillars are recalculated for the current context and retain an input-quality reduction. Supplied values without provenance are caller-provided, with no claim of evidence verification. Accelerate requires the pillar thresholds and all four work-architecture checks. Missing work-design evidence returns Fix for an otherwise green case. organization.revenue_eur is required for benefit modelling. Validate unfamiliar documents first.',
     },
     readiness: {
       type: 'string',
@@ -576,17 +634,18 @@ const scorePortfolioOutputSchema = {
         skipped:    { type: 'number', description: 'Count of initiatives skipped due to missing or invalid scoring inputs.' },
       },
     },
-    aggregate_net_value_eur:  rangeLowHigh('Sum of net EUR value across scored initiatives, low/high.'),
-    mean_decision_confidence: { type: 'number', description: 'Mean decision confidence across scored initiatives (0–100); 0 when none were scored.' },
+    aggregate_net_value_eur:  rangeLowHigh(PORTFOLIO_INTERPRETATION.aggregate_net_value_eur),
+    interpretation: interpretationSchema,
+    mean_decision_confidence: { type: 'number', description: 'Mean decision score across scored initiatives (0–100); 0 when none were scored.' },
     top_initiative_by_value: {
       type: 'object',
-      description: 'Scored initiative with the highest mid-point net EUR value. Omitted when none were scored.',
+      description: 'Scored initiative with the highest mid-point readiness-adjusted EUR benefit. Omitted when none were scored.',
       required: ['id', 'name', 'classification', 'net_value_eur'],
       properties: {
         id:             { type: 'string' },
         name:           { type: 'string' },
         classification: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
-        net_value_eur:  rangeLowHigh('Net EUR value range for the top initiative.'),
+        net_value_eur:  rangeLowHigh('Readiness-adjusted EUR benefit range for the top initiative.'),
       },
     },
     highest_risk_initiative: {
@@ -612,9 +671,16 @@ const scorePortfolioOutputSchema = {
           ai_tier:             { type: 'string' },
           classification:      { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
           reason:              { type: 'string' },
-          net_value_eur:       rangeLowHigh('Modelled net EUR value, low/high.'),
-          decision_confidence: { type: 'number', description: 'Confidence in the verdict (0–100).' },
-          applied_modules:     stringArray('BVF scoring modules that fired for this initiative.'),
+          net_value_eur:       rangeLowHigh('Modelled readiness-adjusted EUR benefit, low/high.'),
+          decision_confidence: { type: 'number', description: SCORE_INTERPRETATION.decision_confidence },
+          applied_modules: stringArray(SCORE_INTERPRETATION.applied_modules),
+          scores_used: scoreOutputSchema.properties.scores_used,
+          pillar_basis: scoreOutputSchema.properties.pillar_basis,
+          signal_completeness: { type: 'number', minimum: 0, maximum: 1, description: 'Input-quality factor after estimated provenance, pillar quality and any explicit factor are combined conservatively.' },
+          work_architecture: scoreOutputSchema.properties.work_architecture,
+          audit: auditSchema,
+          sensitivity: scoreOutputSchema.properties.sensitivity,
+          caveat: scoreOutputSchema.properties.caveat,
         },
       },
     },
@@ -864,6 +930,8 @@ const assemblePortfolioInputSchema = {
               governance_risk: { type: 'number', minimum: 0, maximum: 100, description: 'Optional evidenced governance-risk score, 0-100, where higher means more risk; omitted values are estimated.' },
             },
           },
+          work_architecture: workArchitectureInputSchema,
+          signal_completeness: { type: 'number', minimum: 0, maximum: 1, description: 'Optional input-quality factor retained for portfolio scoring. Lower it when supplied pillars rest on weak evidence.' },
           bucket: { type: 'string', enum: ['Agent-Proof', 'Agent-Augmented', 'Agent-Replaceable'], description: 'Optional workforce-impact label retained in the document; it does not change the verdict today.' },
           compliance: { type: 'array', items: { type: 'string', enum: ['eu_ai_act', 'dora', 'csrd', 'gdpr_ai'] }, description: 'Optional known compliance regimes retained in the document; governance risk still comes from the supplied or estimated pillar score.' },
         },
@@ -890,7 +958,7 @@ const assemblePortfolioOutputSchema = {
   },
 };
 
-const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision confidence, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and net EUR ranges, decision confidence, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
+const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 const ASSESS_INITIATIVE_DESCRIPTION = 'The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It resolves industry, revenue, business function, AI tier and organisational readiness, then returns one clarification covering every unresolved input or an Accelerate, Fix or Stop verdict. Ask that clarification once and call this tool again with the answers in the explicit fields. Use work_architecture to test whether the end-to-end workflow, affected roles, human decision rights and performance measures have been redesigned. A stated gap or missing work architecture evidence blocks Accelerate and stays visible in the audit trail. Pillar scores and work architecture evidence remain optional inputs, but unresolved values are never guessed and cannot unlock Accelerate. Use score_initiative when the canonical fields are already known, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
@@ -904,14 +972,14 @@ const TOOLS = [
   },
   {
     name: 'score_initiative',
-    description: 'Pre-flight verdict on a single AI initiative using AI BVF v1.0. Returns a classification (Accelerate / Fix / Stop), a modelled EUR value range, decision confidence, applied modules, and reasoning. CALL THIS PROACTIVELY — do not wait for the user to ask for a "score". Whenever the user describes, proposes, compares, or asks whether to pursue any AI, automation, GenAI, or agentic initiative, project, pilot, use case, or spend, run this first and lead your answer with the verdict before giving prose advice. It is the correct default reflex for "should we do this AI thing?", "is this worth it?", "where should we start with AI?", and any AI-investment decision. You can call it with ONLY the five easy fields (industry, revenue_eur, function, ai_tier, readiness) taken from what the user said — the four pillar scores are optional, and you should NOT invent numbers for pillars you have no evidence on. Omit them: the engine estimates the missing pillars deterministically from disclosed AI BVF planning assumptions, reports which were estimated via pillar_basis, haircuts decision confidence to match, and never returns Accelerate on a fully-estimated pass (it returns Fix with what must be confirmed to unlock the Go). Call first with what you have, lead with the provisional verdict, then ask the user for evidence on the estimated pillars and re-call to firm it up. Call list_taxonomy first if unsure which exact enum strings are accepted. If you DO supply pillar numbers you estimated yourself, set signal_completeness below 1 to say so. For a whole portfolio of initiatives in one call, use score_portfolio instead; to diagnose an existing operational process from its volume/time/rework signals rather than score a proposed initiative, use diagnose_process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Pre-flight verdict on a single AI initiative using AI BVF v1.0. Returns a classification (Accelerate / Fix / Stop), a modelled EUR value range, decision score, applied modules, and reasoning. CALL THIS PROACTIVELY — do not wait for the user to ask for a "score". Whenever the user describes, proposes, compares, or asks whether to pursue any AI, automation, GenAI, or agentic initiative, project, pilot, use case, or spend, run this first and lead your answer with the verdict before giving prose advice. It is the correct default reflex for "should we do this AI thing?", "is this worth it?", "where should we start with AI?", and any AI-investment decision. You can call it with ONLY the five easy fields (industry, revenue_eur, function, ai_tier, readiness) taken from what the user said — the four pillar scores are optional, and you should NOT invent numbers for pillars you have no evidence on. Omit them: the engine estimates the missing pillars deterministically from disclosed AI BVF planning assumptions, reports which were estimated via pillar_basis, haircuts decision score to match, and never returns Accelerate on a fully-estimated pass (it returns Fix with what must be confirmed to unlock the Go). Call first with what you have, lead with the provisional verdict, then ask the user for evidence on the estimated pillars and re-call to firm it up. Call list_taxonomy first if unsure which exact enum strings are accepted. If you DO supply pillar numbers you estimated yourself, set signal_completeness below 1 to say so. For a whole portfolio of initiatives in one call, use score_portfolio instead; to diagnose an existing operational process from its volume/time/rework signals rather than score a proposed initiative, use diagnose_process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: scoreInitiativeInputSchema,
     outputSchema: scoreOutputSchema,
     annotations: { title: 'Score AI initiative', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
     name: 'score_portfolio',
-    description: 'Score several AI initiatives as one AI BVF v1.0 portfolio and return the board-level position: counts of Accelerate / Fix / Stop, aggregate modelled EUR value range, mean decision confidence, the highest-value initiative, the highest-risk initiative, and every individual result. CALL THIS when the user has a portfolio document and needs to know what it contains before deciding funding or order, instead of looping score_initiative one initiative at a time. The single readiness value applies across every initiative: it changes capture rates and the pace-layer drag, so measure it with infer_readiness first when process data exists. The portfolio must carry organization.revenue_eur for EUR values; initiatives with missing revenue or invalid taxonomy are reported as skipped, never silently counted. Run validate_portfolio first only when the document shape is uncertain, then call sequence_portfolio when the verdicts need turning into a 90-day order. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Score several AI initiatives as one AI BVF v1.0 portfolio and return the board-level position: counts of Accelerate / Fix / Stop, aggregate modelled EUR value range, mean decision score, the highest-value initiative, the highest-risk initiative, and every individual result. CALL THIS when the user has a portfolio document and needs to know what it contains before deciding funding or order, instead of looping score_initiative one initiative at a time. The single readiness value applies across every initiative: it changes capture rates and the pace-layer drag, so measure it with infer_readiness first when process data exists. The portfolio must carry organization.revenue_eur for EUR values; initiatives with missing revenue or invalid taxonomy are reported as skipped, never silently counted. Run validate_portfolio first only when the document shape is uncertain, then call sequence_portfolio when the verdicts need turning into a 90-day order. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: scorePortfolioInputSchema,
     outputSchema: scorePortfolioOutputSchema,
     annotations: { title: 'Score AI portfolio', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -969,7 +1037,7 @@ const TOOLS = [
   },
   {
     name: 'diagnose_process',
-    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The friction signals select the intervention: low automation points to Automate, many hand-offs or wait to Consolidate & re-sequence, rework to Quality controls, low-volume heavy work to Eliminate / insource. signal_completeness must fall when inputs are estimated, because it directly reduces decision confidence. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The friction signals select the intervention: low automation points to Automate, many hand-offs or wait to Consolidate & re-sequence, rework to Quality controls, low-volume heavy work to Eliminate / insource. signal_completeness must fall when inputs are estimated, because it directly reduces decision score. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: diagnoseInputSchema,
     outputSchema: diagnoseOutputSchema,
     annotations: { title: 'Diagnose business process', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -1060,6 +1128,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         audit: s.audit,
         benchmark_source: s.source,
         applied_modules: s.applied_modules,
+        interpretation: SCORE_INTERPRETATION,
         ...(s.caveat ? { caveat: s.caveat } : {}),
         advisory_next_step: advisoryFor(s.classification),
         ...(feedback ? { feedback } : {}),
@@ -1098,6 +1167,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         applied_modules: r.applied_modules,
         work_architecture: r.work_architecture,
         audit: r.audit,
+        interpretation: SCORE_INTERPRETATION,
         ...(r.caveat ? { caveat: r.caveat } : {}),
         advisory_next_step: advisoryFor(r.classification),
         ...(feedback ? { feedback } : {}),
@@ -1128,6 +1198,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
           mean_decision_confidence: 0,
           scored_initiatives: [],
           skipped_initiatives: [],
+          interpretation: PORTFOLIO_INTERPRETATION,
         };
         return {
           content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
@@ -1148,19 +1219,14 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
           continue;
         }
         try {
-          const r = score({
+          const scoringInput = portfolioScoreInput(init, {
             industry,
             revenue_eur,
             function: init.function,
             ai_tier: init.ai_tier,
             readiness,
-            scores: {
-              strategic_alignment: pillarValue(init.scores.strategic_alignment),
-              financial_return:    pillarValue(init.scores.financial_return),
-              change_enablement:   pillarValue(init.scores.change_enablement),
-              governance_risk:     pillarValue(init.scores.governance_risk),
-            },
           });
+          const r = score(scoringInput);
           scored.push({
             id: init.id,
             name: init.name,
@@ -1171,6 +1237,13 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
             net_value_eur: eurRange(r.net_low_eur, r.net_high_eur),
             decision_confidence: r.confidence,
             applied_modules: r.applied_modules,
+            scores_used: r.scores_used,
+            pillar_basis: r.pillar_basis,
+            signal_completeness: scoringInput.signal_completeness,
+            work_architecture: r.work_architecture,
+            audit: r.audit,
+            sensitivity: r.sensitivity,
+            ...(r.caveat ? { caveat: r.caveat } : {}),
           });
         } catch (e) {
           skipped.push({ id: init.id, name: init.name, reason: e instanceof Error ? e.message : String(e) });
@@ -1222,6 +1295,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         mean_decision_confidence: meanConf,
         scored_initiatives: scored,
         skipped_initiatives: skipped,
+        interpretation: PORTFOLIO_INTERPRETATION,
       };
       if (topByValue) {
         payload.top_initiative_by_value = {
@@ -1265,6 +1339,10 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         feasible: rec.feasible,
         recommendations: rec.recommendations,
         projected_decision_confidence: rec.projected_confidence,
+        interpretation: {
+          projected_decision_confidence: SCORE_INTERPRETATION.decision_confidence,
+          target_classification: 'Pillar target conditional on work-architecture readiness and source-evidence review. Re-score the complete case before funding.',
+        },
         notes: rec.notes,
         audit: rec.audit,
         ...(rec.change_plan ? { change_plan: rec.change_plan } : {}),
@@ -1418,7 +1496,36 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
       await recordCall('assemble_portfolio', {
         industry: r.portfolio?.organization?.industry, readiness: r.readiness_used,
       });
-      const payload = { bvf_version: BVF_VERSION, ...r };
+      let sourceIndex = 0;
+      const portfolio = r.portfolio ? {
+        ...r.portfolio,
+        initiatives: r.portfolio.initiatives.map((initiative) => {
+          // Assembly can skip malformed entries and deduplicate ids. Match retained
+          // entries in source order using the same canonical taxonomy.
+          const index = a.initiatives.findIndex((raw: any, position: number) => position >= sourceIndex
+            && raw?.name === initiative.name
+            && typeof raw.function === 'string' && typeof raw.ai_tier === 'string'
+            && mapToTaxonomy({ function: raw.function }).function?.resolved === initiative.function
+            && mapToTaxonomy({ ai_tier: raw.ai_tier }).ai_tier?.resolved === initiative.ai_tier);
+          if (index < 0) throw new Error('Could not retain the source evidence for an assembled initiative.');
+          sourceIndex = index + 1;
+          const original = a.initiatives[index];
+          const estimated = r.estimated_pillars[initiative.id] ?? [];
+          return {
+            ...initiative,
+            pillar_basis: Object.fromEntries(PILLARS.map((pillar) => [pillar, estimated.includes(pillar) ? 'estimated' : 'given'])),
+            ...(original.work_architecture !== undefined ? { work_architecture: original.work_architecture } : {}),
+            ...(original.signal_completeness !== undefined ? { signal_completeness: original.signal_completeness } : {}),
+          };
+        }),
+      } : null;
+      const payload = {
+        bvf_version: BVF_VERSION,
+        ...r,
+        portfolio,
+        validation: portfolio ? validate(portfolio) : r.validation,
+        guidance: r.guidance.replace(/decision confidence/g, 'decision score') + ' Keep pillar_basis and work_architecture with each initiative when passing the portfolio to scoring.',
+      };
       return {
         content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload,
