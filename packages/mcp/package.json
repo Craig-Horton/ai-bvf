@@ -36,7 +36,7 @@
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', 0o755)\"",
     "start": "node dist/index.js",
-    "test": "npm run build && node telemetry-test.mjs"
+    "test": "npm run build && node telemetry-test.mjs && node --test output-test.mjs"
   },
   "dependencies": {
     "@aibvf/core": "0.10.5",

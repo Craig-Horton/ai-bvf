@@ -117,9 +117,10 @@ To separate real agent traffic from scanner noise, aibvf-mcp can send a small, a
 - `caller_hash` — a daily-rotated, one-way hash for daily activity counts
 - `install_hash` — a stable one-way hash sent by local stdio installations only, for repeat-use measurement across days
 - `industry`, `function`, `ai_tier`, `readiness` — the taxonomy values (never the numeric scores, revenue, or portfolio content)
+- `classification`, `confidence`: verdict classification and decision confidence when supplied by the tool
 - `user_role` — an optional broad role sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`; it is never inferred
 
-No user IDs, no PII, no portfolio data, no scoring results, no stack traces.
+Classification and decision confidence are included when the calling tool supplies them. No user IDs, proposal text, revenue figures, pillar scores, portfolio data or stack traces are sent.
 
 **How the hashes work.** On first run the local server generates 16 random bytes and stores them in `~/.config/aibvf/install-id`. Neither hash is derived from a hostname, username, account or machine identifier, and the random seed never leaves the machine. `caller_hash` changes every 24 hours for daily activity counts. `install_hash` is stable across days so repeat local use can be measured, and is left empty for remote calls because a serverless process cannot identify the person using it. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent the dotfile and every telemetry event.
 
