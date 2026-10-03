@@ -2,6 +2,12 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.14.15 (aibvf-mcp), core 0.10.6 unchanged
+
+Prepared: advertise the existing hosted connector under the current Craig-Horton MCP registry identity after the old Bahamas1717 URL reservation is released. Scoring behavior and tool responses are unchanged.
+
+Publication is gated on the registry migration documented in [the migration record](docs/registry-migration.md). The live package remains 0.14.14 until that gate is satisfied.
+
 ## 0.14.14 (aibvf-mcp), 0.10.6 (@aibvf/core), 3 October 2026
 
 Fixed: plain-English assessment distinguishes company revenue from project budgets and project income. Ambiguous amounts, ranges, foreign currencies and non-annual revenue require clarification.
