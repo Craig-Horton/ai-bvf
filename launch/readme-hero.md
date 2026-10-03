@@ -1,7 +1,7 @@
 # README hero source
 
-Use the introduction and first-assessment instructions in the maintained [README.md](../README.md).
+Use the first-assessment section of the maintained [README](../README.md). The opening task is to review one AI investment decision at [aibvf.com/start](https://www.aibvf.com/start), where the first assessment needs no account.
 
-AI BVF starts with a proposal in plain English, resolves decision inputs, tests the work architecture and returns Accelerate, Fix or Stop with modelled EUR value and the next actions. Thirteen tools are available through a local MCP client or the hosted connector.
+Show the verdict, evidence gaps, planning benefit limits and an owned next action. The [worked example](../docs/worked-example.md) is the source for exact numbers and conditional re-score results.
 
-Current setup: [MCP client guide](../packages/mcp/README.md). Current package version: [MCP manifest](../packages/mcp/package.json).
+Technical setup follows the first task: [MCP client guide](../packages/mcp/README.md). Read package versions from the manifests when preparing a release.

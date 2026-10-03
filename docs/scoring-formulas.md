@@ -1,89 +1,115 @@
-# AI BVF v1.0 Scoring Formulas
+# AI BVF scoring formulas
 
-Deterministic, no network, no dependencies. Every output is reproducible from the inputs alone.
+The TypeScript scoring path is deterministic and makes no network calls. The MCP wrapper has separate optional usage telemetry, documented in the [README](../README.md#anonymous-usage-telemetry).
 
-## The Four Pillars
+This page describes the implementation in [score.ts](../packages/js/src/score.ts) and [workArchitecture.ts](../packages/js/src/workArchitecture.ts). Protocol 1.0 identifies the portfolio document format; the engine package version identifies the scoring implementation.
 
-Every initiative is scored on four pillars, 0 to 100, honest self-assessment.
+## Pillars and provenance
 
-1. **Strategic Alignment (SA)** — how clearly this moves a board-level KPI.
-2. **Financial Return (FR)** — strength of the modelled return.
-3. **Change Enablement (CE)** — sponsor in place, owner named, change budget funded.
-4. **Governance Risk (GR)** — regulatory and reputational exposure. Higher value means more risk.
+Each pillar ranges from 0 to 100:
 
-## Classification Rules
+| Pillar | Question |
+|---|---|
+| Strategic Alignment, SA | How clearly does the initiative support a named organisational outcome? |
+| Financial Return, FR | How well does the evidence support the investment case? |
+| Change Enablement, CE | Are the owner, capacity and change work in place? |
+| Governance Risk, GR | What regulatory and operational exposure remains? Higher means more risk. |
 
-Rules are evaluated top to bottom, first match wins.
+Supplied numeric values are marked `given` in `pillar_basis`. This records input provenance; it does not verify the underlying evidence.
 
-```
-if GR >= 70          then Stop    (reason: governance risk above safe threshold)
-if FR <= 20          then Stop    (reason: financial return too thin to justify scope)
-if SA >= 60 and FR >= 60 and CE >= 60 and GR <= 40
-                     then Accelerate
-otherwise            then Fix     (reason: specific gaps named in the output)
-```
+Missing pillars are filled with deterministic planning priors. SA defaults to 50; FR depends on the function's planning range; CE depends on readiness; GR depends on AI tier and regulated context. The response identifies every estimated pillar.
 
-These thresholds are intentional. A 60 floor on the positive pillars forces the business case to actually clear a bar, and a 40 ceiling on governance risk forces risk exposure to be actively contained rather than ignored.
+## Classification and the work architecture gate
 
-## Work architecture gate
+The pillar rules run in this order:
 
-The four pillars test the investment case, and the work architecture gate tests whether the organisation has redesigned the work needed to capture it. The optional evidence covers four checks:
-
-1. The end-to-end workflow has been redesigned around the AI and retained human judgement.
-2. Affected roles, accountabilities and capability expectations have been rewritten.
-3. Decision, override and escalation rights have named human owners.
-4. Performance measures and incentives support the redesigned work.
-
-Each check returns `met`, `gap` or `unknown`. Any explicit gap changes an otherwise Accelerate verdict to Fix and records `gate:work_architecture_gap` in the audit trail. Unknown evidence stays visible and returns the next question, but it does not silently become a gap or a pass. `recommend_improvements` turns stated gaps into the `work-architecture-redesign` play, with an owner, role transition, sequenced actions, stop condition and re-score gate.
-
-## Decision Confidence
-
-A single percentage summarising the strength of the call.
-
-```
-confidence = round( (SA + FR + CE + (100 - GR)) / 4 )
+```text
+GR >= 70 or FR <= 20                            -> Stop
+SA >= 60 and FR >= 60 and CE >= 60 and GR <= 40  -> provisional Accelerate
+all other combinations                        -> Fix
 ```
 
-Higher is better. A confidence of 85 on an Accelerate means every pillar is strong and risk is low; a confidence of 40 on a Fix means three or four pillars are weak at the same time, the fix list will be long.
+The engine then applies the work architecture gate. Accelerate requires all four checks to be supplied as true:
 
-## Gross and Net Value
+- `workflow_redesigned`: the end-to-end workflow has been redesigned.
+- `roles_redesigned`: affected roles and accountabilities have been redesigned.
+- `decision_rights_defined`: human decision, override and escalation rights are defined.
+- `measures_updated`: performance measures support the changed work.
 
-Benefit ranges are modelled as a fraction of annual revenue, adjusted by three multipliers.
+An explicit false value is a gap. An omitted check is unknown; partial, unknown and gap states all block Accelerate and produce Fix when the pillars otherwise clear. A Stop remains Stop.
 
-```
-gross_low  = revenue_eur * (rev.lo + cost.lo) * industry_mult * tier_adj
-gross_high = revenue_eur * (rev.hi + cost.hi) * industry_mult * tier_adj
-net_low    = gross_low  * readiness_capture.low
-net_high   = gross_high * readiness_capture.high
-```
+The engine consumes these declarations and records their status. The accountable team must inspect the evidence supporting each declaration.
 
-- `rev.lo/hi, cost.lo/hi` come from `BASE_RATES[function]`. They are AI BVF planning assumptions, not function-specific rates published or endorsed by an external source.
-- `industry_mult` comes from `IND_MULT[industry][function]`. Universal is 1.0, and every other multiplier is a directional AI BVF assumption.
-- `tier_adj` is 0.55 for gen1 (RPA / classical automation), 1.00 for gen2 (GenAI), 1.35 for gen3 (agentic).
-- `readiness_capture` pulls value through the organisational operating model. Agile captures 85 to 100 percent of modelled benefit, Traditional 50 to 70 percent, Siloed 25 to 40 percent.
+## Decision score
 
-The gap between gross and net is model sensitivity, not an accounting loss. Replace the starting range with an operating baseline, addressable volume, unit economics and an explicit capture rate before using it in a funding decision.
+Compatibility fields named `confidence`, `decision_confidence` and `projected_confidence` contain a rule-based decision score. The score has no calibrated interpretation as a probability that the verdict is correct or that the investment will succeed.
 
-## Pace Layer Diagnostic
+For `score()`, the calculation is:
 
-Annual Organisational Drag Cost in EUR, driven by misalignment between the AI tier being deployed and the operating model running it.
-
-```
-annual_drag_low  = revenue_eur * PACE_DRAG_RATE[ai_tier][readiness].lo
-annual_drag_high = revenue_eur * PACE_DRAG_RATE[ai_tier][readiness].hi
+```text
+base = (SA + FR + CE + (100 - GR)) / 4
+default_signal = 0.5 + 0.125 * number_of_given_pillars
+signal = clamp(explicit_signal_completeness ?? default_signal, 0, 1)
+confidence = round(base * (0.5 + 0.5 * signal))
 ```
 
-Rates range from 0.1 percent (gen1 in an agile org) to 8 percent (gen3 in a siloed org) of annual revenue. Pace gap is classified minimal, moderate, or severe. Directional, not audited, grounded in EY/Oxford six-drivers research and BCG/MIT pace-layer misalignment work.
+With four supplied pillars, the default signal is 1. With no supplied pillars, it is 0.5, giving a 0.75 multiplier on the base score. The output adds an input-quality caveat when signal is below 0.7 and identifies estimated pillars.
 
-## Recommendations
+A high pillar average can coexist with an unresolved work architecture gate. Read the verdict, evidence status and score together.
 
-`recommend_improvements` takes a Stop or Fix and returns the specific pillar raises that would flip the call.
+## Planning benefit and the legacy net fields
 
-- Any pillar below 60 gets a target of 65, a named action, and a rationale citing published evidence.
-- Governance risk above 40 gets a target of 35, action, rationale.
-- `feasible=false` when the gaps are structurally too wide to close (e.g. FR <= 15 would need a 50+ point raise; GR >= 80 would need a 45+ point drop). At that point the honest answer is to scope a different use case.
-- `projected_confidence` shows what the confidence would look like after the raises, letting the reader see whether the work is worth the effort.
+The scorer computes a revenue-based planning scenario:
 
-## Sources and Licensing
+```text
+gross_low  = round(revenue_eur * (rev.lo + cost.lo) * industry_mult * tier_adj)
+gross_high = round(revenue_eur * (rev.hi + cost.hi) * industry_mult * tier_adj)
+net_low    = round(gross_low  * readiness_capture.low)
+net_high   = round(gross_high * readiness_capture.high)
+```
 
-Benchmark ranges cite the source. Industry multipliers and readiness capture rates are calibrated from a mix of McKinsey, BCG, Deloitte, Gartner, Forrester, Accenture, ServiceNow, EY/Oxford, and MIT published research. The schema and the scoring logic are MIT/CC-BY-4.0; the benchmark corpus and certification marks are proprietary.
+The existing `net_low_eur`, `net_high_eur` and MCP `net_value_eur` names are retained for API compatibility. Their meaning is readiness-adjusted planning benefit.
+
+| Input | Implementation |
+|---|---|
+| Function rates | `BASE_RATES[function]`, AI BVF planning assumptions expressed as fractions of annual revenue. |
+| Industry multiplier | `IND_MULT[industry][function]`, a directional model assumption. |
+| Tier adjustment | gen1: 0.55; gen2: 1.00; gen3: 1.35. |
+| Readiness capture | agile: 0.85 to 1.00; traditional: 0.50 to 0.70; siloed: 0.25 to 0.40. |
+
+The calculation has no project-cost deduction, investment schedule, discount rate, revenue-margin conversion or check for overlap between initiatives. It therefore supplies an initial scenario that needs a separate business case.
+
+For a funding decision, build that case from measured baseline, addressable volume, unit economics, delivery cost, recurring operating cost, change cost and an explicit capture schedule. Reconcile shared benefits across initiatives before using portfolio totals.
+
+## Pace-layer scenario
+
+```text
+annual_drag_low  = round(revenue_eur * PACE_DRAG_RATE[ai_tier][readiness].lo)
+annual_drag_high = round(revenue_eur * PACE_DRAG_RATE[ai_tier][readiness].hi)
+```
+
+These directional AI BVF rates range from 0.1% to 8% of annual revenue. The output is a planning scenario for operating-model friction; external research does not publish or validate these rates.
+
+Keep this scenario separate from the readiness-adjusted benefit calculation. Subtracting it automatically would require evidence that it measures a distinct cost and does not duplicate the readiness capture adjustment.
+
+## Improvement plans and re-scoring
+
+The recommendation engine proposes a target of 65 for SA, FR or CE below 60, and a target of 35 for GR above 40. These are proposed evidence positions to work towards, rather than automatic score increases after completing a task.
+
+`projected_confidence` is the pillar average at the proposed targets. Treat it as a scenario and run `score()` again with the evidence, input completeness and work architecture checks that actually exist.
+
+For pillar inputs in the documented 0 to 100 range, the current `feasible` heuristic rejects GR above 75 or FR below 15. This heuristic does not evaluate implementation cost, capacity or a team's ability to deliver the plan.
+
+The work architecture must still clear before Accelerate. A projected target in an improvement response does not replace the final assessment.
+
+## Audit, sensitivity and module labels
+
+The audit records model rules and inputs used for the calculation. Sensitivity reports selected changes to readiness, revenue and pillar thresholds; it does not establish a statistical confidence interval.
+
+`applied_modules` contains implementation labels selected by industry, function and readiness. Labels such as `healthcare_clinical_validation`, `healthcare_hipaa_module` and `financial_dora_module` identify context and do not run a clinical evaluation or legal compliance certification.
+
+## Evidence and rights
+
+The model's evidence register links external research and states its limits. Those studies inform the diagnostic questions; AI BVF's function rates, industry multipliers, readiness capture percentages and drag rates remain disclosed model assumptions.
+
+[LICENSE](../LICENSE) governs repository source code, and [NOTICE](../NOTICE) sets out the specification and trademark exceptions. See [contribution boundaries](../CONTRIBUTING.md#licensing-and-contribution-boundaries) before submitting separately licensed material.

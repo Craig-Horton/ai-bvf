@@ -1,33 +1,34 @@
 # HN launch draft
 
-## Title Options, Ranked
+Status: prepared for review, not posted. Use the [directory submission pack](directory-submission.md) for the separate awesome-mcp-servers submission.
 
-1. Show HN: An MCP server that scores AI initiatives Accelerate, Fix, or Stop
-2. Show HN: aibvf-mcp, open protocol for pre-flight AI portfolio scoring
-3. Show HN: Give your Claude agent a second opinion before it recommends an AI project
+## Title
 
-Recommendation: Option 1. Direct, tells the reader the interface and the output in nine words.
+Show HN: Review an AI proposal with a reproducible decision model
 
-Draft only. Verify current package and registry metadata before posting.
+## Post
 
-## Body
+I built AI BVF to help teams review an AI investment proposal and identify the evidence needed for the next decision.
 
-aibvf-mcp is an open Model Context Protocol server that starts from a proposal in plain English, resolves decision inputs, applies disclosed AI BVF planning assumptions and a readiness capture model, and returns Accelerate, Fix, or Stop with a modelled EUR value range, decision confidence, and an applied-modules list.
+The browser entry point takes a proposal in plain English and returns Stop, Fix or Accelerate, with supplied and estimated inputs, a work architecture check and the next questions. The first assessment needs no account: https://www.aibvf.com/start
 
-Thirteen tools are available over local stdio or the hosted connector. Start with assess_ai_initiative, use recommend_improvements for the change plan, or assemble, score and sequence a portfolio.
+For a technical example, the repository includes an executable healthcare case. Raising the supplied pillar scores still leaves the verdict at Fix until workflow, roles, human decision rights and measures are also evidenced.
 
-Why I built it. I kept watching Claude agents confidently recommend AI deployments with no reference to the business case, no reference to operating model readiness, and no reference to governance exposure. You can ask Claude to write you a one-pager on rolling out agentic discharge coordination in a 800M EUR hospital group and get back an executive summary that reads like a vendor pitch. The scoring belongs in the agent's pre-flight check before the decision.
+The scoring path is deterministic. Its EUR ranges are planning scenarios based on disclosed AI BVF assumptions, and its decision score is a rule-based summary with no calibrated probability interpretation.
 
-The four pillars are Strategic Alignment, Financial Return, Change Enablement, Governance Risk, each 0 to 100, honest self-assessment. The scoring engine runs locally and deterministically. GR >= 70 or FR <= 20 returns Stop; SA, FR and CE >= 60 with GR <= 40 clear the pillar test for Accelerate; anything else returns Fix with a specific gap list.
+The legacy API names include `net_value_eur` and `decision_confidence`. The documentation explains that the former applies a readiness capture factor without deducting project costs, and that the latter is a score.
 
-Accelerate also requires evidence that workflows, roles, human decision rights and measures are ready; partial or missing evidence and stated gaps hold the verdict at Fix. External research provides context for the disclosed AI BVF planning assumptions. Readiness capture rates come from EY/Oxford and Prosci change-success research.
+There are thirteen MCP tools for an assessment, improvement planning and portfolio work. A hosted connector is available at https://mcp.aibvf.com/api/mcp, and local clients can run `npx -y aibvf-mcp`.
 
-recommend_improvements is the answer to "what do I do next." It takes a Stop or Fix and returns the pillar raises that would flip classification toward Accelerate, each with a named action and a rationale. calculate_pace_layer_drag returns the annual Organisational Drag Cost in EUR from running an AI tier that outruns your operating model, so a gen3 agent in a siloed org reads back at 4.5 to 8 percent of revenue in annual structural friction, separate from the AI build cost.
+I am looking for counterexamples: a proposal, the result, the decision you expected, and the evidence for it. The engine and examples can then be tested against the disagreement.
 
-Install: npm install -g aibvf-mcp. Configure your MCP client using packages/mcp/README.md. For claude.ai, add https://mcp.aibvf.com/api/mcp as a custom connector under Settings, Connectors. There is a worked example in docs/worked-example.md with the full math on a healthcare portfolio.
+Source code is MIT licensed, the public specification under `spec/` is CC-BY-4.0, and trademarks have separate terms in NOTICE.
 
-What I want you to tell me I got wrong. The benchmark ranges are directional, they are disclosed planning assumptions, with external research as context, and the industry multipliers are a starting calibration. I would rather argue the numbers in public and improve the protocol than ship a quiet tool no one checks. File an issue or push a PR.
+Browser: https://www.aibvf.com/start  
+Repository: https://github.com/Craig-Horton/ai-bvf  
+Worked example: https://github.com/Craig-Horton/ai-bvf/blob/main/docs/worked-example.md  
+MCP setup: https://github.com/Craig-Horton/ai-bvf/blob/main/packages/mcp/README.md
 
-Repo: https://github.com/Craig-Horton/ai-bvf
-Registry: https://registry.modelcontextprotocol.io/servers?search=aibvf
-Protocol page: https://www.aibvf.com/protocol
+## Checks before posting
+
+Confirm the browser example, hosted tool call, local installation and worked-example assertions on the release being announced. Record the package versions and checks in the release notes, and use only observed pilot outcomes that have publication consent.
