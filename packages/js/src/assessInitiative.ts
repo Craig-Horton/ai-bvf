@@ -37,7 +37,7 @@ const MULTIPLIER: Record<string, number> = {
 };
 
 const SCALE = 'billion|million|thousand|bn|mn|[kmb]';
-const CURRENCY = 'EUR|euros?|USD|dollars?|GBP|pounds?|CHF|AUD|CAD|NZD|SEK|NOK|DKK|JPY|CNY|INR|[€$£¥]';
+const CURRENCY = 'EUR|euros?|USD|dollars?|GBP|pounds?|CHF|AUD|CAD|NZD|SEK|NOK|DKK|JPY|CNY|INR|BRL|RUB|ZAR|AED|SGD|HKD|PLN|CZK|HUF|KRW|ILS|TRY|MXN|TWD|THB|MYR|PHP|IDR|[€$£¥]';
 
 function amount(value: string, scale?: string): number | undefined {
   const compact = value.replace(/ /g, '');
@@ -80,6 +80,8 @@ export function extractRevenueEur(proposal: string): number | undefined {
   const projectRevenueBefore = /\b(?:project|pilot|incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
   const projectRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\b/i;
   const companyAfter = /^\s*(?:(?:global|international|European)\s+)?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit)\b/i;
+  const rangeAfter = new RegExp(String.raw`^\s*(?:[-–—/]|to\b|through\b|or\b)\s*(?:(?:${CURRENCY})\s*)?[0-9]`, 'i');
+  const foreignSuffix = /^\s*(?:[A-Z]{3}\b|dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/;
   const revenues: number[] = [];
   const otherAmounts: number[] = [];
   let unresolved = false;
@@ -96,7 +98,9 @@ export function extractRevenueEur(proposal: string): number | undefined {
     const companySize = euro && companyAfter.test(after);
     if (!labelled && !companySize && !currencies.length) continue;
     const parsed = amount(value, scale);
-    if ((currencies.length && !euro) || /[-−]\s*$/.test(before) || parsed === undefined) {
+    if ((currencies.length && !euro) || /[-−]\s*$/.test(before) || parsed === undefined
+        || rangeAfter.test(after) || /^\s*[0-9]/.test(after)
+        || (!currencies.length && foreignSuffix.test(after))) {
       if (labelled || companySize) unresolved = true;
       continue;
     }

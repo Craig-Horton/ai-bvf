@@ -156,6 +156,8 @@ test('revenue extraction separates company revenue from initiative costs and ben
     'An investment of EUR 2m in a traditional retailer.',
     'Annual revenue USD 300m; project budget EUR 250k.',
     'Revenue 300 million dollars; a EUR 250k pilot.',
+    'Company revenue 300m BRL.',
+    'Company revenue 300m rupees.',
   ]) {
     assert.equal(extractRevenueEur(proposal), undefined, proposal);
   }
@@ -168,6 +170,9 @@ test('conflicting amounts require clarification while repeated equivalent revenu
     'Revenue EUR 300m EUR 400m.',
     'An EUR 300m retailer and an EUR 400m bank.',
     'Revenue EUR 300m and an unexplained EUR 250k.',
+    'Revenue EUR 300-400m.',
+    'Revenue EUR 300m to EUR 400m.',
+    'Revenue EUR 300m or 400m.',
   ]) {
     assert.equal(extractRevenueEur(proposal), undefined, proposal);
   }
@@ -196,6 +201,7 @@ test('revenue extraction handles full scales, decimal commas and grouped EUR amo
   for (const proposal of [
     'Annual revenue EUR 1,200 million.',
     'Annual revenue EUR 1,20,000.',
+    'Annual revenue EUR 12 34 567.',
     'Annual revenue EUR 300m2.',
     'Annual revenue -EUR 300m.',
     'Annual revenue EUR 999999999999999999999 billion.',
