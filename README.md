@@ -13,7 +13,7 @@ The scoring tool your Claude agent calls before it recommends an AI deployment. 
 
 ## What You Get Back
 
-Ask your agent:
+For an assessment with evidenced pillar scores, ask your agent:
 
 > Score a gen2 CX AI initiative for a EUR 400M retailer with traditional readiness, Strategic Alignment 70, Financial Return 50, Change Enablement 55, Governance Risk 45.
 
@@ -28,11 +28,11 @@ Why: Strategic alignment is credible, but change enablement and financial return
 Next: raise Change Enablement by 15 points, name an accountable owner, fund adoption, and rerun recommend_improvements.
 ```
 
-This is the missing pre-flight check for agentic AI work: not "can we build it?", but **should this work survive a board review?**
+The pre-flight check asks whether the initiative can survive a board review. Start with a proposal in plain English, then supply evidence for the inputs the assessment needs.
 
 ## What It Does
 
-Thirteen tools, callable from any MCP-compatible agent over stdio (npx) or as a hosted remote connector at https://mcp.aibvf.com/api/mcp (claude.ai: Settings, Connectors, Add custom connector). The tool count is fixed through 0.15.x while the next two releases improve the route into the verdict.
+Thirteen tools, callable from any MCP-compatible agent over stdio (npx) or as a hosted remote connector at https://mcp.aibvf.com/api/mcp (claude.ai: Settings, Connectors, Add custom connector). Start with `assess_ai_initiative` for a proposal in plain English.
 
 | Tool | Purpose |
 |---|---|
@@ -52,31 +52,39 @@ Thirteen tools, callable from any MCP-compatible agent over stdio (npx) or as a 
 
 The portfolio chain, in order: `assemble_portfolio` gets messy inputs into the right shape, `validate_portfolio` checks the document, `score_portfolio` returns the verdicts, `sequence_portfolio` turns them into a rollout plan. The assembler structures, the scores advise.
 
-## 30-Second Install
+## Start with one AI decision
 
-Run it directly:
+Choose a hosted connector or a local MCP client. Both expose the same thirteen tools.
 
-```bash
-npx -y aibvf-mcp
+### Hosted on claude.ai
+
+In Settings, open Connectors, choose Add custom connector, and paste:
+
+```text
+https://mcp.aibvf.com/api/mcp
 ```
 
-Or install globally:
+### Local with Claude Desktop, Claude Code or Cursor
 
-```bash
-npm install -g aibvf-mcp
-```
-
-Register with Claude Desktop, Claude Code, or any MCP client:
+Use this npx configuration in your MCP client:
 
 ```json
 {
   "mcpServers": {
-    "aibvf": { "command": "aibvf-mcp" }
+    "aibvf": { "command": "npx", "args": ["-y", "aibvf-mcp"] }
   }
 }
 ```
 
-Ask your agent: "score a gen2 CX AI initiative for a 400M EUR retailer, traditional readiness, SA 70, FR 50, CE 55, GR 45," and the agent will call `score_initiative`, return a Fix classification with a concrete gap list, and offer to call `recommend_improvements` next.
+Quit and restart the client after configuring it. Windows needs `cmd /c`; see the [client setup and troubleshooting guide](packages/mcp/README.md#wire-into-claude-desktop--cursor--any-mcp-host).
+
+### Ask for the first assessment
+
+> Assess this AI initiative using AI BVF: we're a EUR 2.4bn manufacturer, planning a GenAI predictive maintenance rollout in our EU plants, we're a traditional hierarchy, strong sponsor, modest change budget.
+
+The agent calls `assess_ai_initiative`, resolves the proposal, and asks for unresolved decision inputs before returning a verdict. Missing pillar scores are estimated and disclosed; supply evidence and rerun the assessment to strengthen the decision.
+
+For a Fix or Stop, ask for `recommend_improvements` to get the actions and named change plays. Accelerate requires evidence that workflows, affected roles, human decision rights and performance measures are ready.
 
 ## Why This Exists
 
@@ -99,9 +107,9 @@ Every initiative is scored on four pillars, 0 to 100, honest self-assessment.
 3. **Change Enablement**, sponsor in place, owner named, change budget funded.
 4. **Governance Risk**, regulatory and reputational exposure. Higher value means more risk.
 
-Rules are deterministic, no network, no dependencies. `GR >= 70` or `FR <= 20` returns Stop, all four pillars at or above 60 with `GR <= 40` returns Accelerate, anything else returns Fix with a specific gap list.
+The scoring engine runs locally and deterministically without network calls. `GR >= 70` or `FR <= 20` returns Stop; `SA >= 60`, `FR >= 60`, `CE >= 60` and `GR <= 40` clear the pillar test for Accelerate; anything else returns Fix with a specific gap list.
 
-The work architecture gate then tests four questions: has the end-to-end workflow been redesigned, have affected roles and accountabilities changed, are human decision and override rights named, and do the measures support the new work? Any explicit gap holds an otherwise green initiative at Fix until the work has been redesigned and re-scored.
+The work architecture gate then tests four questions: has the end-to-end workflow been redesigned, have affected roles and accountabilities changed, are human decision and override rights named, and do the measures support the new work? A gap, a partial assessment or missing work architecture evidence holds an otherwise green initiative at Fix. All four checks must be evidenced as met before Accelerate.
 
 See `docs/scoring-formulas.md` for every formula and `docs/worked-example.md` for a full run on a healthcare portfolio.
 
@@ -135,14 +143,18 @@ Same inputs through `recommendImprovements` return three pillar raises, each wit
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.14.9 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.14.12 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | CI/CD pre-flight gate ("SonarQube for AI") + GitHub Action. |
-| [`@aibvf/core`](packages/js) | 0.10.3 | TypeScript scoring engine, plain-English assessment, work architecture gate, change-leader plans, readiness inference, and Advisor Brain. |
+| [`@aibvf/core`](packages/js) | 0.10.5 | TypeScript scoring engine, plain-English assessment, work architecture gate, change-leader plans, readiness inference, and Advisor Brain. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. |
 
-## Anonymous Usage Telemetry
+## Anonymous usage telemetry
 
-The MCP server reports a small anonymous payload on each tool call (`tool_name`, BVF version, taxonomy fields, a daily-rotated caller hash, and classification plus confidence for `score_initiative`) and a single `server_connect` event when the server first wires into a client. No portfolio content, no revenue figures, no user identifiers. Opt out with `AIBVF_TELEMETRY_DISABLE=1`. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
+The MCP server can report tool calls and a `server_connect` event. Events include protocol and package versions, entry route, assessment stage, work architecture status, taxonomy fields, a daily-rotated caller hash, and classification plus confidence where supplied.
+
+Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement. It comes from a random local seed; hosted calls send no stable install hash. A broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
+
+No portfolio content, revenue figures, numeric pillar scores or personal identifiers are included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
 
 ## Protocol
 
@@ -154,7 +166,7 @@ The benchmark ranges are directional, the industry multipliers are a starting ca
 
 ## License
 
-The scoring engine and the MCP server are **MIT** licensed — see [`LICENSE`](LICENSE). The AI BVF Protocol specification and JSON Schema under `./spec/` are **CC-BY-4.0**, and the "AI BVF" / "AI BVF Certified" names and logo are trademarks; both are covered in [`NOTICE`](NOTICE). The benchmark corpus and certification marks are proprietary.
+The scoring engine and the MCP server are **MIT** licensed, see [`LICENSE`](LICENSE). The AI BVF Protocol specification and JSON Schema under `./spec/` are **CC-BY-4.0**, and the "AI BVF" / "AI BVF Certified" names and logo are trademarks; both are covered in [`NOTICE`](NOTICE). The benchmark corpus and certification marks are proprietary.
 
 ## About The Author
 
