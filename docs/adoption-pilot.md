@@ -6,7 +6,7 @@ Status: execution pack prepared; no teams have been enrolled by this document an
 
 Recruit AI transformation consultants and internal AI portfolio leads who have one live investment decision to review within the next 30 days. Each team needs a decision owner and access to the person who can inspect the affected workflow.
 
-Choose proposals where a team can return with evidence within 30 days. A second proposal is useful later; the first retention check is whether the team returns to the same decision and reviews what changed.
+Choose proposals where a team can return with evidence within 14 days. A second proposal is useful later; the first retention check is whether the team returns to the same decision and reviews what changed.
 
 ## Proposed success criteria
 
@@ -16,7 +16,7 @@ These are pilot thresholds for a cohort of ten enrolled teams, not current adopt
 |---|---:|---|
 | Enrolled teams | 10 | A named participant agrees to bring one live decision and attend the follow-up. |
 | First completed assessment | 8 of 10 | The participant reaches a verdict, can explain its assumptions, and records one next action with an owner and review date. |
-| Return use | 5 of 10 | Within 30 days of first assessment, the team reopens the same decision, updates evidence and completes a re-score. |
+| Return use | 5 of 10 | Within 14 days of first assessment, the team reopens the same decision, updates evidence and completes a re-score. |
 | Consented cases | 2 | The team explicitly approves a written account of the observed decision and what changed. |
 
 Count each team once per measure. Also report returns among first completers, the number reminded, and the number who returned without a reminder.
@@ -58,7 +58,7 @@ Subject: Test one live AI investment decision with AI BVF
 
 > I am testing whether AI BVF helps transformation teams make a clearer decision on an AI proposal, including the evidence needed, who owns the next action and what changes before the next review.
 >
-> Would you bring one live proposal to a 30-minute session, then return within 30 days with the evidence your team can produce? The first browser assessment needs no account, and you can remove confidential details before using it.
+> Would you bring one live proposal to a 30-minute session, then return within 14 days with the evidence your team can produce? The first browser assessment needs no account, and you can remove confidential details before using it.
 >
 > I want to observe where the framework helps and where it gets the decision wrong. Any published case or quotation would require your separate approval.
 >
@@ -108,7 +108,7 @@ T09,,,,,,,,,,,,,,,,,,,
 T10,,,,,,,,,,,,,,,,,,,
 ```
 
-Define enrolled_at as day zero for administration and first_assessment_at as day zero for each team's 30-day return window. Report the denominator, date range and late or incomplete follow-ups with every result.
+Define enrolled_at as day zero for administration and first_assessment_at as day zero for each team's 14-day return window. Report the denominator, date range and late or incomplete follow-ups with every result.
 
 ## Case study template and consent
 
