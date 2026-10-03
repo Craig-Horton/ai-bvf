@@ -1,72 +1,52 @@
-# AI BVF MCP: Stop Bad AI Projects Before Agents Recommend Them
+# AI BVF: review one AI investment decision
 
-The scoring tool your Claude agent calls before it recommends an AI deployment. It checks the business case, operating-model readiness, change enablement, governance exposure and whether the work itself has been redesigned, then returns **Accelerate**, **Fix**, or **Stop** with modelled EUR value, decision confidence, and a specific list of what to do next.
+Turn an AI proposal into a decision brief: the verdict, the evidence gaps and the next action for the person who owns the work.
 
-[![npm](https://img.shields.io/npm/v/aibvf-mcp?color=111&label=npm)](https://www.npmjs.com/package/aibvf-mcp)
-[![mcp registry](https://img.shields.io/badge/mcp--registry-active-111)](https://registry.modelcontextprotocol.io/v0/servers?search=aibvf)
-[![Glama score](https://glama.ai/mcp/servers/Craig-Horton/ai-bvf/badges/score.svg)](https://glama.ai/mcp/servers/Craig-Horton/ai-bvf)
-[![npm downloads](https://img.shields.io/npm/dm/aibvf-mcp?color=111&label=downloads%2Fmo)](https://www.npmjs.com/package/aibvf-mcp)
-[![GitHub stars](https://img.shields.io/github/stars/Craig-Horton/ai-bvf?style=social)](https://github.com/Craig-Horton/ai-bvf/stargazers)
-[![license](https://img.shields.io/badge/license-MIT-111)](LICENSE)
+## Try one proposal in your browser
 
-> If you think AI agents should check business value, governance risk, and change readiness before recommending deployment, [star this repo](https://github.com/Craig-Horton/ai-bvf/stargazers). The signal helps other agents discover the BVF and keeps the benchmarks improving in public.
+Open [aibvf.com/start](https://www.aibvf.com/start). Your first assessment needs no account or installation.
 
-## What You Get Back
+Paste this synthetic example, or describe a proposal you are reviewing:
 
-For an assessment with evidenced pillar scores, ask your agent:
+> We are a EUR 2.4bn manufacturer considering GenAI for predictive maintenance in our supply chain. Our operating model is traditional. We have a sponsor, but the affected roles, human override rights and performance measures still need review.
 
-> Score a gen2 CX AI initiative for a EUR 400M retailer with traditional readiness, Strategic Alignment 70, Financial Return 50, Change Enablement 55, Governance Risk 45.
+Run the assessment, check how the proposal was interpreted, and correct the assumptions. The assessment asks for unresolved inputs and marks estimated pillar scores. Keep the action list, name an owner and return with evidence when the work changes.
 
-Expected shape of the answer:
+### The decision brief
 
-```text
-Classification: Fix
-Decision confidence: 54
-Net value range: EUR 10.8M-EUR 37.8M
-Applied modules: four_pillar_base, readiness_capture_traditional, retail_cx_benchmark
-Why: Strategic alignment is credible, but change enablement and financial return are not yet strong enough to defend an Accelerate call.
-Next: raise Change Enablement by 15 points, name an accountable owner, fund adoption, and rerun recommend_improvements.
-```
+The result brings the following questions together. This is an illustrative reading guide for the example, with the engine's field names documented below.
 
-The pre-flight check asks whether the initiative can survive a board review. Start with a proposal in plain English, then supply evidence for the inputs the assessment needs.
-
-## What It Does
-
-Thirteen tools, callable from any MCP-compatible agent over stdio (npx) or as a hosted remote connector at https://mcp.aibvf.com/api/mcp (claude.ai: Settings, Connectors, Add custom connector). Start with `assess_ai_initiative` for a proposal in plain English.
-
-| Tool | Purpose |
+| Part of the brief | What to review |
 |---|---|
-| `assess_ai_initiative` | Plain-English front door for one AI decision: resolves the five scoring inputs, tests the work architecture, asks once for every unresolved input, then returns the verdict. |
-| `score_initiative` | Four-pillar score plus a work architecture gate returns Accelerate, Fix, or Stop with EUR value range, decision confidence, applied modules and reasoning. |
-| `score_portfolio` | Scores every initiative in a BVF portfolio in one call and returns the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision confidence, top initiative by value, highest-risk initiative. |
-| `assemble_portfolio` | Assembles a valid BVF v1.0 portfolio document from loose inputs: names, plain-language functions and tiers, and whatever pillar scores exist. Aliases resolved, ids generated, missing pillars estimated with the estimation reported per initiative, document validated before return. Nothing stored, nothing edited. |
-| `recommend_improvements` | For Stop or Fix, returns the pillar raises and named change plays, including workflow and role redesign when the work architecture has a gap. |
-| `calculate_pace_layer_drag` | Annual Organisational Drag Cost in EUR from AI-tier vs operating-model misalignment. |
-| `validate_portfolio` | Validates a portfolio JSON document against the BVF v1.0 schema. |
-| `get_benchmark` | Looks up the disclosed AI BVF planning rates for a business function and industry, with evidence status and use guidance. |
-| `list_taxonomy` | Returns valid values for industries, functions, AI tiers, readiness levels. |
-| `diagnose_process` | AI BVF Advisor Brain: diagnoses one business process from observed signals (volume, labour, cycle time, handoffs, rework, automation, spend) and returns heaviness, intervention, net EUR saving, efficiency gain, verdict, and decision confidence. |
-| `infer_readiness` | Measures organisational readiness from process signals (hand-offs, rework, touch ratio, automation, cycle time vs function medians) instead of accepting self-report. Returns the classification the data supports, per-signal reasoning, and a confidence set by coverage and agreement. When the measured answer is lower than the claimed one, that gap is itself a change-readiness finding. |
-| `sequence_portfolio` | Turns a scored portfolio into a three-wave rollout plan with named gates: Stops first (free the budget), quick Accelerates second (buy trust), complex work and Fixes third. Enforces change capacity per function, because ten good ideas can still break an organisation if they all land in one place. |
-| `map_to_taxonomy` | Maps everyday business language (customer service, procurement, banking, GenAI copilot, bureaucratic) onto the canonical enums, deterministically, with suggestions instead of guesses when there is no confident match. |
+| Verdict | Stop, Fix or Accelerate, with the rule that produced the call. An initial proposal with estimated pillars remains provisional. |
+| Evidence gaps | Which inputs were supplied, which were estimated, and what remains unknown about workflow, roles, decision rights and measures. |
+| Planning benefit | A readiness-adjusted EUR scenario. Build costs, operating costs, change costs and financial timing still need a separate business case. |
+| Decision score | A 0 to 100 summary of pillar inputs and input completeness. It has no calibrated probability interpretation. |
+| Next action | The evidence or work change needed before another review, with an accountable owner assigned by the team. |
 
-The portfolio chain, in order: `assemble_portfolio` gets messy inputs into the right shape, `validate_portfolio` checks the document, `score_portfolio` returns the verdicts, `sequence_portfolio` turns them into a rollout plan. The assembler structures, the scores advise.
+For the example above, the first useful action is to evidence the proposed workflow and its owners. An Accelerate verdict requires the pillar thresholds to clear and all four work architecture checks to be met.
 
-## Start with one AI decision
+[See the reproducible worked example](docs/worked-example.md) for exact inputs, calculations and a re-score that stays at Fix until the work architecture is evidenced.
 
-Choose a hosted connector or a local MCP client. Both expose the same thirteen tools.
+## Bring the assessment into your existing workflow
 
-### Hosted on claude.ai
+The browser is the first-use route. The hosted connector and local MCP package let an assistant repeat the assessment while you work on a proposal.
 
-In Settings, open Connectors, choose Add custom connector, and paste:
+### Hosted connector on claude.ai
+
+Open Settings, then Connectors, then Add custom connector, and paste:
 
 ```text
 https://mcp.aibvf.com/api/mcp
 ```
 
+Then ask:
+
+> Assess this AI initiative using AI BVF: we are a EUR 2.4bn manufacturer considering GenAI predictive maintenance, with a traditional operating model. Resolve the inputs, show the assumptions and identify the evidence needed for the next decision.
+
 ### Local with Claude Desktop, Claude Code or Cursor
 
-Use this npx configuration in your MCP client:
+Add this configuration to your MCP client:
 
 ```json
 {
@@ -76,98 +56,87 @@ Use this npx configuration in your MCP client:
 }
 ```
 
-Quit and restart the client after configuring it. Windows needs `cmd /c`; see the [client setup and troubleshooting guide](packages/mcp/README.md#wire-into-claude-desktop--cursor--any-mcp-host).
+Quit and restart the client. Windows uses `cmd /c`; the [client setup and troubleshooting guide](packages/mcp/README.md#wire-into-claude-desktop--cursor--any-mcp-host) contains the complete configuration.
 
-### Ask for the first assessment
+Start with `assess_ai_initiative`. Use `recommend_improvements` for a Fix or Stop, review the proposed actions with the people who own the work, and re-score after the evidence changes.
 
-> Assess this AI initiative using AI BVF: we're a EUR 2.4bn manufacturer, planning a GenAI predictive maintenance rollout in our EU plants, we're a traditional hierarchy, strong sponsor, modest change budget.
+## How to read a result
 
-The agent calls `assess_ai_initiative`, resolves the proposal, and asks for unresolved decision inputs before returning a verdict. Missing pillar scores are estimated and disclosed; supply evidence and rerun the assessment to strengthen the decision.
+AI BVF is a deterministic planning model with disclosed assumptions. The source and formulas can be inspected, and identical inputs produce identical outputs for a given engine version.
 
-For a Fix or Stop, ask for `recommend_improvements` to get the actions and named change plays. Accelerate requires evidence that workflows, affected roles, human decision rights and performance measures are ready.
+The four pillars are Strategic Alignment, Financial Return, Change Enablement and Governance Risk. `GR >= 70` or `FR <= 20` returns Stop; `SA >= 60`, `FR >= 60`, `CE >= 60` and `GR <= 40` clear the pillar test for Accelerate. A gap, partial assessment or missing work architecture evidence holds an otherwise green initiative at Fix.
 
-## Why This Exists
+Keep these boundaries with the result:
 
-Agents confidently recommend AI projects with no reference to the business case, no reference to operating-model readiness, and no reference to governance exposure. The scoring belongs upstream of the slide deck, inside the agent's pre-flight check before the budget gets committed.
+- **Decision score.** Existing API fields `confidence`, `decision_confidence` and `projected_confidence` retain their names for compatibility. These are rule-based scores, with no measured probability of project success or prediction accuracy.
+- **Planning benefit.** The scorer's `net_low_eur`, `net_high_eur` and MCP `net_value_eur` apply a readiness capture assumption to a revenue-based benefit scenario. Project costs, margins, timing and overlap are outside that calculation.
+- **Research context.** External research informs the questions. It does not publish or validate the AI BVF function rates, industry multipliers, readiness capture percentages or drag rates.
+- **Module labels.** `applied_modules` records implementation context. Labels such as `healthcare_clinical_validation` and `financial_dora_module` do not perform clinical validation or certify regulatory compliance.
+- **Supplied evidence.** The engine records supplied values and work architecture checks. The organisation remains responsible for reviewing the evidence behind them.
 
-The protocol is open, the benchmarks cite McKinsey, Gartner, BCG, Deloitte, Forrester, Accenture, ServiceNow, and readiness capture rates come from EY/Oxford and Prosci change-success research.
+Read the [scoring formulas](docs/scoring-formulas.md) and [worked example](docs/worked-example.md) before using the outputs in a funding decision.
 
-## About The Methodology
+## Tools for developers
 
-aibvf-mcp is the runtime arm of the AI Business Value Framework, the methodology I have been building since going independent in 2024 to evaluate AI investments against the measurable outcomes that survive a board review. The framework sits inside the AI Readiness Blueprint, a six-driver diagnostic informed by the EY/Oxford research on transformation success. The weekly applied case studies live in The Transformation Brief, where the calibration gets argued in public.
+Thirteen tools are exposed through local stdio and the hosted Streamable HTTP connector.
 
-The advisory practice puts the framework in front of senior leaders making AI investment decisions inside enterprises with EUR 500m or more revenue. The MCP server makes the same scoring available to anyone running a Claude agent.
+| Tool | Purpose |
+|---|---|
+| `assess_ai_initiative` | Resolve a plain-English proposal, request missing decision inputs and return the assessment. |
+| `score_initiative` | Score explicit inputs, apply the work architecture gate, and return reasoning, audit and sensitivity. |
+| `recommend_improvements` | Propose pillar actions and work redesign steps for a Fix or Stop. Re-score evidence before accepting a projected outcome. |
+| `assemble_portfolio` | Structure loose portfolio inputs, resolve aliases and disclose estimated pillars. |
+| `validate_portfolio` | Validate a portfolio document against the published JSON Schema. |
+| `score_portfolio` | Score a portfolio and return its aggregate shape. Review benefit overlap before using a total. |
+| `sequence_portfolio` | Produce rollout waves with change-capacity constraints and named gates. |
+| `diagnose_process` | Evaluate observed process signals and return an intervention with its modelled effect. |
+| `infer_readiness` | Infer a readiness classification from supplied process signals and report coverage. |
+| `calculate_pace_layer_drag` | Return a directional scenario for operating-model friction using disclosed rates. |
+| `get_benchmark` | Return AI BVF planning rates with evidence status and use guidance. |
+| `list_taxonomy` | List the accepted industries, functions, AI tiers and readiness levels. |
+| `map_to_taxonomy` | Map everyday business terms to the supported taxonomy and expose unresolved terms. |
 
-## The Four Pillars
+For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio`, then `sequence_portfolio`. An aggregate modelled range needs a separate review of overlapping work and shared benefits.
 
-Every initiative is scored on four pillars, 0 to 100, honest self-assessment.
-
-1. **Strategic Alignment**, how clearly this moves a board-level KPI.
-2. **Financial Return**, strength of the modelled return.
-3. **Change Enablement**, sponsor in place, owner named, change budget funded.
-4. **Governance Risk**, regulatory and reputational exposure. Higher value means more risk.
-
-The scoring engine runs locally and deterministically without network calls. `GR >= 70` or `FR <= 20` returns Stop; `SA >= 60`, `FR >= 60`, `CE >= 60` and `GR <= 40` clear the pillar test for Accelerate; anything else returns Fix with a specific gap list.
-
-The work architecture gate then tests four questions: has the end-to-end workflow been redesigned, have affected roles and accountabilities changed, are human decision and override rights named, and do the measures support the new work? A gap, a partial assessment or missing work architecture evidence holds an otherwise green initiative at Fix. All four checks must be evidenced as met before Accelerate.
-
-See `docs/scoring-formulas.md` for every formula and `docs/worked-example.md` for a full run on a healthcare portfolio.
-
-## Example: Scoring an Agentic Healthcare Initiative
-
-```js
-import { score, recommendImprovements, calculatePaceLayerDrag } from '@aibvf/core';
-
-const r = score({
-  industry: 'healthcare',
-  revenue_eur: 800_000_000,
-  function: 'cx',
-  ai_tier: 'gen3',
-  readiness: 'traditional',
-  scores: {
-    strategic_alignment: 75,
-    financial_return:    55,
-    change_enablement:   40,
-    governance_risk:     55,
-  },
-});
-// { classification: 'Fix', net_low_eur: 23_760_000, net_high_eur: 83_160_000,
-//   confidence: 54, applied_modules: ['four_pillar_base',
-//   'readiness_capture_traditional', 'healthcare_clinical_validation',
-//   'healthcare_regulatory_overhead'], ... }
-```
-
-Pass the same inputs to `recommendImprovements` to get the pillar actions and work redesign plan. Accelerate requires evidence that the workflow, affected roles, human decision rights and performance measures are ready; completing the pillar actions alone does not clear that gate. `calculatePaceLayerDrag({ revenue_eur: 800_000_000, ai_tier: 'gen3', readiness: 'traditional' })` returns 20M to 36M EUR of annual Organisational Drag Cost, the structural friction cost of running gen3 in a traditional operating model, separate from the AI build.
-
-## Packages
+## Packages and public specification
 
 | Package | Version | Purpose |
 |---|---|---|
 | [`aibvf-mcp`](packages/mcp) | 0.14.13 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
-| [`aibvf-check`](packages/cli) | 0.1.1 | CI/CD pre-flight gate ("SonarQube for AI") + GitHub Action. |
-| [`@aibvf/core`](packages/js) | 0.10.5 | TypeScript scoring engine, plain-English assessment, work architecture gate, change-leader plans, readiness inference, and Advisor Brain. |
-| [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. |
+| [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
+| [`@aibvf/core`](packages/js) | 0.10.5 | TypeScript assessment and scoring engine. |
+| [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
+
+The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.
+
+[Protocol page](https://www.aibvf.com/protocol) · [npm package](https://www.npmjs.com/package/aibvf-mcp) · [MCP registry](https://registry.modelcontextprotocol.io/v0/servers?search=aibvf) · [Release history](CHANGELOG.md)
 
 ## Anonymous usage telemetry
 
 The MCP server can report tool calls and a `server_connect` event. Events include protocol and package versions, entry route, assessment stage, work architecture status, taxonomy fields, a daily-rotated caller hash, and classification plus confidence where supplied.
 
-Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement. It comes from a random local seed; hosted calls send no stable install hash. A broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
+Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement, derived from a random local seed. Hosted calls send no stable install hash, and a broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
 
 No portfolio content, revenue figures, numeric pillar scores or personal identifiers are included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
 
-## Protocol
+Package downloads include repeat installs, dependencies and automation. Use completed assessments and subsequent decision reviews to evaluate adoption.
 
-Full schema at `spec/bvf-protocol.schema.json`. Protocol page at [www.aibvf.com/protocol](https://www.aibvf.com/protocol).
+## Contribute a case or a correction
 
-## Contributing
+Bring a reproducible counterexample: the inputs, actual output, expected decision, supporting evidence and engine version. The [contribution guide](CONTRIBUTING.md) includes a template and explains the review and licensing boundaries.
 
-The benchmark ranges are directional, the industry multipliers are a starting calibration, and the protocol depends on public review to improve. File an issue or push a PR. The calibration will argue itself out in public.
+The [ten-team pilot pack](docs/adoption-pilot.md) defines the first-use and return-use checks, interview prompts and tracker. Examples in this repository are synthetic unless a case explicitly records consent and its evidence.
+
+If AI BVF helped you review a decision, [star the repository](https://github.com/Craig-Horton/ai-bvf) or share a counterexample. Both give the project useful feedback.
 
 ## License
 
-The scoring engine and the MCP server are **MIT** licensed, see [`LICENSE`](LICENSE). The AI BVF Protocol specification and JSON Schema under `./spec/` are **CC-BY-4.0**, and the "AI BVF" / "AI BVF Certified" names and logo are trademarks; both are covered in [`NOTICE`](NOTICE). The benchmark corpus and certification marks are proprietary.
+Repository source code is MIT licensed under [LICENSE](LICENSE). The specification and JSON Schema under `spec/` are CC-BY-4.0, and the AI BVF names and logo are trademarks, as set out in [NOTICE](NOTICE).
 
-## About The Author
+Private benchmark material and certification marks are outside the source-code contribution route. The [contribution guide](CONTRIBUTING.md#licensing-and-contribution-boundaries) explains how to discuss those materials without changing the rights granted by the repository licenses.
 
-Craig Horton is an independent transformation lead based in Amsterdam, with twenty years supplier-side at HPE, Atos, Microsoft, Salesforce, and Accenture. He runs Craig Horton Advisory and writes The Transformation Brief, a weekly publication for senior leaders making AI investment decisions, with executive education at Saïd Business School, Oxford, and an AMBA-accredited Global Executive MBA with AI in progress at the University of Hertfordshire. Find the Brief at [brief.craighortonadvisory.com](https://brief.craighortonadvisory.com), and reach out at [linkedin.com/in/Craig-Horton-ai](https://linkedin.com/in/Craig-Horton-ai).
+## About the author
+
+Craig Horton is an independent transformation lead based in Amsterdam and the author of the AI Business Value Framework. His work connects AI investment decisions with organisational readiness and the redesign of work.
+
+[The Transformation Brief](https://brief.craighortonadvisory.com) · [Craig Horton on LinkedIn](https://linkedin.com/in/Craig-Horton-ai)

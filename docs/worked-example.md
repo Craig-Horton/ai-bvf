@@ -1,104 +1,151 @@
-# Worked Example: Scoring a Healthcare AI Portfolio
+# Worked example: an AI decision that needs evidence
 
-A regional hospital group, 800m EUR revenue, evaluates three initiatives. This walk-through shows every number the scorer produces and how.
+This synthetic healthcare example shows the current TypeScript scoring rules. It is a reproducible calculation, with no customer outcome or clinical validation claim.
 
-## Organisation
+An organisation with EUR 800M annual revenue is considering agentic discharge coordination. The example uses the healthcare industry, customer-experience function, gen3 tier and traditional readiness.
 
-- Name: Regional Hospital Group
-- Industry: healthcare
-- Revenue: 800,000,000 EUR
-- Readiness: traditional (the default for a hospital group with strong clinical governance but slow budget cycles)
+## First assessment
 
-## Initiative 1: Clinical Documentation GenAI
+Assume a reviewer supplies these pillar scores after reviewing the proposal:
 
-Function: cx (patient-facing). AI tier: gen2. Scores: SA 80, FR 70, CE 65, GR 35.
+| Pillar | Value |
+|---|---:|
+| Strategic Alignment | 75 |
+| Financial Return | 55 |
+| Change Enablement | 40 |
+| Governance Risk | 55 |
 
-### Step-by-step scoring
+No work architecture checks are supplied. The result is **Fix**, with four unknown work architecture checks and a decision score of **54**.
 
-- `BASE_RATES.cx` = rev 2–5%, cost 2–5%, so `rev.lo + cost.lo = 0.04`, `rev.hi + cost.hi = 0.10`.
-- `IND_MULT.healthcare.cx` = 1.1.
-- `TIER_ADJ.gen2` = 1.00.
-- `READINESS_CAPTURE.traditional` = low 0.50, high 0.70.
-
-```
-gross_low  = 800,000,000 * 0.04 * 1.1 * 1.00 = 35,200,000 EUR
-gross_high = 800,000,000 * 0.10 * 1.1 * 1.00 = 88,000,000 EUR
-net_low    = 35,200,000 * 0.50 = 17,600,000 EUR
-net_high   = 88,000,000 * 0.70 = 61,600,000 EUR
+```text
+round((75 + 55 + 40 + (100 - 55)) / 4) = 54
 ```
 
-### Classification
+All four pillars are supplied, so the default input-completeness multiplier is 1. The score describes those inputs and does not estimate the probability of success.
 
-- GR 35 < 70, FR 70 > 20 → not a Stop.
-- SA 80, FR 70, CE 65, GR 35 → all four pillars clear → **Accelerate**.
-- Confidence = round((80 + 70 + 65 + (100 - 35)) / 4) = **70**.
+## Planning benefit calculation
 
-### Applied modules
+The disclosed planning assumptions are:
 
-`four_pillar_base`, `readiness_capture_traditional`, `healthcare_clinical_validation`, `healthcare_regulatory_overhead`.
+```text
+cx revenue rate: 0.02 to 0.05
+cx cost rate: 0.02 to 0.05
+healthcare / cx multiplier: 1.1
+gen3 multiplier: 1.35
+traditional readiness capture: 0.50 to 0.70
 
-## Initiative 2: Agentic Discharge Coordination
-
-Function: cx. AI tier: gen3. Scores: SA 75, FR 55, CE 40, GR 55.
-
-### Scoring
-
-```
-gross_low  = 800,000,000 * 0.04 * 1.1 * 1.35 = 47,520,000 EUR
-gross_high = 800,000,000 * 0.10 * 1.1 * 1.35 = 118,800,000 EUR
-net_low    = 47,520,000 * 0.50 = 23,760,000 EUR
-net_high   = 118,800,000 * 0.70 = 83,160,000 EUR
+gross_low  = round(800,000,000 * 0.04 * 1.1 * 1.35) = 47,520,000
+gross_high = round(800,000,000 * 0.10 * 1.1 * 1.35) = 118,800,000
+net_low    = round(47,520,000 * 0.50)               = 23,760,000
+net_high   = round(118,800,000 * 0.70)              = 83,160,000
 ```
 
-### Classification
+The API's `net_low_eur` and `net_high_eur` fields therefore return EUR 23.76M to EUR 83.16M of readiness-adjusted planning benefit. Delivery costs, operating costs, change costs, margins and financial timing have not been deducted or modelled.
 
-- GR 55 is between 40 and 70: not fatal but not clear.
-- FR 55 is below the 60 floor, CE 40 is below the 60 floor.
-- Classification: **Fix**. Reason: financial return is thin; change enablement is a risk; governance exposure is real. Close the gap before scaling.
-- Confidence = round((75 + 55 + 40 + 45) / 4) = **54**.
+This large revenue-based scenario requires replacement with measured process volumes and unit economics before funding. The healthcare module labels in the response do not validate the clinical use case or determine its legal classification.
 
-### What to do next (recommend_improvements output)
+## Turn the assessment into an owned action
 
-- Financial Return: current 55, target 65, action "Rebuild the business case with itemised gross benefit, change cost line, and readiness-adjusted capture rate." Rationale: weak FR usually means capture rate has been assumed away.
-- Change Enablement: current 40, target 65, action "Fund CM at 15 to 25 percent of initiative spend and assign a named product owner with capacity." Rationale: Prosci and EY/Oxford evidence on CM funding.
-- Governance Risk: current 55, target 35, action "Commission a pre-deployment governance review covering data lineage, model risk, EU AI Act classification, and human-in-the-loop design." Rationale: agentic systems in clinical coordination fall inside EU AI Act high-risk.
+An illustrative action record for the team is:
 
-Projected confidence after the raises: **68** (up from 54). Target classification: **Accelerate**. Feasible: true.
+| Item | Proposed next step |
+|---|---|
+| Financial case | Finance owner measures addressable discharge-coordination work and costs the delivery and recurring operation. |
+| Change work | Operations owner documents capacity, training and changed accountabilities. |
+| Governance | Relevant clinical and governance owners review intended use, data, oversight and applicable obligations. |
+| Work architecture | Workflow owner records the redesigned workflow, roles, human decision rights and performance measures. |
+| Re-score point | Review those records together before changing the pillar scores or the four work checks. |
 
-## Initiative 3: Predictive No-Show Model for Radiology Scheduling
+Owners and dates must be assigned by the team. Completing an action does not mechanically award the engine's target score.
 
-Function: risk. AI tier: gen1. Scores: SA 55, FR 15, CE 40, GR 20.
+## Re-score the evidence
 
-### Scoring
+If the supplied pillars become SA 75, FR 65, CE 65 and GR 35, the decision score becomes 68. The result remains **Fix** while the work architecture checks are missing.
 
+Only when all four work checks are also supplied as evidenced true does this example return **Accelerate**. This is a conditional model result; the organisation still owns the funding decision and the verification of its evidence.
+
+| Stage | Pillars, SA / FR / CE / GR | Work architecture | Verdict | Decision score |
+|---|---|---|---|---:|
+| Initial review | 75 / 55 / 40 / 55 | Four unknown checks | Fix | 54 |
+| Pillars strengthened | 75 / 65 / 65 / 35 | Four unknown checks | Fix | 68 |
+| Work changes evidenced | 75 / 65 / 65 / 35 | Four checks met | Accelerate | 68 |
+
+The modelled benefit range stays the same across these three stages because the revenue, function, industry, tier and readiness inputs remain the same. This demonstrates why the benefit range needs a separate costed business case.
+
+## Run the example against the built source
+
+From a checkout of this repository, run `npm ci`, `npm run build`, then `node scripts/check-worked-example.mjs`. The checker reads and executes this exact JavaScript block against the built local engine:
+
+```js
+import assert from 'node:assert/strict';
+import { score, calculatePaceLayerDrag } from './packages/js/dist/index.js';
+
+const initial = {
+  industry: 'healthcare',
+  revenue_eur: 800_000_000,
+  function: 'cx',
+  ai_tier: 'gen3',
+  readiness: 'traditional',
+  scores: {
+    strategic_alignment: 75,
+    financial_return: 55,
+    change_enablement: 40,
+    governance_risk: 55,
+  },
+};
+const stronger = {
+  ...initial,
+  scores: {
+    strategic_alignment: 75,
+    financial_return: 65,
+    change_enablement: 65,
+    governance_risk: 35,
+  },
+};
+const evidenced = {
+  ...stronger,
+  work_architecture: {
+    workflow_redesigned: true,
+    roles_redesigned: true,
+    decision_rights_defined: true,
+    measures_updated: true,
+  },
+};
+
+const stages = [initial, stronger, evidenced].map(score);
+assert.deepEqual(stages.map(r => r.classification), ['Fix', 'Fix', 'Accelerate']);
+assert.deepEqual(stages.map(r => r.confidence), [54, 68, 68]);
+assert.deepEqual(stages.map(r => r.work_architecture.status), ['unknown', 'unknown', 'ready']);
+assert.equal(stages[0].work_architecture.unknowns.length, 4);
+for (const result of stages) {
+  assert.equal(result.gross_low_eur, 47_520_000);
+  assert.equal(result.gross_high_eur, 118_800_000);
+  assert.equal(result.net_low_eur, 23_760_000);
+  assert.equal(result.net_high_eur, 83_160_000);
+  assert.ok(result.audit);
+  assert.ok(result.sensitivity);
+}
+const drag = calculatePaceLayerDrag({
+  revenue_eur: initial.revenue_eur,
+  ai_tier: initial.ai_tier,
+  readiness: initial.readiness,
+});
+assert.equal(drag.annual_drag_eur_low, 20_000_000);
+assert.equal(drag.annual_drag_eur_high, 36_000_000);
+console.table(stages.map(r => ({
+  verdict: r.classification,
+  decision_score: r.confidence,
+  work_architecture: r.work_architecture.status,
+  planning_benefit_low_eur: r.net_low_eur,
+  planning_benefit_high_eur: r.net_high_eur,
+})));
+console.log('Worked-example assertions passed.');
 ```
-gross_low  = 800,000,000 * 0.025 * 1.4 * 0.55 = 15,400,000 EUR
-gross_high = 800,000,000 * 0.050 * 1.4 * 0.55 = 30,800,000 EUR
-net_low    = 15,400,000 * 0.50 = 7,700,000 EUR
-net_high   = 30,800,000 * 0.70 = 21,560,000 EUR
-```
 
-### Classification
+The Test workflow executes this block after the package build and test suite. A missing example, a changed verdict or a different published number fails the check.
 
-- FR 15 is at or below 20 → **Stop**. Reason: financial return too thin to justify scope.
-- Confidence = round((55 + 15 + 40 + 80) / 4) = **48**.
+## Keep the drag scenario separate
 
-### What to do next
+For gen3 and traditional readiness, the drag model applies 2.5% to 4.5% of revenue, producing EUR 20M to EUR 36M. These are AI BVF planning rates with no measured organisation-specific cost basis in this example.
 
-`recommend_improvements` returns `feasible=true`, because the FR gap is 50 points (RAISE_TARGET 65 minus current 15) which is at the edge of feasibility. The recommendation flags that the business case probably has an assumed capture rate that would not survive a readiness check. The honest answer here is either rebuild the case at a gen2 tier so the benefit range actually earns its place, or scope a different use case.
-
-## Pace Layer Diagnostic for this organisation
-
-Inputs: revenue 800m EUR, tier gen3 (the agentic initiative above), readiness traditional.
-
-```
-PACE_DRAG_RATE.gen3.traditional = lo 2.5%, hi 4.5%
-annual_drag_low  = 800,000,000 * 0.025 = 20,000,000 EUR
-annual_drag_high = 800,000,000 * 0.045 = 36,000,000 EUR
-```
-
-Pace gap: **severe**. The cost of running gen3 in a traditional operating model is 20 to 36m EUR annually in structural friction alone, separate from the cost of the AI build. This is the number a CFO sees and understands.
-
-## What this tells the executive
-
-The portfolio looks like 86m to 230m of net value on paper across three initiatives. After pace-layer drag on the agentic one, real net is 50 to 130m, with 20 to 36m lost per year if the operating model stays where it is. The honest call: accelerate initiative 1 now, fix initiative 2 before it scales, stop initiative 3 until the business case is rebuilt, and invest in moving readiness from traditional toward agile so the pace-layer tax stops compounding.
+Do not automatically subtract that range from readiness-adjusted planning benefit. Establish its distinct cost basis and check for overlap with the capture adjustment before including it in an investment model.
