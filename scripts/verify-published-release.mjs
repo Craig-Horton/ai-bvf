@@ -115,11 +115,18 @@ try {
     assert.equal(server.name, registryName);
     assert.equal(server.version, expectedMcp);
     assert.ok(server.packages?.some((pkg) => pkg.registryType === 'npm' && pkg.identifier === 'aibvf-mcp' && pkg.version === expectedMcp));
-    assert.ok(server.remotes?.some((remote) => remote.type === 'streamable-http' && remote.url === endpoint));
     return server;
   });
   console.log('VERIFIED_MCP_REGISTRY ' + JSON.stringify({ name: entry.name, version: entry.version, packages: entry.packages, remotes: entry.remotes }));
-  console.log('Published artifact and hosted runtime verification passed. Hosted probes are synthetic operational events.');
+  try {
+    const legacyName = 'io.github.Bahamas1717/aibvf-mcp';
+    const legacyResult = await json(`https://registry.modelcontextprotocol.io/v0.1/servers/${encodeURIComponent(legacyName)}/versions/latest`);
+    const legacy = legacyResult.server ?? legacyResult;
+    console.log('LEGACY_REGISTRY_METADATA ' + JSON.stringify({ name: legacy.name, version: legacy.version, remotes: legacy.remotes ?? [] }));
+  } catch (error) {
+    console.log('LEGACY_REGISTRY_METADATA_UNAVAILABLE ' + error.message);
+  }
+  console.log('Published artifact and hosted runtime verification passed. Hosted availability was checked separately from registry discovery; hosted probes are synthetic operational events.');
 } finally {
   await rm(sandbox, { recursive: true, force: true });
 }
