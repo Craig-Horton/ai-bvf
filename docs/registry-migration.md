@@ -1,6 +1,6 @@
 # MCP registry namespace migration
 
-Status: maintainer request prepared; no external request has been sent. The working website, npm package and hosted connector remain at their current production versions until the migration release is merged.
+Status: [maintainer request 1684](https://github.com/modelcontextprotocol/registry/issues/1684) submitted on 3 October 2026; administrator action is pending. The working website, npm package and hosted connector remain at their current production versions until the migration release is merged.
 
 ## Verified state, 3 October 2026
 
@@ -66,7 +66,7 @@ We can provide a repository commit or a domain-control challenge if required. Af
 
 ## Completion procedure
 
-1. Record the submitted maintainer issue URL and the administrator's resolution.
+1. Track [request 1684](https://github.com/modelcontextprotocol/registry/issues/1684) and record the administrator's resolution.
 2. Verify every old registry version is deleted, or confirm an equivalent ownership transfer that releases the URL.
 3. Recheck the working hosted endpoint and the current namespace before publication.
 4. Merge the tested MCP 0.14.15 release change. The release keeps core 0.10.6 and restores the hosted entry in `server.json`.
