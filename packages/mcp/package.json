@@ -1,7 +1,7 @@
 {
   "name": "aibvf-mcp",
   "mcpName": "io.github.Craig-Horton/aibvf-mcp",
-  "version": "0.14.12",
+  "version": "0.14.13",
   "description": "AI BVF: score AI portfolios Stop/Fix/Accelerate with decision confidence and pace-layer drag.",
   "keywords": [
     "mcp",

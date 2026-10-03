@@ -143,7 +143,7 @@ Pass the same inputs to `recommendImprovements` to get the pillar actions and wo
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.14.12 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.14.13 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | CI/CD pre-flight gate ("SonarQube for AI") + GitHub Action. |
 | [`@aibvf/core`](packages/js) | 0.10.5 | TypeScript scoring engine, plain-English assessment, work architecture gate, change-leader plans, readiness inference, and Advisor Brain. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. |
