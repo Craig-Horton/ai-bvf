@@ -1,8 +1,8 @@
 # aibvf-mcp
 
-MCP server exposing AI BVF v1.0 to any Claude agent, thirteen deterministic tools that pre-flight-check AI initiatives before the budget is committed: start from a plain-English proposal, score from whatever is known, test whether workflows, roles, decision rights and measures have been redesigned, return the change plan when the verdict is Fix, and measure organisational readiness from process data instead of self-report. The tool count is fixed through 0.15.x.
+Assess one AI investment proposal and return Stop, Fix or Accelerate with the evidence gaps and next actions. Thirteen tools support assessment, work design checks and portfolio review.
 
-> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · ⭐ star if this helped · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton Advisory](https://craighortonadvisory.com)
+> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · [Try an assessment](https://www.aibvf.com/start) · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton Advisory](https://craighortonadvisory.com)
 
 ## No install: use it on claude.ai
 
@@ -15,7 +15,7 @@ https://mcp.aibvf.com/api/mcp
 ## Install and run (stdio)
 
 ```bash
-npx aibvf-mcp
+npx -y aibvf-mcp
 ```
 
 ## Wire into Claude Desktop / Cursor / any MCP host
@@ -85,12 +85,12 @@ Claude will call `assess_ai_initiative`, resolve the proposal, and return the cl
 |---|---|
 | `assess_ai_initiative` | Plain-English front door for one initiative. Resolves industry, revenue, function, AI tier and readiness, tests the work architecture, asks once for every unresolved input, then returns Accelerate, Fix or Stop from the same scoring engine. |
 | `score_initiative` | Return classification, euro range, reasoning and the work architecture gate for one initiative. |
-| `score_portfolio` | Score every initiative in a BVF portfolio in one call and return the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision confidence, top initiative by value, highest-risk initiative, per-initiative results. Use instead of looping `score_initiative`. |
+| `score_portfolio` | Score every initiative in a BVF portfolio in one call and return the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision score, top initiative by value, highest-risk initiative, per-initiative results. Use instead of looping `score_initiative`. |
 | `assemble_portfolio` | Assembles a valid BVF v1.0 portfolio document from loose inputs: names, plain-language functions and tiers, and whatever pillar scores exist. Aliases resolved, ids generated, missing pillars estimated with the estimation reported per initiative, document validated before return. Nothing stored, nothing edited. |
 | `recommend_improvements` | For a Stop or Fix initiative, return concrete pillar actions and named change plays, including workflow and role redesign when the work architecture has a gap. |
-| `calculate_pace_layer_drag` | Return the annual Organisational Drag Cost in EUR from misalignment between AI tier and organisational readiness — the cost of *not* changing the operating model. |
+| `calculate_pace_layer_drag` | Return a directional operating-model friction scenario in EUR using disclosed planning rates. |
 | `validate_portfolio` | Check a BVF portfolio JSON against the v1.0 schema. |
-| `get_benchmark` | Return the published benchmark base-rate and industry multiplier for a function + industry. Use when the caller wants the raw rates without an initiative-level verdict. |
+| `get_benchmark` | Return the disclosed AI BVF planning rate, evidence status and industry multiplier for a function + industry. Use when the caller wants the raw rates without an initiative-level verdict. |
 | `list_taxonomy` | List the valid industries, functions, AI tiers, and readiness levels. |
 | `diagnose_process` | AI BVF Advisor Brain: diagnose one business process from observed signals (volume, labour, cycle time, handoffs, rework, automation, spend) and return heaviness, the recommended intervention (Automate / Consolidate & re-sequence / Quality controls / Eliminate), the modelled net EUR saving, the efficiency gain, an Accelerate/Fix/Stop verdict, and a decision confidence governed by how much was actually measured. |
 | `infer_readiness` | Measures organisational readiness from process signals (hand-offs, rework, touch ratio, automation, cycle time vs function medians) instead of accepting self-report. Returns the classification the data supports, per-signal reasoning, and a confidence set by coverage and agreement. When the measured answer is lower than the claimed one, that gap is itself a change-readiness finding. |
@@ -99,13 +99,23 @@ Claude will call `assess_ai_initiative`, resolve the proposal, and return the cl
 
 The portfolio chain, in order: `assemble_portfolio` gets messy inputs into the right shape, `validate_portfolio` checks the document, `score_portfolio` returns the verdicts, `sequence_portfolio` turns them into a rollout plan. The assembler structures, the scores advise.
 
+## Reading the result
+
+`decision_confidence` is a heuristic decision score with no calibrated probability interpretation. `net_value_eur` is a readiness-adjusted benefit scenario before project costs. Portfolio totals are arithmetic sums that require a review of overlapping benefits.
+
+`applied_modules` records scoring and sector context; the labels do not certify clinical validation or regulatory compliance. The `interpretation` response describes these limits alongside the compatible field names.
+
+MCP portfolio assembly and scoring retain work architecture and supplied-versus-estimated provenance. Estimated pillars stay visible, and a missing work-design check blocks Accelerate until all four checks are evidenced.
+
+[Formulas and assumptions](https://github.com/Craig-Horton/ai-bvf/blob/main/docs/scoring-formulas.md) · [Reproducible example](https://github.com/Craig-Horton/ai-bvf/blob/main/docs/worked-example.md)
+
 ## Spec
 
 <https://www.aibvf.com/protocol>
 
-## Anonymous Usage Telemetry
+## Anonymous usage telemetry
 
-To separate real agent traffic from scanner noise, aibvf-mcp can send a small, anonymous event on each tool call. The payload is:
+aibvf-mcp can send an anonymous event on each tool call. Events describe observed activity; the current payload does not reliably distinguish people, tests and scanners. The payload is:
 
 - `ts` — timestamp
 - `tool_name` — one of the tool names above

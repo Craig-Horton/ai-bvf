@@ -38,13 +38,18 @@ jobs:
           package-manager-cache: false
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build packages
         run: npm run build
 
       - name: Run tests before publishing
         run: npm test
+
+      - name: Verify release contract and worked example
+        run: |
+          node scripts/check-release-contract.mjs
+          node scripts/check-worked-example.mjs
 
       # Publish the shared engine before packages that depend on its new version.
       - name: Read @aibvf/core version before dependants
@@ -71,6 +76,18 @@ jobs:
           echo "Publishing @aibvf/core@${{ steps.corepkg_before.outputs.version }} with npm $(npm --version)"
           npm publish --provenance --access public
           echo "Published @aibvf/core@${{ steps.corepkg_before.outputs.version }} to npm"
+
+      - name: Wait for core package propagation
+        run: |
+          for attempt in {1..12}; do
+            if npm view "@aibvf/core@${{ steps.corepkg_before.outputs.version }}" version > /dev/null 2>&1; then
+              npm view "@aibvf/core@${{ steps.corepkg_before.outputs.version }}" dist --json
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "The core package did not become visible on npm"
+          exit 1
 
       - name: Read package version
         id: pkg
@@ -177,3 +194,37 @@ jobs:
           sleep 5
           curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=aibvf" \
             | head -c 1000
+
+  release-notes:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare release notes
+        id: release
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const mcp = require('./packages/mcp/package.json').version;
+          const core = require('./packages/js/package.json').version;
+          const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
+          const section = changelog.split(/^## /m)[1];
+          if (!section || !section.includes(mcp) || !section.includes(core)) {
+            throw new Error('The latest changelog section must name both package versions.');
+          }
+          fs.writeFileSync('release-notes.md', section.slice(section.indexOf('\n') + 1).trim() + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'tag=v' + mcp + '\nname=AI BVF MCP ' + mcp + ' / core ' + core + '\n');
+          NODE
+      - name: Publish GitHub release after package verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_NAME: ${{ steps.release.outputs.name }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists"
+          else
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_NAME" --notes-file release-notes.md
+          fi
