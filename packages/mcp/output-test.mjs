@@ -35,7 +35,8 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
     const improved = await client.callTool({ name: 'recommend_improvements', arguments: input });
     assert.notEqual(improved.isError, true);
     const plan = JSON.parse(improved.content[0].text);
-    assert.deepEqual(improved.structuredContent, plan);
+    // In-memory transport retains optional undefined properties; JSON wire transport omits them.
+    assert.deepEqual(JSON.parse(JSON.stringify(improved.structuredContent)), plan);
     assert.deepEqual(plan.audit, recommendImprovements(input).audit);
     assert.ok(plan.audit.rules_fired.length > 0);
 
