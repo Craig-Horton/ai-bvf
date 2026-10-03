@@ -3,7 +3,7 @@
   "name": "io.github.Craig-Horton/aibvf-mcp",
   "description": "AI BVF: review AI proposals with Stop, Fix or Accelerate, evidence gaps and next actions.",
   "status": "active",
-  "version": "0.14.14",
+  "version": "0.14.15",
   "repository": {
     "url": "https://github.com/Craig-Horton/ai-bvf",
     "source": "github"
@@ -13,10 +13,16 @@
     {
       "registryType": "npm",
       "identifier": "aibvf-mcp",
-      "version": "0.14.14",
+      "version": "0.14.15",
       "transport": {
         "type": "stdio"
       }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.aibvf.com/api/mcp"
     }
   ]
 }
