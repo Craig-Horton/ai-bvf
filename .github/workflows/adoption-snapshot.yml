@@ -1,0 +1,19 @@
+name: AI BVF adoption snapshot
+on:
+  push:
+    branches: ["run/adoption-20261003-0840"]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Run live package download report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/adoption.mjs
