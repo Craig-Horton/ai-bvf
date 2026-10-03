@@ -69,6 +69,7 @@ async function withMcp(run) {
   try {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
+    await client.listTools();
     return await run(async (name, args) => {
       const response = await client.callTool({ name, arguments: args });
       assert.notEqual(response.isError, true, JSON.stringify(response.content));
@@ -178,7 +179,7 @@ test('MCP assembly keeps evidence attached when invalid entries are skipped and 
     const result = await call('assemble_portfolio', {
       organization, readiness: 'traditional',
       initiatives: [
-        { name: 'Same name', function: 'not-a-business-function', ai_tier: 'copilot', work_architecture: { roles_redesigned: false } },
+        { name: 'Same name', function: 123, ai_tier: 'copilot', work_architecture: { roles_redesigned: false } },
         { name: 'Same name', function: 'cx', ai_tier: 'gen2', scores: input.scores, work_architecture: readyWork },
         { name: 'Same name', function: 'cx', ai_tier: 'gen2', scores: input.scores, work_architecture: { ...readyWork, measures_updated: false } },
       ],

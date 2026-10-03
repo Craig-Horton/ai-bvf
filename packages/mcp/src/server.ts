@@ -411,7 +411,7 @@ const scoreOutputSchema = {
       type: 'object',
       description: 'What moves this verdict, computed deterministically: the value if readiness were one notch worse, the value at revenue minus 20 percent, and the nearest single-pillar movements that flip the classification. Boards trust ranges with visible assumptions over point estimates; show this.',
       properties: {
-        readiness_one_notch_down: { type: 'object', description: 'Null when readiness is already siloed.' },
+        readiness_one_notch_down: { type: ['object', 'null'], description: 'Null when readiness is already siloed.' },
         revenue_minus_20pct: { type: 'object' },
         verdict_flips: { type: 'array', items: { type: 'string' } },
       },
@@ -1504,6 +1504,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
           // entries in source order using the same canonical taxonomy.
           const index = a.initiatives.findIndex((raw: any, position: number) => position >= sourceIndex
             && raw?.name === initiative.name
+            && typeof raw.function === 'string' && typeof raw.ai_tier === 'string'
             && mapToTaxonomy({ function: raw.function }).function?.resolved === initiative.function
             && mapToTaxonomy({ ai_tier: raw.ai_tier }).ai_tier?.resolved === initiative.ai_tier);
           if (index < 0) throw new Error('Could not retain the source evidence for an assembled initiative.');
