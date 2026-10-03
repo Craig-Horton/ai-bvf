@@ -74,7 +74,7 @@ The modelled benefit range stays the same across these three stages because the 
 
 ## Run the example against the built source
 
-From a checkout of this repository, run `npm ci` and `npm run build`. Save the following block as `worked-example.mjs` in the repository root, then run `node worked-example.mjs`:
+From a checkout of this repository, run `npm ci`, `npm run build`, then `node scripts/check-worked-example.mjs`. The checker reads and executes this exact JavaScript block against the built local engine:
 
 ```js
 import assert from 'node:assert/strict';
@@ -142,7 +142,7 @@ console.table(stages.map(r => ({
 console.log('Worked-example assertions passed.');
 ```
 
-The arithmetic and conditions above were checked against source when this example was revised. Running the assertions verifies them against the exact code in a checkout.
+The Test workflow executes this block after the package build and test suite. A missing example, a changed verdict or a different published number fails the check.
 
 ## Keep the drag scenario separate
 

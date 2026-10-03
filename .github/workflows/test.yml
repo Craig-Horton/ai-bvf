@@ -23,3 +23,5 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm test
+      - name: Verify published worked example
+        run: node scripts/check-worked-example.mjs
