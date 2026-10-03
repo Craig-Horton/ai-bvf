@@ -53,6 +53,7 @@ This submission follows closed PR 6388 using the current repository identity and
 | Check | Result to record |
 |---|---|
 | Current directory instructions and category | Pending final check |
+| Registry identity and hosted URL ownership | Package listing uses Craig-Horton; hosted URL remains registered under Bahamas1717. Migration pending. |
 | No duplicate existing entry | Pending final search |
 | npm package version and local connection | Pending release check |
 | Local tools/list returns thirteen tools | Pending release check |

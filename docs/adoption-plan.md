@@ -92,3 +92,7 @@ A million retrievals driven by repeated automation would not satisfy the adoptio
 - [Directory submission draft](../launch/directory-submission.md)
 
 Invitations and external submissions are drafts until sent by Craig or explicitly authorised with recipients. No outreach has been sent as part of this delivery.
+
+## Registry ownership follow-up
+
+The registry rejected adding the hosted URL to `io.github.Craig-Horton/aibvf-mcp` because it is already registered to `io.github.Bahamas1717/aibvf-mcp`. Publish the current npm listing and keep the documented hosted endpoint available while the old listing ownership is migrated. The hosted URL must not be advertised as attached to the new registry identity until that migration is verified.
