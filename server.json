@@ -1,22 +1,28 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.Craig-Horton/aibvf-mcp",
-  "description": "AI BVF: score AI portfolios Stop/Fix/Accelerate with decision confidence and pace-layer drag.",
+  "description": "AI BVF: review AI proposals with Stop, Fix or Accelerate, evidence gaps and next actions.",
   "status": "active",
-  "version": "0.14.13",
+  "version": "0.14.14",
   "repository": {
     "url": "https://github.com/Craig-Horton/ai-bvf",
     "source": "github"
   },
-  "websiteUrl": "https://www.aibvf.com/protocol",
+  "websiteUrl": "https://www.aibvf.com/start",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "aibvf-mcp",
-      "version": "0.14.13",
+      "version": "0.14.14",
       "transport": {
         "type": "stdio"
       }
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.aibvf.com/api/mcp"
     }
   ]
 }

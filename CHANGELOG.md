@@ -2,6 +2,20 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.14.14 (aibvf-mcp), 0.10.6 (@aibvf/core), 3 October 2026
+
+Fixed: plain-English assessment distinguishes company revenue from project budgets and project income. Ambiguous amounts, ranges, foreign currencies and non-annual revenue require clarification.
+
+Fixed: MCP portfolio assembly and scoring preserve work architecture and supplied-versus-estimated provenance. Portfolio responses retain per-initiative audit, sensitivity and input-quality evidence.
+
+Changed: result interpretation identifies the decision score as a heuristic and the EUR range as a benefit scenario before project costs. Sector labels do not certify compliance, and portfolio sums require an overlap review.
+
+Changed: onboarding starts with one browser assessment. Adoption reporting distinguishes observed connections, tool use, completed assessments and repeat tool-use days. A ten-team pilot pack defines the next validation work.
+
+Added: executable worked-example and release-contract checks, plus hosted connector discovery in the MCP registry. GitHub releases are created after package publication succeeds.
+
+Scope: scoring formulas and existing response fields remain compatible. Direct core portfolio assembly retains its previous metadata behavior. Pilot targets are proposed validation criteria; no pilot outcomes are claimed.
+
 ## 0.14.13 (aibvf-mcp), 3 October 2026
 
 Fixed: `score_initiative` returns the audit trail and sensitivity analysis. `recommend_improvements` returns its audit evidence.

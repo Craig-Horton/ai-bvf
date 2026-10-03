@@ -14,7 +14,7 @@ The assessment tests strategic alignment, the financial case, change enablement 
 
 The EUR range is a planning scenario that needs a costed business case, and the decision score has no calibrated probability interpretation. Those limits stay visible because the useful discussion is about the evidence the team can act on.
 
-The pilot asks for a 30-minute first review and a return within 30 days, when you bring the evidence produced since the first assessment. I want to see where the framework helps, where it misunderstands the work and what you would remove.
+The pilot asks for a 30-minute first review and a return within 14 days, when you bring the evidence produced since the first assessment. I want to see where the framework helps, where it misunderstands the work and what you would remove.
 
 If you lead AI investment reviews and have a proposal to bring, reply with the decision you need to make and its review date. Any public case would need your approval of the exact text and images.
 

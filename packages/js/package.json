@@ -1,7 +1,7 @@
 {
   "name": "@aibvf/core",
-  "version": "0.10.5",
-  "description": "AI BVF \u2014 open protocol for scoring AI investments. Validator and scoring engine.",
+  "version": "0.10.6",
+  "description": "AI BVF: deterministic AI investment assessment with disclosed assumptions and work design checks.",
   "keywords": [
     "ai",
     "bvf",
