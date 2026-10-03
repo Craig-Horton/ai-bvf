@@ -23,3 +23,8 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm test
+      - name: Verify published worked example
+        run: node scripts/check-worked-example.mjs
+
+      - name: Verify release metadata and tool catalogue
+        run: node scripts/check-release-contract.mjs
