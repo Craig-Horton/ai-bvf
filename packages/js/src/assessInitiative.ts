@@ -77,11 +77,15 @@ export function extractRevenueEur(proposal: string): number | undefined {
   const revenueAfter = /^\s*(?:(?:in|of)\s+)?(?:annual\s+)?(?:revenue|turnover)\b/i;
   const nonRevenueBefore = /\b(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\s*(?:(?:of|is|are|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
   const nonRevenueAfter = /^\s*(?:(?:in|of|for|annual|projected|expected|implementation|operating)\s+)*(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\b/i;
-  const projectRevenueBefore = /\b(?:project|pilot|incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const projectRevenueBefore = /\b(?:(?:project|pilot|initiative)(?:['’]s)?|incremental|additional|projected|expected|potential|target|expect|forecast|anticipate)\s+(?:annual\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
   const projectRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\b/i;
+  const projectRevenueSource = /^\s*(?:(?:in|of)\s+)?(?:(?:annual|incremental|additional|projected|expected|potential|target)\s+)?(?:(?:revenue|turnover)\s+)?(?:from|for|generated\s+by|attributable\s+to)\s+(?:(?:the|this|our|an?)\s+)?(?:pilot|project|initiative)\b/i;
+  const periodicRevenueBefore = /\b(?:monthly|quarterly|weekly|daily|Q[1-4])\s+(?:(?:company|organisation|organization)\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const periodicRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:(?:revenue|turnover)\s+)?(?:(?:per|a|each|every)\s+(?:month|quarter|week|day)\b|(?:monthly|quarterly|weekly|daily)\b|\/\s*(?:month|quarter|week|day)\b)/i;
   const companyAfter = /^\s*(?:(?:global|international|European)\s+)?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit)\b/i;
   const rangeAfter = new RegExp(String.raw`^\s*(?:[-–—/]|to\b|through\b|or\b)\s*(?:(?:${CURRENCY})\s*)?[0-9]`, 'i');
-  const foreignSuffix = /^\s*(?:[A-Z]{3}\b|dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/;
+  const foreignCodeSuffix = /^\s*[A-Z]{3}\b/;
+  const foreignSuffix = /^\s*(?:dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/i;
   const revenues: number[] = [];
   const otherAmounts: number[] = [];
   let unresolved = false;
@@ -91,7 +95,9 @@ export function extractRevenueEur(proposal: string): number | undefined {
     const before = text.slice(0, match.index).slice(-100);
     const after = text.slice(match.index! + match[0].length, match.index! + match[0].length + 100);
     const labelled = revenueBefore.test(before) || revenueAfter.test(after);
-    if (projectRevenueBefore.test(before) || projectRevenueAfter.test(after)) continue;
+    if (projectRevenueBefore.test(before) || projectRevenueAfter.test(after)
+        || projectRevenueSource.test(after) || periodicRevenueBefore.test(before)
+        || periodicRevenueAfter.test(after)) continue;
     if (!labelled && (nonRevenueBefore.test(before) || nonRevenueAfter.test(after))) continue;
     const currencies = [currencyBefore, currencyAfter].filter(Boolean);
     const euro = currencies.length > 0 && currencies.every((currency) => /^(?:EUR|euros?|€)$/i.test(currency));
@@ -100,7 +106,7 @@ export function extractRevenueEur(proposal: string): number | undefined {
     const parsed = amount(value, scale);
     if ((currencies.length && !euro) || /[-−]\s*$/.test(before) || parsed === undefined
         || rangeAfter.test(after) || /^\s*[0-9]/.test(after)
-        || (!currencies.length && foreignSuffix.test(after))) {
+        || (!currencies.length && (foreignCodeSuffix.test(after) || foreignSuffix.test(after)))) {
       if (labelled || companySize) unresolved = true;
       continue;
     }
