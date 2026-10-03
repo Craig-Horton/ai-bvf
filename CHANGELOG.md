@@ -12,7 +12,9 @@ Changed: result interpretation identifies the decision score as a heuristic and 
 
 Changed: onboarding starts with one browser assessment. Adoption reporting distinguishes observed connections, tool use, completed assessments and repeat tool-use days. A ten-team pilot pack defines the next validation work.
 
-Added: executable worked-example and release-contract checks, plus hosted connector discovery in the MCP registry. GitHub releases are created after package publication succeeds.
+Added: executable worked-example and release-contract checks. GitHub releases are created after package publication succeeds.
+
+Distribution: the current MCP registry listing publishes the npm package. The registry assigns the hosted URL to the previous io.github.Bahamas1717/aibvf-mcp identity; migrating that ownership remains a follow-up. The hosted connector remains available through its documented URL.
 
 Scope: scoring formulas and existing response fields remain compatible. Direct core portfolio assembly retains its previous metadata behavior. Pilot targets are proposed validation criteria; no pilot outcomes are claimed.
 
