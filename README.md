@@ -137,7 +137,7 @@ const r = score({
 //   'healthcare_regulatory_overhead'], ... }
 ```
 
-Same inputs through `recommendImprovements` return three pillar raises, each with a named action, and project a new decision confidence of 68 with target classification Accelerate. `calculatePaceLayerDrag({ revenue_eur: 800_000_000, ai_tier: 'gen3', readiness: 'traditional' })` returns 20M to 36M EUR of annual Organisational Drag Cost, the structural friction cost of running gen3 in a traditional operating model, separate from the AI build.
+Pass the same inputs to `recommendImprovements` to get the pillar actions and work redesign plan. Accelerate requires evidence that the workflow, affected roles, human decision rights and performance measures are ready; completing the pillar actions alone does not clear that gate. `calculatePaceLayerDrag({ revenue_eur: 800_000_000, ai_tier: 'gen3', readiness: 'traditional' })` returns 20M to 36M EUR of annual Organisational Drag Cost, the structural friction cost of running gen3 in a traditional operating model, separate from the AI build.
 
 ## Packages
 
