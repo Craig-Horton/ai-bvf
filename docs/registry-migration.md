@@ -67,9 +67,9 @@ We can provide a repository commit or a domain-control challenge if required. Af
 ## Completion procedure
 
 1. Track [request 1684](https://github.com/modelcontextprotocol/registry/issues/1684) and record the administrator's resolution.
-2. Verify every old registry version is deleted, or confirm an equivalent ownership transfer that releases the URL.
+2. Request all old versions from `https://registry.modelcontextprotocol.io/v0.1/servers/io.github.Bahamas1717%2Faibvf-mcp/versions?include_deleted=true`. Inspect every entry's `_meta['io.modelcontextprotocol.registry/official'].status`, including historical versions, and confirm each is `deleted`, or record an equivalent administrative resolution that releases the URL. Checking only the latest version is insufficient.
 3. Recheck the working hosted endpoint and the current namespace before publication.
-4. Merge the tested MCP 0.14.15 release change. The release keeps core 0.10.6 and restores the hosted entry in `server.json`.
+4. Update this record with the resolution and replace the prepared wording in `CHANGELOG.md` with dated release wording. Recheck CI, then merge the MCP 0.14.15 change. The release keeps core 0.10.6 and restores the hosted entry in `server.json`.
 5. Verify npm installation, MCP registry version 0.14.15, the hosted remote entry and the GitHub release.
 6. Update this record and the adoption plan with the resolution evidence.
 
