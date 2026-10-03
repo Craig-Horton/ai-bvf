@@ -41,11 +41,12 @@ try {
     console.log('VERIFIED_NPM_MANIFEST ' + JSON.stringify({ name, version, integrity: metadata.dist.integrity, tarball: metadata.dist.tarball }));
   }
   await writeFile(join(sandbox, 'package.json'), JSON.stringify({ private: true, type: 'module' }));
-  execFileSync('npm', [
-    'install', '--ignore-scripts', '--no-audit', '--no-fund',
+  await retry('npm artifact installation', async () => execFileSync('npm', [
+    'install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-online',
+    '--registry=https://registry.npmjs.org', '--cache=' + join(sandbox, 'npm-cache'),
     '--fetch-retries=3', '--fetch-retry-mintimeout=5000',
     `@aibvf/core@${expectedCore}`, `aibvf-mcp@${expectedMcp}`,
-  ], { cwd: sandbox, stdio: 'inherit', timeout: 180000 });
+  ], { cwd: sandbox, stdio: 'inherit', timeout: 180000 }), 12);
   const coreManifest = JSON.parse(await readFile(join(sandbox, 'node_modules/@aibvf/core/package.json'), 'utf8'));
   const mcpManifest = JSON.parse(await readFile(join(sandbox, 'node_modules/aibvf-mcp/package.json'), 'utf8'));
   assert.equal(coreManifest.version, expectedCore);
