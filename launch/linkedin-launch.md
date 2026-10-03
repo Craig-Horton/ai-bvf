@@ -1,26 +1,25 @@
-# LinkedIn launch draft
+# LinkedIn pilot invitation draft
 
-Audience: senior leaders making AI investment decisions.
+Audience: AI transformation consultants and internal AI portfolio leads with a live investment decision.
 
-Draft only. Verify current package and registry metadata before posting.
+Status: prepared for review, not posted. The [pilot pack](../docs/adoption-pilot.md) contains the cohort criteria and interview guide.
 
 ## Post
 
-AI BVF gives a Claude agent a pre-flight check before it recommends an AI deployment, starting from a proposal in plain English and returning Accelerate, Fix or Stop with a change plan.
+Bring one AI proposal your team has to decide on this month, with the evidence you have today and the questions the business case still needs to answer.
 
-I built it because I kept watching agents confidently greenlight AI projects with no reference to the business case, no reference to operating-model readiness, and no reference to governance exposure. Four pillars, strategic alignment, financial return, change enablement and governance risk, each scored 0 to 100, and a deterministic classification of Accelerate, Fix, or Stop. The model uses disclosed AI BVF planning assumptions, with external research as context and readiness capture informed by EY/Oxford and Prosci.
+I am running a ten-team pilot of AI BVF to test whether a structured assessment changes the next decision, who owns the work and what the team comes back to review. You can start in the browser without an account, describe the proposal in plain English and inspect the assumptions behind Stop, Fix or Accelerate.
 
-Worked example, a 800M EUR hospital group running an agentic discharge coordination pilot. Four-pillar scores SA 75, FR 55, CE 40, GR 55 return Fix, with modelled net value between 24M and 83M EUR and a decision confidence of 54. recommend_improvements returns three specific raises, rebuild the business case with a readiness-adjusted capture rate, fund change management at 15 to 25 percent of initiative spend with a named owner, commission a pre-deployment governance review covering EU AI Act classification and human-in-the-loop design. The pillar improvements project a decision confidence of 68; Accelerate also requires evidence that workflows, affected roles, human decision rights and performance measures are ready.
+The assessment tests strategic alignment, the financial case, change enablement and governance exposure, then asks whether workflows, roles, human decision rights and measures are ready. A team can strengthen the pillar scores and still remain at Fix when the work design has not been evidenced.
 
-The same organisation in gen3 agentic mode with traditional readiness has a modelled annual Organisational Drag Cost of 20M to 36M EUR, and that is structural friction separate from the AI build. A CFO reads that number and understands the conversation immediately.
+The EUR range is a planning scenario that needs a costed business case, and the decision score has no calibrated probability interpretation. Those limits stay visible because the useful discussion is about the evidence the team can act on.
 
-Thirteen tools support the decision from initial assessment through improvement planning and portfolio sequencing, available through a local MCP client or the hosted claude.ai connector. Describe one proposal in plain English, review the assumptions with the people who own the work, then supply evidence and rerun the assessment.
+The pilot asks for a 30-minute first review and a return within 30 days, when you bring the evidence produced since the first assessment. I want to see where the framework helps, where it misunderstands the work and what you would remove.
 
-The benchmark corpus is directional, the protocol is open, the calibration will improve through public review. If you run AI portfolios in your day job and the numbers look wrong, file an issue or push a PR, I would rather argue the calibration in public than ship a quiet tool no one checks.
+If you lead AI investment reviews and have a proposal to bring, reply with the decision you need to make and its review date. Any public case would need your approval of the exact text and images.
 
-If you own an AI portfolio, take one proposal through the assessment and test whether the change plan answers the questions your team has to act on.
+First assessment: https://www.aibvf.com/start
 
-Repo: https://github.com/Craig-Horton/ai-bvf
+## Publication boundary
 
-#AIBVF #MCP #AgenticAI #AITransformation #EnterpriseAI #AIGovernance
-
+The ten-team, eight-first-assessment, five-return and two-case figures are pilot targets. They must not be presented as customers, results or adoption already achieved.
