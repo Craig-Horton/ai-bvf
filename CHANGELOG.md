@@ -2,6 +2,14 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.14.13 (aibvf-mcp), 3 October 2026
+
+Fixed: `score_initiative` returns the audit trail and sensitivity analysis. `recommend_improvements` returns its audit evidence.
+
+Added: MCP response regression tests exercise actual client and server calls. Pull requests and package publication run the full test suite.
+
+Changed: onboarding guides begin with a plain English assessment. Telemetry documentation describes the optional verdict, confidence and anonymous installation identifier accurately.
+
 ## 0.14.6 (aibvf-mcp), 23 August 2026
 
 Changed: every tool input now explains its intent, accepted ranges, defaults and interaction with neighbouring tools. `recommend_improvements` names when it should and should not be called, while `sequence_portfolio` and `assemble_portfolio` now describe every input field. The tool count, scoring rules and verdicts are unchanged.
