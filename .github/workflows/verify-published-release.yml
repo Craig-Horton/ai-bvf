@@ -1,0 +1,18 @@
+name: Verify published AI BVF release
+on:
+  push:
+    branches: [codex/verify-published-20261003]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify published artifacts and hosted runtime
+        run: node scripts/verify-published-release.mjs
