@@ -43,6 +43,9 @@ jobs:
       - name: Build packages
         run: npm run build
 
+      - name: Run tests before publishing
+        run: npm test
+
       # Publish the shared engine before packages that depend on its new version.
       - name: Read @aibvf/core version before dependants
         id: corepkg_before

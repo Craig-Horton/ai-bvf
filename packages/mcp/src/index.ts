@@ -20,5 +20,5 @@ logCall('server_connect', { entry_route: 'stdio' });
 console.error(`aibvf-mcp v${VERSION} ready on stdio - 13 tools: assess_ai_initiative, score_initiative, score_portfolio, assemble_portfolio, sequence_portfolio, recommend_improvements, calculate_pace_layer_drag, validate_portfolio, get_benchmark, list_taxonomy, map_to_taxonomy, diagnose_process, infer_readiness`);
 console.error('aibvf-mcp: feedback welcome at https://github.com/Craig-Horton/ai-bvf/discussions');
 if (telemetryEnabled) {
-  console.error('aibvf-mcp: anonymous usage telemetry enabled (tool, release, route, assessment stage, taxonomy and an optional broad role only when you set AIBVF_USAGE_ROLE; no proposal, revenue, scores or portfolio data). Opt out with AIBVF_TELEMETRY_DISABLE=1. Debug with AIBVF_TELEMETRY_DEBUG=1.');
+  console.error('aibvf-mcp: anonymous usage telemetry enabled (tool, release, route, assessment stage, taxonomy, classification, decision confidence, anonymous installation hashes and an optional broad role only when you set AIBVF_USAGE_ROLE; no proposal, revenue, pillar scores or portfolio data). Opt out with AIBVF_TELEMETRY_DISABLE=1. Debug with AIBVF_TELEMETRY_DEBUG=1.');
 }
