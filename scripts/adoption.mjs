@@ -1,8 +1,8 @@
-// AI BVF package download snapshot · pulls live numbers from npm, PyPI, and GitHub.
+// AI BVF package download snapshot: live npm, PyPI and GitHub observations.
 // Registry downloads include dependencies, repeat installs and automation.
 // Usage: node scripts/adoption.mjs   (or: npm run adoption)
 // Requires Node 18+ (native fetch).
-// Behind an HTTPS proxy, run with NODE_USE_ENV_PROXY=1 (Node >= 22.21) —
+// Behind an HTTPS proxy, run with NODE_USE_ENV_PROXY=1 (Node >= 22.21).
 // native fetch ignores HTTPS_PROXY otherwise.
 
 const JS_PKG    = '@aibvf/core';
@@ -11,7 +11,8 @@ const CHECK_PKG = 'aibvf-check';
 const PY_PKG    = 'aibvf';
 const GH_REPO   = 'Craig-Horton/ai-bvf';
 
-const unreachable = new Set();
+const unavailable = new Map();
+const requestedAt = new Date().toISOString();
 
 async function json(url) {
   const headers = {};
@@ -20,17 +21,26 @@ async function json(url) {
   }
   try {
     const r = await fetch(url, { headers });
-    if (!r.ok) return null;
-    return r.json();
+    if (!r.ok) {
+      unavailable.set(url, `HTTP ${r.status}`);
+      return null;
+    }
+    return await r.json();
   } catch {
-    unreachable.add(new URL(url).host);
+    unavailable.set(url, 'network or JSON response error');
     return null;
   }
 }
 
 async function npmDownloads(pkg, period) {
   const d = await json(`https://api.npmjs.org/downloads/point/${period}/${encodeURIComponent(pkg)}`);
-  return d?.downloads ?? null;
+  if (!Number.isSafeInteger(d?.downloads) || d.downloads < 0
+      || !/^\d{4}-\d{2}-\d{2}$/.test(d?.start ?? '')
+      || !/^\d{4}-\d{2}-\d{2}$/.test(d?.end ?? '')) {
+    if (d) unavailable.set(`npm:${pkg}:${period}`, 'invalid count or reporting dates');
+    return null;
+  }
+  return { downloads: d.downloads, start: d.start, end: d.end };
 }
 
 async function githubStats(repo) {
@@ -48,10 +58,11 @@ async function githubStats(repo) {
 async function pypiStats(pkg) {
   // pypistats.org (public, no auth). Returns 404 until the package is published.
   const d = await json(`https://pypistats.org/api/packages/${pkg}/recent`);
-  return d?.data ?? null;
+  return d ? { ...d.data, fetchedAt: new Date().toISOString() } : null;
 }
 
-function pad(n, w = 7) { return n == null ? ('—'.padStart(w, ' ')) : String(n).padStart(w, ' '); }
+function pad(n, w = 7) { return n == null ? ('n/a'.padStart(w, ' ')) : String(n).padStart(w, ' '); }
+const downloads = (point) => point?.downloads ?? null;
 
 const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh] = await Promise.all([
   npmDownloads(JS_PKG, 'last-day'),
@@ -69,40 +80,58 @@ const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh] = await Promise.a
 
 // Raw package-download sums can count dependencies from the same install twice.
 // Suppress incomplete sums when any package count is unavailable.
-const sum = (...xs) => xs.every((x) => x != null) ? xs.reduce((a, x) => a + x, 0) : null;
+const sum = (...points) => points.every((p) => p && p.start === points[0].start && p.end === points[0].end)
+  ? points.reduce((total, point) => total + point.downloads, 0) : null;
 const [npmD, npmW, npmM] = [sum(jsD, mcpD, ckD), sum(jsW, mcpW, ckW), sum(jsM, mcpM, ckM)];
 
 const line = '─'.repeat(56);
-console.log('\nAI BVF · package download snapshot · ' + new Date().toISOString().slice(0, 10));
+console.log('\nAI BVF · package download snapshot · ' + requestedAt);
 console.log(line);
 console.log('npm downloads           day     week    month');
 console.log(line);
-console.log(`  @aibvf/core       ${pad(jsD)}  ${pad(jsW)}  ${pad(jsM)}`);
-console.log(`  aibvf-mcp         ${pad(mcpD)}  ${pad(mcpW)}  ${pad(mcpM)}`);
-console.log(`  aibvf-check       ${pad(ckD)}  ${pad(ckW)}  ${pad(ckM)}`);
+console.log(`  @aibvf/core       ${pad(downloads(jsD))}  ${pad(downloads(jsW))}  ${pad(downloads(jsM))}`);
+console.log(`  aibvf-mcp         ${pad(downloads(mcpD))}  ${pad(downloads(mcpW))}  ${pad(downloads(mcpM))}`);
+console.log(`  aibvf-check       ${pad(downloads(ckD))}  ${pad(downloads(ckW))}  ${pad(downloads(ckM))}`);
 console.log(`  raw download sum  ${pad(npmD)}  ${pad(npmW)}  ${pad(npmM)}`);
 console.log(line);
 console.log('Counts include repeat installs, dependencies and automation.');
-console.log('Unique users and active installations require usage telemetry.');
+console.log('Counts measure package retrievals; one installation can retrieve several packages.');
+console.log('Raw sums require all package counts and matching reporting dates.');
+console.log('npm reporting dates (inclusive, returned by the registry):');
+for (const [label, points] of [
+  ['day', [jsD, mcpD, ckD]], ['week', [jsW, mcpW, ckW]], ['month', [jsM, mcpM, ckM]],
+]) {
+  const windows = [...new Set(points.filter(Boolean).map((p) => `${p.start} to ${p.end}`))];
+  console.log(`  ${label}: ${windows.join('; ') || 'unavailable'}${points.some((p) => !p) ? ' (incomplete)' : ''}`);
+}
 console.log(line);
 console.log('PyPI downloads          day     week    month');
 console.log(`  aibvf             ${pad(py?.last_day)}  ${pad(py?.last_week)}  ${pad(py?.last_month)}`);
+console.log('PyPI periods are provider-defined recent windows; exact dates are not supplied.');
+console.log(`PyPI fetched: ${py?.fetchedAt ?? 'unavailable'}`);
 console.log(line);
 if (gh) {
   console.log(`GitHub · ${GH_REPO}`);
   console.log(`  stars:     ${gh.stars}`);
   console.log(`  forks:     ${gh.forks}`);
   console.log(`  watchers:  ${gh.watchers}`);
-  console.log(`  issues:    ${gh.openIssues}`);
+  console.log(`  open issues/PRs: ${gh.openIssues}`);
   console.log(`  updated: ${gh.updatedAt}`);
 } else {
   console.log('GitHub: rate limited or unreachable.');
 }
-if (unreachable.size) {
+if (unavailable.size) {
   console.log();
-  console.log(`note: could not reach ${[...unreachable].join(', ')}`);
-  console.log('      (network/proxy block?) — a dash above may mean blocked, not zero.');
+  console.log('Unavailable sources (n/a indicates missing data):');
+  for (const [source, reason] of unavailable) console.log(`  ${source}: ${reason}`);
 }
+console.log();
+console.log('Usage and return-use evidence: run supabase/queries/adoption-retention.sql.');
+console.log('That report separates connection-only IDs, tool-using IDs and repeat tool use.');
+console.log('Browser saves are local to a device; portfolio handoffs and imports are separate.');
+console.log('Telemetry covers observed IDs and can include internal or automated activity.');
+console.log('Definitions and limits: docs/adoption-metrics.md');
+console.log(`Snapshot completed: ${new Date().toISOString()}`);
 console.log();
 console.log('Dashboards:');
 console.log(`  npm (core):   https://www.npmjs.com/package/${JS_PKG}`);
