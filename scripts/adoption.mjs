@@ -1,4 +1,5 @@
-// AI BVF adoption snapshot · pulls live numbers from npm, PyPI, and GitHub.
+// AI BVF package download snapshot · pulls live numbers from npm, PyPI, and GitHub.
+// Registry downloads include dependencies, repeat installs and automation.
 // Usage: node scripts/adoption.mjs   (or: npm run adoption)
 // Requires Node 18+ (native fetch).
 // Behind an HTTPS proxy, run with NODE_USE_ENV_PROXY=1 (Node >= 22.21) —
@@ -66,19 +67,23 @@ const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh] = await Promise.a
   githubStats(GH_REPO),
 ]);
 
-// npm totals (day/week/month) across all three packages, where a number exists.
-const sum = (...xs) => xs.some((x) => x != null) ? xs.reduce((a, x) => a + (x ?? 0), 0) : null;
+// Raw package-download sums can count dependencies from the same install twice.
+// Suppress incomplete sums when any package count is unavailable.
+const sum = (...xs) => xs.every((x) => x != null) ? xs.reduce((a, x) => a + x, 0) : null;
 const [npmD, npmW, npmM] = [sum(jsD, mcpD, ckD), sum(jsW, mcpW, ckW), sum(jsM, mcpM, ckM)];
 
 const line = '─'.repeat(56);
-console.log('\nAI BVF · adoption snapshot · ' + new Date().toISOString().slice(0, 10));
+console.log('\nAI BVF · package download snapshot · ' + new Date().toISOString().slice(0, 10));
 console.log(line);
 console.log('npm downloads           day     week    month');
 console.log(line);
 console.log(`  @aibvf/core       ${pad(jsD)}  ${pad(jsW)}  ${pad(jsM)}`);
 console.log(`  aibvf-mcp         ${pad(mcpD)}  ${pad(mcpW)}  ${pad(mcpM)}`);
 console.log(`  aibvf-check       ${pad(ckD)}  ${pad(ckW)}  ${pad(ckM)}`);
-console.log(`  npm total         ${pad(npmD)}  ${pad(npmW)}  ${pad(npmM)}`);
+console.log(`  raw download sum  ${pad(npmD)}  ${pad(npmW)}  ${pad(npmM)}`);
+console.log(line);
+console.log('Counts include repeat installs, dependencies and automation.');
+console.log('Unique users and active installations require usage telemetry.');
 console.log(line);
 console.log('PyPI downloads          day     week    month');
 console.log(`  aibvf             ${pad(py?.last_day)}  ${pad(py?.last_week)}  ${pad(py?.last_month)}`);
@@ -89,7 +94,7 @@ if (gh) {
   console.log(`  forks:     ${gh.forks}`);
   console.log(`  watchers:  ${gh.watchers}`);
   console.log(`  issues:    ${gh.openIssues}`);
-  console.log(`  last push: ${gh.updatedAt}`);
+  console.log(`  updated: ${gh.updatedAt}`);
 } else {
   console.log('GitHub: rate limited or unreachable.');
 }
