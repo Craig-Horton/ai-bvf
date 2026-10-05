@@ -40,11 +40,11 @@
   },
   "dependencies": {
     "@aibvf/core": "0.10.6",
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@modelcontextprotocol/sdk": "^1.31.0"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
-    "@types/node": "^26.1.0"
+    "@types/node": "^26.6.4"
   },
   "exports": {
     "./server": {
