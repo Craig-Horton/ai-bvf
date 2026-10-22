@@ -1,0 +1,44 @@
+name: Adoption snapshot 22 October 2026 (public metrics only)
+on:
+  push:
+    branches: [ops/adoption-snapshot-20261022]
+    paths: [.github/workflows/adoption-snapshot-20261022.yml]
+permissions:
+  contents: read
+jobs:
+  public-metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Run current adoption report without installing dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/adoption.mjs
+      - name: Query cumulative downloads through the last registry-reported day
+        shell: bash
+        run: |
+          node --input-type=module <<'ADOPTION_SNAPSHOT'
+          const names = ['@aibvf/core', 'aibvf-mcp', 'aibvf-check'];
+          const requestedAt = new Date().toISOString();
+          async function json(url) {
+            const r = await fetch(url, { signal: AbortSignal.timeout(30000) });
+            if (!r.ok) throw new Error(url + ': HTTP ' + r.status);
+            return await r.json();
+          }
+          const days = await Promise.all(names.map(name => json('https://api.npmjs.org/downloads/point/last-day/' + encodeURIComponent(name))));
+          if (!days.every(d => d.end === days[0].end)) throw new Error('Different registry reporting cutoffs');
+          const end = days[0].end;
+          const cumulative = await Promise.all(names.map(async packageName => {
+            const metadata = await json('https://registry.npmjs.org/' + encodeURIComponent(packageName));
+            const start = metadata.time.created.slice(0,10);
+            const url = 'https://api.npmjs.org/downloads/point/' + start + ':' + end + '/' + encodeURIComponent(packageName);
+            const result = await json(url);
+            if (result.start !== start || result.end !== end || !Number.isSafeInteger(result.downloads) || result.downloads < 0) throw new Error('Invalid downloads response');
+            return { package: packageName, created: metadata.time.created, latest: metadata['dist-tags']?.latest, url, ...result };
+          }));
+          console.log('CUMULATIVE_SNAPSHOT=' + JSON.stringify({requestedAt, completedAt: new Date().toISOString(), end, cumulative, totalRawRetrievals: cumulative.reduce((sum, item) => sum + item.downloads, 0)}));
+          console.log('Counts include dependencies, repeat installations and automation; they are not unique people.');
+          ADOPTION_SNAPSHOT
