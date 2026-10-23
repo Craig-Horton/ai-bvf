@@ -2,7 +2,7 @@
   "name": "ai-bvf",
   "private": true,
   "version": "0.1.0",
-  "description": "AI BVF monorepo \u2014 open protocol for scoring AI investments",
+  "description": "AI BVF monorepo — open protocol for scoring AI investments",
   "workspaces": [
     "packages/js",
     "packages/mcp",
@@ -22,7 +22,8 @@
     "qs": "^6.16.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0"
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@vercel/analytics": "^2.0.1"
   },
   "type": "module"
 }
