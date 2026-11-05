@@ -22,6 +22,11 @@ mcp as (
   from public.mcp_calls e cross join report r
   where e.ts >= r.starts_at and e.ts < r.ends_at
 ),
+page_viewers as (
+  select journey_hash, min(ts) as first_viewed_at
+  from web where event_name = 'start_page_viewed'
+  group by journey_hash
+),
 starters as (
   select journey_hash, min(ts) as started_at
   from web where event_name = 'assessment_started'
@@ -66,12 +71,15 @@ journeys as (
 ),
 web_counts as (
   select
+    (select count(*) from page_viewers) as start_page_viewer_ids,
     count(*) as assessment_starter_ids,
     count(verdict_at) as verdict_recipient_ids,
     count(saved_at) as local_decision_saver_ids,
     count(rescored_at) as later_rescorer_ids,
     count(handoff_at) as portfolio_handoff_ids,
     count(imported_at) as later_portfolio_import_ids,
+    (select count(distinct journey_hash) from web where event_name = 'connector_setup_opened')
+      as connector_setup_ids,
     count(*) filter (where exists (
       select 1 from web w where w.journey_hash = j.journey_hash
         and w.event_name = 'feedback_submitted' and w.ts >= j.started_at
@@ -112,11 +120,13 @@ event_detail as (
   select
     event_name,
     case event_name
+      when 'start_page_viewed' then 'Start page loaded in a browser session'
       when 'decision_record_saved' then 'decision saved in browser local storage'
       when 'rescore_due' then 'future re-score date recorded at save time'
       when 'improvement_plan_opened' then 'non-Accelerate plan rendered automatically'
       when 'portfolio_handoff_started' then 'portfolio navigation requested'
       when 'portfolio_import_confirmed' then 'portfolio import confirmation emitted'
+      when 'connector_setup_opened' then 'hosted connector instructions opened'
       else event_name
     end as event_meaning,
     entry_route,
@@ -143,6 +153,19 @@ feedback as (
       as responses_with_comments
   from web where event_name = 'feedback_submitted'
   group by feedback_response
+),
+acquisition as (
+  select
+    coalesce(utm_source, referrer_host, 'direct_or_unknown') as source,
+    coalesce(utm_medium, 'not_recorded') as medium,
+    coalesce(utm_campaign, 'not_recorded') as campaign,
+    count(*) filter (where event_name = 'start_page_viewed') as page_views,
+    count(distinct journey_hash) filter (where event_name = 'start_page_viewed') as browser_ids,
+    count(distinct journey_hash) filter (where event_name = 'assessment_started') as starter_ids,
+    count(distinct journey_hash) filter (where event_name = 'verdict_returned') as verdict_ids
+  from web
+  group by coalesce(utm_source, referrer_host, 'direct_or_unknown'),
+    coalesce(utm_medium, 'not_recorded'), coalesce(utm_campaign, 'not_recorded')
 )
 select
   r.starts_at as window_start_inclusive,
@@ -155,6 +178,10 @@ select
   'Observed IDs and events; internal and automated activity are unlabelled.'
     as interpretation,
   w.*,
+  round(100.0 * assessment_starter_ids / nullif(start_page_viewer_ids, 0), 1)
+    as start_page_to_assessment_pct,
+  round(100.0 * verdict_recipient_ids / nullif(start_page_viewer_ids, 0), 1)
+    as start_page_to_verdict_pct,
   round(100.0 * verdict_recipient_ids / nullif(assessment_starter_ids, 0), 1)
     as requested_assessment_verdict_pct,
   round(100.0 * local_decision_saver_ids / nullif(verdict_recipient_ids, 0), 1)
@@ -192,5 +219,7 @@ select
   coalesce((select jsonb_agg(to_jsonb(d) order by entry_route) from route_detail d), '[]'::jsonb)
     as mcp_route_detail,
   coalesce((select jsonb_agg(to_jsonb(f) order by feedback_response) from feedback f), '[]'::jsonb)
-    as feedback_summary
+    as feedback_summary,
+  coalesce((select jsonb_agg(to_jsonb(a) order by page_views desc, source) from acquisition a), '[]'::jsonb)
+    as acquisition_summary
 from report r cross join web_counts w;

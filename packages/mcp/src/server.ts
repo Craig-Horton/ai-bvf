@@ -18,7 +18,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.14.14';
+export const VERSION = '0.14.15';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 
@@ -1550,7 +1550,10 @@ export const telemetryEnabled = !TELEMETRY_DISABLED && !!TELEMETRY_DEFAULT_URL &
 export function createAibvfServer(options: { entryRoute?: EntryRoute } = {}): Server {
   const server = new Server(
     { name: 'io.github.Craig-Horton/aibvf-mcp', version: VERSION },
-    { capabilities: { tools: {} } },
+    {
+      capabilities: { tools: {} },
+      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. If it returns needs_input, ask its single clarification and call it again with the supplied answers. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
+    },
   );
   server.setRequestHandler(ListToolsRequestSchema, LIST_TOOLS_HANDLER);
   server.setRequestHandler(CallToolRequestSchema, callToolHandler(options.entryRoute ?? 'unknown'));

@@ -2,6 +2,16 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.14.15 (aibvf-mcp), 0.10.6 (@aibvf/core), 5 November 2026
+
+Changed: the Registry manifest now advertises the hosted Streamable HTTP endpoint alongside the npm package, so compatible clients can discover the no-install route.
+
+Changed: MCP server instructions make `assess_ai_initiative` the first tool for one plain-English proposal. The thirteen-tool surface and scoring rules are unchanged.
+
+Added: public-journey measurement can record a privacy-limited page-view denominator, connector setup, referring host and campaign labels without proposal text, organisation names or full URLs.
+
+Security: the MCP TypeScript SDK and its runtime dependency overrides move to patched releases. The published runtime has no known npm audit finding at release preparation.
+
 ## 0.14.14 (aibvf-mcp), 0.10.6 (@aibvf/core), 3 October 2026
 
 Fixed: plain-English assessment distinguishes company revenue from project budgets and project income. Ambiguous amounts, ranges, foreign currencies and non-annual revenue require clarification.

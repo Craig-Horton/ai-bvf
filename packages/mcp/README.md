@@ -12,6 +12,12 @@ Settings, then Connectors, then Add custom connector, and paste the hosted endpo
 https://mcp.aibvf.com/api/mcp
 ```
 
+Start with one request:
+
+> *"Use assess_ai_initiative to review this proposal: we are a EUR 2.4bn manufacturer considering a GenAI predictive maintenance rollout in our EU plants."*
+
+`assess_ai_initiative` resolves the business context, asks once for any missing decision input, then returns the verdict and the next action. The other twelve tools are specialist routes for a deeper score, work redesign or a portfolio.
+
 ## Install and run (stdio)
 
 ```bash

@@ -16,18 +16,22 @@ The SQL window is `[starts_at, ends_at)`, with a 30-day default. Replace `now()`
 | --- | --- |
 | npm raw download sum | Package retrievals across three packages, including dependencies, repeated installation and automation. |
 | Browser ID | A hash of a seed stored in browser localStorage. Several assessments can share it, and clearing storage creates another ID. |
-| Assessment starter | A browser ID that submitted nonempty text with the Assess button during the window. Page visits and typing are outside this denominator. |
+| Start page viewer | A browser ID that loaded the Start page during the window. It is a browser-storage count, not a person or organisation. |
+| Assessment starter | A page-viewing browser ID that submitted nonempty text with the assessment button during the window. Typing without submission remains outside this count. |
 | Verdict recipient | A starting browser ID with a later or simultaneous verdict event. |
 | Local decision saver | A verdict recipient with a later or simultaneous successful save to browser localStorage. |
 | Later rescorer | A local saver with an assessment_rescored event strictly after the save. The browser emitter also requires the evidence-review state. |
 | Portfolio handoff | A verdict recipient with a later or simultaneous request to navigate to the portfolio. |
 | Later portfolio import | A handoff browser ID with a later or simultaneous portfolio_import_confirmed event. This requires the emitter to complete successfully. |
+| Connector setup | A browser ID that opened the hosted connector instructions after a result. It does not establish that a connector was added. |
 | Local connection-only ID | A local MCP install hash with connection events and no recorded tool call in the window. |
 | Local tool-using ID | A local MCP install hash with at least one recorded call other than server_connect. |
 | Repeat local tool use | A local install hash with tool calls on at least two distinct UTC dates. Repeat connection events do not satisfy this measure. |
 | Remote tool calls | Recorded hosted MCP calls. Remote caller hashes originate in the server runtime and cannot count customers. |
 
 Ordered browser steps use the same browser ID. They cannot establish that each event belongs to the same assessment, or link browsers to authenticated organizations. Recent starters have less time to return, so these are observed window rates rather than fixed-day retention cohorts.
+
+The acquisition summary records a sanitised `utm_source`, `utm_medium`, `utm_campaign` and the referring hostname only. It never stores the full referring URL, query string, proposal or organisation. `direct_or_unknown` combines direct visits, blocked referrers and older events recorded before these fields existed.
 
 The event detail retains the raw event names and provides their meanings. `improvement_plan_opened` currently records automatic rendering for a non-Accelerate result. `rescore_due` records the future date when a local decision is saved; it does not establish that a reminder was delivered.
 

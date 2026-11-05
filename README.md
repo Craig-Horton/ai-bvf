@@ -102,7 +102,7 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.14.14 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.14.15 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
 | [`@aibvf/core`](packages/js) | 0.10.6 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |

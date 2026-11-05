@@ -1,19 +1,26 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.Craig-Horton/aibvf-mcp",
-  "description": "AI BVF: review AI proposals with Stop, Fix or Accelerate, evidence gaps and next actions.",
+  "title": "AI business value framework",
+  "description": "Review an AI proposal and return Stop, Fix or Accelerate, the decision gaps and the next action.",
   "status": "active",
-  "version": "0.14.14",
+  "version": "0.14.15",
   "repository": {
     "url": "https://github.com/Craig-Horton/ai-bvf",
     "source": "github"
   },
   "websiteUrl": "https://www.aibvf.com/start",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.aibvf.com/api/mcp"
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "aibvf-mcp",
-      "version": "0.14.14",
+      "version": "0.14.15",
       "transport": {
         "type": "stdio"
       }

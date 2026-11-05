@@ -21,6 +21,7 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
   try {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
+    assert.match(client.getInstructions() || '', /call assess_ai_initiative first/);
     const scored = await client.callTool({ name: 'score_initiative', arguments: input });
     assert.notEqual(scored.isError, true);
     const text = JSON.parse(scored.content[0].text);
