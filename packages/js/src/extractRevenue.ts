@@ -1,0 +1,96 @@
+/**
+ * Reads a company's annual revenue in EUR from a plain-language proposal.
+ * The front door no longer asks for revenue; this stays for the specialist
+ * scoring tools and for callers that use it directly.
+ */
+const MULTIPLIER: Record<string, number> = {
+  k: 1_000, thousand: 1_000,
+  m: 1_000_000, mn: 1_000_000, million: 1_000_000,
+  b: 1_000_000_000, bn: 1_000_000_000, billion: 1_000_000_000,
+};
+
+const SCALE = 'billion|million|thousand|bn|mn|[kmb]';
+const CURRENCY = 'EUR|euros?|USD|dollars?|GBP|pounds?|CHF|AUD|CAD|NZD|SEK|NOK|DKK|JPY|CNY|INR|BRL|RUB|ZAR|AED|SGD|HKD|PLN|CZK|HUF|KRW|ILS|TRY|MXN|TWD|THB|MYR|PHP|IDR|[€$£¥]';
+
+function amount(value: string, scale?: string): number | undefined {
+  const compact = value.replace(/ /g, '');
+  let normalized = compact;
+  if (compact.includes(',') && compact.includes('.')) {
+    if (/^\d{1,3}(?:,\d{3})+\.\d+$/.test(compact)) {
+      normalized = compact.replace(/,/g, '');
+    } else if (/^\d{1,3}(?:\.\d{3})+,\d+$/.test(compact)) {
+      normalized = compact.replace(/\./g, '').replace(',', '.');
+    } else return undefined;
+  } else if (/[,.]/.test(compact)) {
+    const parts = compact.split(/[,.]/);
+    const grouped = /^\d{1,3}(?:[,.]\d{3})+$/.test(compact);
+    // A scaled value such as "1,200 million" has two plausible readings.
+    if (scale && grouped) return undefined;
+    if (grouped) normalized = compact.replace(/[,.]/g, '');
+    else if (parts.length === 2) normalized = compact.replace(',', '.');
+    else return undefined;
+  }
+  const result = Math.round(Number(normalized) * (scale ? MULTIPLIER[scale.toLowerCase()] : 1));
+  return Number.isSafeInteger(result) && result >= 0 ? result : undefined;
+}
+
+/**
+ * Reads revenue-labelled amounts and explicit EUR company-size descriptions.
+ * Costs, foreign currencies and conflicting amounts require a revenue answer.
+ * Unmarked revenue/turnover retains the EUR default used by the assessment.
+ */
+export function extractRevenueEur(proposal: string): number | undefined {
+  const text = proposal.replace(/[\u00a0\u202f]/g, ' ');
+  const number = '(?:[0-9]{1,3}(?: [0-9]{3})+(?:[.,][0-9]+)?|[0-9]+(?:[.,][0-9]+)*)';
+  const monetaryAmount = new RegExp(
+    String.raw`(?<![\w.,])(?:(?<before>${CURRENCY})\s*)?(?<value>${number})\s*(?<scale>${SCALE})?(?![\w]|[.,][0-9])(?:\s*(?<after>${CURRENCY})(?!\w|\s*[0-9]))?`,
+    'gi',
+  );
+  const revenueBefore = /\b(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const revenueAfter = /^\s*(?:(?:in|of)\s+)?(?:annual\s+)?(?:revenue|turnover)\b/i;
+  const nonRevenueBefore = /\b(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\s*(?:(?:of|is|are|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const nonRevenueAfter = /^\s*(?:(?:in|of|for|annual|projected|expected|implementation|operating)\s+)*(?:pilot|project|budget|costs?|spend|investment|savings?|benefits?|funding|profit|valuation)\b/i;
+  const projectRevenueBefore = /\b(?:(?:project|pilot|initiative)(?:['’]s)?|incremental|additional|projected|expected|potential|target|expect|forecast|anticipate)\s+(?:annual\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const projectRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:incremental|additional|projected|expected|potential|target)\s+(?:annual\s+)?(?:revenue|turnover)\b/i;
+  const projectRevenueSource = /^\s*(?:(?:in|of)\s+)?(?:(?:annual|incremental|additional|projected|expected|potential|target)\s+)?(?:(?:revenue|turnover)\s+)?(?:from|for|generated\s+by|attributable\s+to)\s+(?:(?:the|this|our|an?)\s+)?(?:pilot|project|initiative)\b/i;
+  const periodicRevenueBefore = /\b(?:monthly|quarterly|weekly|daily|Q[1-4])\s+(?:(?:company|organisation|organization)\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
+  const periodicRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:(?:revenue|turnover)\s+)?(?:(?:per|a|each|every)\s+(?:month|quarter|week|day)\b|(?:monthly|quarterly|weekly|daily)\b|\/\s*(?:month|quarter|week|day)\b)/i;
+  // "15m euro IT services company": up to three describing words may sit between the
+  // amount and the organisation noun, but never a preposition or verb ("EUR 2m saved by the business").
+  const companyAfter = /^\s*(?:(?!(?:at|for|by|in|to|from|of|on|with|per|and|or|that|which|is|was|are|will|would|saved|spent|invested|raised|paid|lost)\b)[\w&-]+\s+){0,3}?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit|firm|practice|agency|group|provider|msp|charity|startup|consultancy|partnership|council|university|school|studio|clinic)\b/i;
+  const rangeAfter = new RegExp(String.raw`^\s*(?:[-–—/]|to\b|through\b|or\b)\s*(?:(?:${CURRENCY})\s*)?[0-9]`, 'i');
+  const foreignCodeSuffix = /^\s*[A-Z]{3}\b/;
+  const foreignSuffix = /^\s*(?:dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/i;
+  const revenues: number[] = [];
+  const otherAmounts: number[] = [];
+  let unresolved = false;
+
+  for (const match of text.matchAll(monetaryAmount)) {
+    const { before: currencyBefore, after: currencyAfter, value, scale } = match.groups!;
+    const before = text.slice(0, match.index).slice(-100);
+    const after = text.slice(match.index! + match[0].length, match.index! + match[0].length + 100);
+    const labelled = revenueBefore.test(before) || revenueAfter.test(after);
+    if (projectRevenueBefore.test(before) || projectRevenueAfter.test(after)
+        || projectRevenueSource.test(after) || periodicRevenueBefore.test(before)
+        || periodicRevenueAfter.test(after)) continue;
+    if (!labelled && (nonRevenueBefore.test(before) || nonRevenueAfter.test(after))) continue;
+    const currencies = [currencyBefore, currencyAfter].filter(Boolean);
+    const euro = currencies.length > 0 && currencies.every((currency) => /^(?:EUR|euros?|€)$/i.test(currency));
+    const companySize = euro && companyAfter.test(after);
+    if (!labelled && !companySize && !currencies.length) continue;
+    const parsed = amount(value, scale);
+    if ((currencies.length && !euro) || /[-−]\s*$/.test(before) || parsed === undefined
+        || rangeAfter.test(after) || /^\s*[0-9]/.test(after)
+        || (!currencies.length && (foreignCodeSuffix.test(after) || foreignSuffix.test(after)))) {
+      if (labelled || companySize) unresolved = true;
+      continue;
+    }
+    if (labelled || companySize) revenues.push(parsed);
+    else otherAmounts.push(parsed);
+  }
+
+  const distinct = new Set(revenues);
+  if (unresolved || distinct.size !== 1) return undefined;
+  const revenue = revenues[0];
+  return otherAmounts.some((value) => value !== revenue) ? undefined : revenue;
+}

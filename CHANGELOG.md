@@ -24,6 +24,18 @@ Changed: agentic AI in a regulated industry or function no longer returns Stop o
 
 Breaking for `assess_ai_initiative` callers: `verdict` no longer carries `net_value_eur`, `gross_value_eur`, `multipliers`, `drivers`, `scores_used`, `pillar_basis`, `sensitivity`, `benchmark_source` or `caveat`. It carries `scores_supplied`, `verdict_flips`, `value_note`, the work architecture gate and the audit record.
 
+Changed: `assess_ai_initiative` is a guided conversation. It reads the context, returns `needs_confirmation` with the reading for the user to confirm or correct, then asks at most five plain questions, one at a time, in `question`.
+
+Added: every guided question carries four everyday answers and "I do not know yet". Each answer maps to a fixed, published score in `CHOICE_SCORES`; the answer, its wording and its score are returned in `answers_given` and recorded in the audit rules. An unknown answer fills nothing in and is listed in `to_find_out`.
+
+Added: two wordings by size. Organisations under 250 people get questions phrased for an owner, larger ones for an executive. The scores, thresholds and work redesign gate are identical for both.
+
+Changed: the front door asks for headcount and no longer asks for annual revenue or the agile, traditional or siloed label. Both inputs are accepted and ignored. Missing context is asked for one item at a time, with choices.
+
+Changed: the work redesign question is asked last, and only when the four pillars clear the Accelerate thresholds.
+
+Breaking for `assess_ai_initiative` callers: `resolved_inputs` and `missing_fields` no longer carry `revenue_eur` or `readiness` and now carry `employees` and `track`. A fourth status, `needs_confirmation`, precedes the questions whenever any context was read from the wording.
+
 Scope: `score_initiative`, the portfolio tools, the scoring formulas and the thresholds are unchanged, and keep the planning range for advisory work. Package versions have not moved; this entry takes its version numbers at release.
 
 ## 0.14.15 (aibvf-mcp), 0.10.6 (@aibvf/core), 5 November 2026

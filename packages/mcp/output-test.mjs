@@ -41,31 +41,34 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
     assert.deepEqual(plan.audit, recommendImprovements(input).audit);
     assert.ok(plan.audit.rules_fired.length > 0);
 
-    const assessment = await client.callTool({
-      name: 'assess_ai_initiative',
-      arguments: { proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.' },
-    });
-    assert.notEqual(assessment.isError, true);
-    // The front door fills in nothing: with no scores supplied there is no verdict and no euro figure.
-    assert.equal(assessment.structuredContent.status, 'not_enough_to_judge');
-    assert.equal(assessment.structuredContent.verdict, undefined);
-    assert.equal(assessment.structuredContent.decides.length, 3);
-    assert.doesNotMatch(JSON.stringify(assessment.structuredContent), /net_value_eur|gross_value_eur|scores_used|pillar_basis/);
+    const proposal = 'We are a retailer with 3,000 staff considering a GenAI assistant for customer service.';
+    const assess = async (extra = {}) => {
+      const result = await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal, ...extra } });
+      assert.notEqual(result.isError, true);
+      return result.structuredContent;
+    };
+    // The front door is a guided conversation: confirm the reading, then one question at a time.
+    const read = await assess();
+    assert.equal(read.status, 'needs_confirmation');
+    assert.match(read.understood, /3,000 people/);
+    const first = await assess({ confirmed: true });
+    assert.equal(first.status, 'not_enough_to_judge');
+    assert.equal(first.verdict, undefined);
+    assert.equal(first.question.id, 'financial_return');
+    assert.equal(first.question.choices.length, 5);
+    assert.doesNotMatch(JSON.stringify(first), /net_value_eur|gross_value_eur|scores_used|pillar_basis/);
 
-    const judged = await client.callTool({
-      name: 'assess_ai_initiative',
-      arguments: {
-        proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.',
-        scores: { strategic_alignment: 70, financial_return: 64, change_enablement: 48, governance_risk: 35 },
-      },
+    const judged = await assess({
+      confirmed: true,
+      answers: { financial_return: 'c', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'b' },
     });
-    assert.notEqual(judged.isError, true);
-    assert.equal(judged.structuredContent.status, 'verdict');
-    assert.equal(judged.structuredContent.verdict.classification, 'Fix');
-    assert.ok(judged.structuredContent.verdict.audit);
-    assert.ok(judged.structuredContent.verdict.verdict_flips.length > 0);
-    assert.match(judged.structuredContent.verdict.value_note, /own volumes, hours and costs/);
-    assert.doesNotMatch(JSON.stringify(judged.structuredContent), /net_value_eur|gross_value_eur|scores_used|estimated/);
+    assert.equal(judged.status, 'verdict');
+    assert.equal(judged.verdict.classification, 'Fix');
+    assert.ok(judged.verdict.audit);
+    assert.ok(judged.verdict.verdict_flips.length > 0);
+    assert.equal(judged.verdict.answers_given.change_enablement.score, 45);
+    assert.match(judged.verdict.value_note, /own volumes, hours and costs/);
+    assert.doesNotMatch(JSON.stringify(judged), /net_value_eur|gross_value_eur|scores_used|estimated/);
   } finally {
     await client.close();
     await server.close();
@@ -220,7 +223,8 @@ test('MCP explanations disclose compatibility field limits on tool listings and 
     assert.match(single.interpretation.applied_modules, /do not certify/);
     assert.match(single.interpretation.net_value_eur, /before project build, run and change costs/);
     const assessment = await call('assess_ai_initiative', {
-      proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.',
+      proposal: 'We are a retailer with 3,000 staff considering a GenAI assistant for customer service.',
+      confirmed: true,
       scores: { strategic_alignment: 70, financial_return: 64, change_enablement: 48, governance_risk: 35 },
     });
     assert.match(assessment.verdict.interpretation.decision_confidence, /no probability calibration/);

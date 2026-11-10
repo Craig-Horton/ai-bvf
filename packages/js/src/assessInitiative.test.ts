@@ -1,367 +1,255 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessInitiative, extractRevenueEur } from './assessInitiative.js';
+import { assessInitiative, extractEmployees } from './assessInitiative.js';
+import { CHOICE_SCORES, WORDING } from './guidedQuestions.js';
 
-const examples = [
-  {
-    proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.',
-    expected: { industry: 'retail', revenue_eur: 300_000_000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional' },
-  },
-  {
-    proposal: 'A siloed hospital group with EUR 1.2 billion revenue is considering an agentic prior-authorisation agent for compliance.',
-    expected: { industry: 'healthcare', revenue_eur: 1_200_000_000, function: 'risk', ai_tier: 'gen3', readiness: 'siloed' },
-  },
-  {
-    proposal: 'An established bank with annual revenue of EUR 2bn wants RPA automation for accounts payable.',
-    expected: { industry: 'financial', revenue_eur: 2_000_000_000, function: 'finance', ai_tier: 'gen1', readiness: 'traditional' },
-  },
-];
+const firm = 'We are a 40-person accountancy firm and we want a chatbot to speed up our month-end bookkeeping.';
+const bank = 'A bank with 9,000 employees wants autonomous agents in customer service.';
+const retailer = 'A retailer with 3,000 staff wants a GenAI assistant for customer service.';
+const ok = { confirmed: true };
 
-test('extractRevenueEur reads common EUR business formats', () => {
-  assert.equal(extractRevenueEur('a EUR 300m retailer'), 300_000_000);
-  assert.equal(extractRevenueEur('turnover of 1.2 billion'), 1_200_000_000);
-  assert.equal(extractRevenueEur('300 million euro retailer'), 300_000_000);
+// ── context ────────────────────────────────────────────────────────────────
+
+test('the front door needs industry, function, AI type and headcount, and nothing about revenue or operating model', () => {
+  const r = assessInitiative({ proposal: firm });
+  assert.deepEqual(r.resolved_inputs, { industry: 'professional', function: 'finance', ai_tier: 'gen2', employees: 40, track: 'smaller_firm' });
+  assert.deepEqual(r.missing_fields, []);
+  assert.deepEqual(r.inferred_fields, ['industry', 'function', 'ai_tier', 'employees']);
+  assert.doesNotMatch(JSON.stringify(r), /revenue|readiness|agile|siloed/);
 });
 
-test('prepared sector examples resolve deterministically and wait for supplied scores', () => {
-  for (const example of examples) {
-    const first = assessInitiative({ proposal: example.proposal });
-    const second = assessInitiative({ proposal: example.proposal });
-    assert.equal(first.status, 'not_enough_to_judge');
-    assert.deepEqual(first.resolved_inputs, example.expected);
-    assert.equal(first.verdict, undefined);
-    assert.deepEqual(second, first);
+test('missing context is asked for one item at a time, with choices in everyday words', () => {
+  const first = assessInitiative({ proposal: 'We want to use AI to improve an internal process.' });
+  assert.equal(first.status, 'needs_input');
+  assert.deepEqual(first.missing_fields, ['industry', 'function', 'ai_tier', 'employees']);
+  assert.equal(first.next_question, 'Which industry is the organisation in?');
+  assert.equal(first.question?.id, 'industry');
+  assert.equal(first.question?.answer_in, 'industry');
+  assert.ok(first.question?.choices?.some((c) => c.id === 'professional' && c.label === 'professional services'));
+
+  const second = assessInitiative({ proposal: first.proposal, industry: 'retail' });
+  assert.equal(second.next_question, 'Which part of the business will use it?');
+  const third = assessInitiative({ proposal: first.proposal, industry: 'retail', function: 'customer service' });
+  assert.equal(third.question?.id, 'ai_tier');
+  assert.deepEqual(third.question?.choices?.map((c) => c.id), ['gen1', 'gen2', 'gen3']);
+  const fourth = assessInitiative({ proposal: first.proposal, industry: 'retail', function: 'customer service', ai_tier: 'chatbot' });
+  assert.equal(fourth.next_question, 'How many people work in the organisation?');
+  assert.equal(fourth.question?.choices, undefined);
+});
+
+test('a two-way reading is asked as a choice between the two', () => {
+  const r = assessInitiative({ proposal: 'A software company with 80 employees selling to hospitals wants a copilot for customer service.' });
+  assert.equal(r.status, 'needs_input');
+  assert.equal(r.next_question, 'The proposal points to more than one industry: healthcare or technology. Which one applies?');
+  assert.deepEqual(r.question?.choices?.map((c) => c.id), ['healthcare', 'technology']);
+  assert.deepEqual(r.ambiguous_fields, { industry: ['healthcare', 'technology'] });
+});
+
+test('headcount is read from descriptions of the organisation and never from a bare group of people', () => {
+  assert.equal(extractEmployees('We are a 40-person accountancy firm.')?.value, 40);
+  assert.equal(extractEmployees('We are a 12 person MSP.')?.value, 12);
+  assert.equal(extractEmployees('Copilot for all 600 staff.')?.value, 600);
+  assert.equal(extractEmployees('A bank with 9,000 employees.')?.value, 9000);
+  assert.equal(extractEmployees('A design agency of 9 people.')?.value, 9);
+  assert.equal(extractEmployees('We want AI to help 40 people in finance.'), undefined);
+  assert.equal(extractEmployees('A 2 billion euro bank.'), undefined);
+  assert.equal(extractEmployees('We have 300 staff in the UK and 80 staff in Spain.'), undefined);
+  const padded = `A retailer wants a chatbot. ${`12${' '.repeat(20_000)}`.repeat(3)}people`;
+  const started = performance.now();
+  extractEmployees(padded);
+  assert.ok(performance.now() - started < 1_000);
+});
+
+test('the size line sits at 250 people', () => {
+  assert.equal(assessInitiative({ proposal: firm, employees: 249 }).resolved_inputs.track, 'smaller_firm');
+  assert.equal(assessInitiative({ proposal: firm, employees: 250 }).resolved_inputs.track, 'enterprise');
+});
+
+// ── confirmation ───────────────────────────────────────────────────────────
+
+test('the reading is confirmed before any question is asked', () => {
+  const r = assessInitiative({ proposal: firm });
+  assert.equal(r.status, 'needs_confirmation');
+  assert.equal(r.understood, 'Read as: industry professional services; business function finance; AI type GenAI; 40 people, so the questions are worded for a smaller firm. Correct any item that is wrong.');
+  assert.equal(r.next_question, 'Is this reading right? Confirm it, or correct any item.');
+  assert.equal(r.question?.id, 'confirmation');
+  assert.equal(r.decides, undefined);
+  assert.equal(r.verdict, undefined);
+
+  const corrected = assessInitiative({ proposal: firm, function: 'customer service' });
+  assert.equal(corrected.status, 'needs_confirmation');
+  assert.equal(corrected.resolved_inputs.function, 'cx');
+  assert.ok(!corrected.inferred_fields.includes('function'));
+
+  assert.equal(assessInitiative({ proposal: firm, ...ok }).status, 'not_enough_to_judge');
+});
+
+test('nothing read from the wording means nothing to confirm', () => {
+  const r = assessInitiative({ proposal: 'An idea.', industry: 'retail', function: 'cx', ai_tier: 'gen2', employees: 30 });
+  assert.deepEqual(r.inferred_fields, []);
+  assert.equal(r.status, 'not_enough_to_judge');
+});
+
+// ── guided questions ───────────────────────────────────────────────────────
+
+test('questions come one at a time, the two that can stop the initiative first', () => {
+  const r = assessInitiative({ proposal: firm, ...ok });
+  assert.equal(r.status, 'not_enough_to_judge');
+  assert.equal(r.question?.id, 'financial_return');
+  assert.equal(r.question?.number, 1);
+  assert.equal(r.question?.of_at_most, 5);
+  assert.equal(r.next_question, 'Not enough to judge yet. Question 1 of at most 5: What does it cost each month, and what does it save or earn?');
+  assert.deepEqual(r.question?.choices?.map((c) => c.id), ['a', 'b', 'c', 'd', 'unknown']);
+  assert.deepEqual(r.decides?.map((d) => d.id), ['financial_return', 'governance_risk', 'strategic_alignment']);
+  assert.deepEqual(r.also_open, ['change_enablement', 'work_architecture']);
+
+  const next = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'c' } });
+  assert.equal(next.question?.id, 'governance_risk');
+  assert.equal(next.question?.number, 2);
+  assert.equal(next.next_question, 'Question 2 of at most 5: What could go wrong, and who can step in?');
+  assert.doesNotMatch(JSON.stringify(next), /net_value|gross_value|estimated|scores_used/);
+});
+
+test('smaller firms and larger organisations get different wording and the same scores', () => {
+  const small = assessInitiative({ proposal: firm, ...ok });
+  const large = assessInitiative({ proposal: retailer, ...ok });
+  assert.equal(small.question?.question, 'What does it cost each month, and what does it save or earn?');
+  assert.equal(large.question?.question, 'What does it cost to build and run, and what does it return each year?');
+  assert.equal(small.question?.choices?.[2].label, 'It pays for itself within two years, on numbers we have checked.');
+  assert.equal(large.question?.choices?.[2].label, 'The return covers the cost within two years, on figures finance has checked.');
+
+  const answers = { financial_return: 'c', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'b' } as const;
+  const smallVerdict = assessInitiative({ proposal: firm, ...ok, answers }).verdict;
+  const largeVerdict = assessInitiative({ proposal: retailer, ...ok, answers }).verdict;
+  assert.equal(smallVerdict?.classification, 'Fix');
+  assert.equal(largeVerdict?.classification, 'Fix');
+  assert.deepEqual(smallVerdict?.scores_supplied, largeVerdict?.scores_supplied);
+  assert.equal(smallVerdict?.confidence, largeVerdict?.confidence);
+});
+
+test('every question has four answers in both wordings, and the scores sit on the right side of the thresholds', () => {
+  for (const track of ['smaller_firm', 'enterprise'] as const) {
+    for (const wording of Object.values(WORDING[track])) {
+      for (const text of [wording.question, wording.a, wording.b, wording.c, wording.d]) {
+        assert.ok(text.length > 5);
+        assert.doesNotMatch(text, /[—–]/);
+      }
+    }
   }
-});
-
-test('asks one question when a required field is missing', () => {
-  const result = assessInitiative({
-    proposal: 'A traditional retailer wants a GenAI assistant for customer service.',
-  });
-  assert.equal(result.status, 'needs_input');
-  assert.deepEqual(result.missing_fields, ['revenue_eur']);
-  assert.equal(result.next_question, "What is the organisation's approximate annual revenue in EUR?");
-  assert.equal(result.verdict, undefined);
-});
-
-test('provided values override proposal resolution', () => {
-  const result = assessInitiative({
-    proposal: 'A traditional retailer with EUR 300m revenue wants a GenAI assistant for customer service.',
-    readiness: 'agile',
-  });
-  assert.equal(result.resolved_inputs.readiness, 'agile');
-  assert.equal(result.status, 'not_enough_to_judge');
-});
-
-test('asks for every unresolved input in one clarification', () => {
-  const result = assessInitiative({
-    proposal: 'We want to use AI to improve an internal process.',
-  });
-  assert.equal(result.status, 'needs_input');
-  assert.deepEqual(result.missing_fields, ['industry', 'revenue_eur', 'function', 'ai_tier', 'readiness']);
-  assert.match(result.next_question ?? '', /industry/);
-  assert.match(result.next_question ?? '', /annual revenue in EUR/);
-  assert.match(result.next_question ?? '', /owning business function/);
-  assert.match(result.next_question ?? '', /automation, GenAI, or agentic/);
-  assert.match(result.next_question ?? '', /agile, traditional, or siloed/);
-});
-
-test('hyphenated industry aliases resolve inside a full proposal', () => {
-  const nonprofit = assessInitiative({
-    proposal: 'A traditional non-profit with EUR 100m revenue wants a GenAI assistant for recruiting.',
-  });
-  const universal = assessInitiative({
-    proposal: 'A traditional cross-industry business with EUR 500m revenue wants a GenAI assistant for finance.',
-  });
-  assert.equal(nonprofit.status, 'not_enough_to_judge');
-  assert.equal(nonprofit.resolved_inputs.industry, 'nonprofit');
-  assert.equal(universal.status, 'not_enough_to_judge');
-  assert.equal(universal.resolved_inputs.industry, 'universal');
-});
-
-test('returns the work architecture question when evidence is absent', () => {
-  const result = assessInitiative({
-    proposal: examples[0].proposal,
-    scores: { strategic_alignment: 55, financial_return: 55, change_enablement: 55, governance_risk: 45 },
-  });
-  assert.equal(result.status, 'verdict');
-  assert.equal(result.verdict?.work_architecture.status, 'unknown');
-  assert.equal(result.verdict?.work_architecture.blocks_accelerate, true);
-  assert.equal(result.verdict?.work_architecture.unknowns.length, 4);
-  assert.ok(result.verdict?.work_architecture.next_question?.includes('affected roles'));
-});
-
-test('unknown work architecture blocks an otherwise Accelerate verdict', () => {
-  const result = assessInitiative({
-    proposal: examples[0].proposal,
-    scores: { strategic_alignment: 80, financial_return: 75, change_enablement: 70, governance_risk: 30 },
-  });
-  assert.equal(result.status, 'verdict');
-  assert.equal(result.verdict?.classification, 'Fix');
-  assert.equal(result.verdict?.work_architecture.status, 'unknown');
-  assert.ok(result.verdict?.reason.includes('not evidenced'));
-  assert.ok(result.verdict?.audit.rules_fired.includes('gate:work_architecture_gap'));
-});
-
-test('a stated work architecture gap blocks an otherwise Accelerate verdict', () => {
-  const result = assessInitiative({
-    proposal: examples[0].proposal,
-    scores: { strategic_alignment: 80, financial_return: 75, change_enablement: 70, governance_risk: 30 },
-    work_architecture: {
-      workflow_redesigned: true,
-      roles_redesigned: false,
-      decision_rights_defined: true,
-      measures_updated: false,
-    },
-  });
-  assert.equal(result.status, 'verdict');
-  assert.equal(result.verdict?.classification, 'Fix');
-  assert.deepEqual(result.verdict?.work_architecture.gaps, [
-    'affected roles and accountabilities redesigned',
-    'performance measures and incentives updated',
-  ]);
-  assert.deepEqual(result.verdict?.work_architecture.unknowns, []);
-  assert.ok(result.verdict?.audit.rules_fired.includes('gate:work_architecture_gap'));
-});
-
-test('evidenced work architecture allows the four pillars to return Accelerate', () => {
-  const result = assessInitiative({
-    proposal: examples[0].proposal,
-    scores: { strategic_alignment: 80, financial_return: 75, change_enablement: 70, governance_risk: 30 },
-    work_architecture: {
-      workflow_redesigned: true,
-      roles_redesigned: true,
-      decision_rights_defined: true,
-      measures_updated: true,
-    },
-  });
-  assert.equal(result.verdict?.classification, 'Accelerate');
-  assert.equal(result.verdict?.work_architecture.status, 'ready');
-  assert.deepEqual(result.verdict?.work_architecture.unknowns, []);
-  assert.equal(result.verdict?.work_architecture.next_question, undefined);
-});
-
-
-test('revenue extraction separates company revenue from initiative costs and benefits', () => {
-  for (const proposal of [
-    'A EUR 250k pilot for a retailer with EUR 300m annual revenue.',
-    'Pilot EUR 250k; company annual revenue EUR 300m.',
-    'Company revenue EUR 300 million; implementation costs EUR 250k.',
-    'Project adds EUR 2m incremental revenue; company revenue is EUR 300m.',
-    'Project revenue EUR 2m; company turnover EUR 300m.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), 300_000_000, proposal);
+  assert.ok(CHOICE_SCORES.financial_return.a <= 20);
+  assert.ok(CHOICE_SCORES.governance_risk.a >= 70);
+  for (const pillar of ['financial_return', 'strategic_alignment', 'change_enablement'] as const) {
+    assert.ok(CHOICE_SCORES[pillar].b < 60 && CHOICE_SCORES[pillar].c >= 60);
   }
-  for (const proposal of [
-    'Pilot cost EUR 250k; annual operating cost EUR 50k.',
-    'Company revenue is undisclosed; project budget EUR 250k.',
-    'We expect EUR 2m incremental revenue from the project.',
-    'An investment of EUR 2m in a traditional retailer.',
-    'Annual revenue USD 300m; project budget EUR 250k.',
-    'Revenue 300 million dollars; a EUR 250k pilot.',
-    'Company revenue 300m BRL.',
-    'Company revenue 300m rupees.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), undefined, proposal);
-  }
+  assert.ok(CHOICE_SCORES.governance_risk.b > 40 && CHOICE_SCORES.governance_risk.c <= 40);
 });
 
-test('conflicting amounts require clarification while repeated equivalent revenue resolves', () => {
-  for (const proposal of [
-    'Annual revenue EUR 300m; annual revenue EUR 400m.',
-    'Revenue EUR 300m in 2024 and EUR 350m in 2025.',
-    'Revenue EUR 300m EUR 400m.',
-    'An EUR 300m retailer and an EUR 400m bank.',
-    'Revenue EUR 300m and an unexplained EUR 250k.',
-    'Revenue EUR 300-400m.',
-    'Revenue EUR 300m to EUR 400m.',
-    'Revenue EUR 300m or 400m.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), undefined, proposal);
-  }
-  assert.equal(
-    extractRevenueEur('Annual revenue EUR 300m, also reported as EUR 300,000,000.'),
-    300_000_000,
-  );
+test('one answer can stop the initiative on its own, with no further questions', () => {
+  const thin = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'a' } });
+  assert.equal(thin.status, 'verdict');
+  assert.equal(thin.verdict?.classification, 'Stop');
+  assert.equal(thin.verdict?.reason, 'Financial return too thin to justify scope.');
+  assert.deepEqual(thin.verdict?.answers_given.financial_return, { choice: 'a', label: 'It costs more than it saves.', score: 15 });
+  assert.equal(thin.verdict?.confidence, undefined);
+
+  const risk = assessInitiative({ proposal: bank, ...ok, answers: { governance_risk: 'a' } });
+  assert.equal(risk.verdict?.classification, 'Stop');
+  assert.equal(risk.verdict?.reason, 'Governance risk above the safe threshold.');
 });
 
-test('revenue extraction handles full scales, decimal commas and grouped EUR amounts', () => {
-  for (const [proposal, expected] of [
-    ['A EUR300m retailer.', 300_000_000],
-    ['Annual revenue EUR 1.5 billion.', 1_500_000_000],
-    ['Annual revenue EUR 1,5 million.', 1_500_000],
-    ['Annual revenue EUR 1,500,000.50.', 1_500_001],
-    ['Annual revenue EUR 1.500.000,50.', 1_500_001],
-    ['Annual revenue EUR 1 500 000.', 1_500_000],
-    ['Annual revenue EUR\u202f1\u202f500\u202f000.', 1_500_000],
-    ['Annual turnover: 2bn.', 2_000_000_000],
-    ['Annual turnover: EUR 250 thousand.', 250_000],
-    ['Annual revenue EUR 0.', 0],
-    ['Annual revenue EUR 300 measured.', 300],
-  ] as const) {
-    assert.equal(extractRevenueEur(proposal), expected, proposal);
-  }
-  for (const proposal of [
-    'Annual revenue EUR 1,200 million.',
-    'Annual revenue EUR 1,20,000.',
-    'Annual revenue EUR 12 34 567.',
-    'Annual revenue EUR 300m2.',
-    'Annual revenue -EUR 300m.',
-    'Annual revenue EUR 999999999999999999999 billion.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), undefined, proposal);
-  }
+test('agentic AI in a regulated setting asks governance first, with a warning', () => {
+  const r = assessInitiative({ proposal: bank, ...ok });
+  assert.equal(r.status, 'not_enough_to_judge');
+  assert.equal(r.question?.id, 'governance_risk');
+  assert.equal(r.warning, 'Agentic AI in a regulated setting cannot proceed until its controls are shown. Answer the governance question first.');
+  const answered = assessInitiative({ proposal: bank, ...ok, answers: { governance_risk: 'c' } });
+  assert.equal(answered.warning, undefined);
+  assert.equal(answered.question?.id, 'financial_return');
 });
 
-test('assessment asks for company revenue when the only amount is a project budget', () => {
-  const result = assessInitiative({
-    proposal: 'A traditional retailer wants a GenAI assistant for customer service with a project budget of EUR 250k.',
+test('four answers that do not clear the bar return Fix without asking about work redesign', () => {
+  const r = assessInitiative({
+    proposal: firm, ...ok,
+    answers: { financial_return: 'c', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'b' },
   });
-  assert.equal(result.status, 'needs_input');
-  assert.deepEqual(result.missing_fields, ['revenue_eur']);
-  assert.equal(result.next_question, "What is the organisation's approximate annual revenue in EUR?");
-  assert.equal(result.verdict, undefined);
+  assert.equal(r.status, 'verdict');
+  assert.equal(r.verdict?.classification, 'Fix');
+  assert.equal(r.verdict?.reason, 'Workable, but change enablement is a risk. Close the gap before scaling.');
+  assert.ok(r.verdict?.verdict_flips?.length);
+  assert.match(r.verdict?.value_note ?? '', /own volumes, hours and costs/);
+  assert.ok(r.verdict?.audit.rules_fired.includes('track:smaller_firm'));
+  assert.ok(r.verdict?.audit.rules_fired.includes('answer:change_enablement=b(45)'));
+  assert.ok(r.verdict?.audit.rules_fired.includes('front_door:value_withheld'));
+  assert.doesNotMatch(JSON.stringify(r), /net_value|gross_value|revenue|estimated/);
 });
 
-test('an explicit revenue answer resolves an ambiguous proposal', () => {
-  const proposal = 'A traditional retailer wants a GenAI assistant for customer service. Annual revenue EUR 300m in 2024 and EUR 350m in 2025.';
-  const ambiguous = assessInitiative({ proposal });
-  assert.equal(ambiguous.status, 'needs_input');
-  assert.deepEqual(ambiguous.missing_fields, ['revenue_eur']);
-  assert.equal(ambiguous.verdict, undefined);
+test('four answers that clear the bar bring the fifth question, and all four parts of the work redesign unlock Accelerate', () => {
+  const answers = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'c', change_enablement: 'c' } as const;
+  const fifth = assessInitiative({ proposal: firm, ...ok, answers });
+  assert.equal(fifth.status, 'not_enough_to_judge');
+  assert.equal(fifth.question?.id, 'work_architecture');
+  assert.equal(fifth.question?.number, 5);
+  assert.equal(fifth.question?.question, 'What changes in how the work gets done?');
 
-  const answered = assessInitiative({ proposal, revenue_eur: 350_000_000 });
-  assert.equal(answered.status, 'not_enough_to_judge');
-  assert.equal(answered.resolved_inputs.revenue_eur, 350_000_000);
-  assert.ok(answered.resolutions.includes('revenue_eur resolved as 350000000 from provided value.'));
+  const go = assessInitiative({ proposal: firm, ...ok, answers: { ...answers, work_architecture: 'd' } });
+  assert.equal(go.verdict?.classification, 'Accelerate');
+  assert.equal(go.verdict?.work_architecture.status, 'ready');
+
+  const partly = assessInitiative({ proposal: firm, ...ok, answers: { ...answers, work_architecture: 'b' } });
+  assert.equal(partly.verdict?.classification, 'Fix');
+  assert.ok(partly.verdict?.audit.rules_fired.includes('gate:work_architecture_gap'));
+
+  const unsure = assessInitiative({ proposal: firm, ...ok, answers: { ...answers, work_architecture: 'unknown' } });
+  assert.equal(unsure.verdict?.classification, 'Fix');
+  assert.ok(unsure.verdict?.reason.includes('not evidenced'));
 });
 
-test('a proposal with a cost before revenue uses company revenue in the verdict', () => {
-  const result = assessInitiative({
-    proposal: 'A traditional retailer wants a EUR 250k GenAI assistant for customer service. Its annual revenue is EUR 300m.',
+test('"I do not know yet" fills nothing in: the question stays open and is listed to find out', () => {
+  const r = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'unknown' } });
+  assert.equal(r.status, 'not_enough_to_judge');
+  assert.equal(r.question?.id, 'governance_risk');
+  assert.equal(r.question?.number, 2);
+  assert.deepEqual(r.to_find_out?.map((d) => d.id), ['financial_return']);
+
+  const done = assessInitiative({
+    proposal: firm, ...ok,
+    answers: { financial_return: 'unknown', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'unknown' },
   });
-  // An unlabelled spend still needs clarification rather than silently becoming revenue.
-  assert.equal(result.status, 'needs_input');
-  const clear = assessInitiative({
-    proposal: 'A traditional retailer wants a GenAI assistant for customer service. Pilot cost EUR 250k; annual revenue EUR 300m.',
-  });
-  assert.equal(clear.status, 'not_enough_to_judge');
-  assert.equal(clear.resolved_inputs.revenue_eur, 300_000_000);
+  assert.equal(done.status, 'not_enough_to_judge');
+  assert.equal(done.question, undefined);
+  assert.equal(done.verdict, undefined);
+  assert.equal(done.next_question, 'Not enough to judge yet. Find out and come back: 1. What does it cost each month, and what does it save or earn? 2. Who makes this happen, and do they have the time?');
 });
 
-
-test('project-attributed revenue requires a separate company revenue answer', () => {
-  for (const proposal of [
-    "The pilot's revenue is EUR 2m.",
-    'The pilot’s annual revenue is EUR 2m.',
-    "The project's annual turnover is EUR 2m.",
-    'We expect revenue of EUR 2m from the project.',
-    'Revenue EUR 2m attributable to this initiative.',
-    'EUR 2m annual revenue generated by the pilot.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), undefined, proposal);
-    assert.equal(
-      extractRevenueEur(proposal + ' Company annual revenue is EUR 300m.'),
-      300_000_000,
-      proposal,
-    );
-  }
-  assert.equal(
-    extractRevenueEur('A pilot for a retailer with company annual revenue EUR 300m.'),
-    300_000_000,
-  );
+test('an answer outside the choices is refused', () => {
+  assert.throws(() => assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'z' as never } }), /must be one of a, b, c, d or unknown/);
 });
 
-test('monthly and quarterly amounts require annual revenue clarification', () => {
-  for (const proposal of [
-    'Company monthly revenue is EUR 2m.',
-    'Quarterly company revenue: EUR 6m.',
-    'Annual revenue EUR 2m monthly.',
-    'Revenue EUR 2m per month.',
-    'EUR 6m quarterly revenue.',
-    'Revenue EUR 6m each quarter.',
-    'Revenue EUR 2m/month.',
-    'EUR 2m in monthly revenue.',
-  ]) {
-    assert.equal(extractRevenueEur(proposal), undefined, proposal);
-    assert.equal(
-      extractRevenueEur(proposal + ' Company annual revenue is EUR 24m.'),
-      24_000_000,
-      proposal,
-    );
-  }
-  const result = assessInitiative({
-    proposal: 'A traditional retailer wants a GenAI assistant for customer service. Company monthly revenue is EUR 2m.',
-  });
-  assert.equal(result.status, 'needs_input');
-  assert.deepEqual(result.missing_fields, ['revenue_eur']);
-  assert.equal(result.next_question, "What is the organisation's approximate annual revenue in EUR?");
-});
+// ── callers that already hold scores ───────────────────────────────────────
 
-test('foreign currency names are case-insensitive without rejecting ordinary connecting words', () => {
-  for (const currency of ['rupees', 'Rupees', 'RUPEES', 'Yen', 'Yuan', 'Renminbi', 'Pounds', 'Dollars']) {
-    assert.equal(extractRevenueEur('Company revenue 300m ' + currency + '.'), undefined, currency);
-  }
-  assert.equal(extractRevenueEur('Company annual revenue 300m and a pilot budget EUR 250k.'), 300_000_000);
-});
-
-const bank = 'A traditional bank with revenue of EUR 2bn wants autonomous agents in customer service.';
-const retailer = 'A traditional retailer with EUR 300m revenue wants a GenAI assistant for customer service.';
 const allFour = { strategic_alignment: 75, financial_return: 70, change_enablement: 70, governance_risk: 30 };
 const ready = { workflow_redesigned: true, roles_redesigned: true, decision_rights_defined: true, measures_updated: true };
 
-test('a first pass with no scores returns no verdict, no euro figure and no filled-in number', () => {
-  const r = assessInitiative({ proposal: retailer });
-  assert.equal(r.status, 'not_enough_to_judge');
-  assert.equal(r.verdict, undefined);
-  assert.deepEqual(r.decides?.map((d) => d.id), ['financial_return', 'governance_risk', 'strategic_alignment']);
-  assert.deepEqual(r.also_open, ['change_enablement', 'work_architecture']);
-  assert.equal(r.warning, undefined);
-  assert.match(r.next_question ?? '', /^Not enough to judge yet\. Three things decide it\. 1\. /);
-  const text = JSON.stringify(r);
-  assert.doesNotMatch(text, /net_value|gross_value|net_low_eur|scores_used|pillar_basis|estimated|decision_confidence|"confidence"/);
-});
-
-test('agentic AI in a regulated setting asks about governance first, with a warning, and never stops on a filled-in score', () => {
-  const r = assessInitiative({ proposal: bank });
-  assert.equal(r.status, 'not_enough_to_judge');
-  assert.equal(r.decides?.[0].id, 'governance_risk');
-  assert.equal(r.warning, 'Agentic AI in a regulated setting cannot proceed until its controls are shown. Answer the governance question first.');
-  const answered = assessInitiative({ proposal: bank, scores: { governance_risk: 35 } });
-  assert.equal(answered.status, 'not_enough_to_judge');
-  assert.equal(answered.warning, undefined);
-});
-
-test('one supplied score can stop the initiative on its own', () => {
-  const risk = assessInitiative({ proposal: bank, scores: { governance_risk: 80 } });
-  assert.equal(risk.status, 'verdict');
-  assert.equal(risk.verdict?.classification, 'Stop');
-  assert.deepEqual(risk.verdict?.scores_supplied, { governance_risk: 80 });
-  assert.equal(risk.verdict?.confidence, undefined);
-  const thin = assessInitiative({ proposal: retailer, scores: { financial_return: 15 } });
-  assert.equal(thin.verdict?.classification, 'Stop');
-  assert.equal(thin.verdict?.reason, 'Financial return too thin to justify scope.');
-});
-
-test('some scores without a stop return what is still open, never a Fix', () => {
-  const r = assessInitiative({ proposal: retailer, scores: { strategic_alignment: 80, financial_return: 70 } });
-  assert.equal(r.status, 'not_enough_to_judge');
-  assert.deepEqual(r.decides?.map((d) => d.id), ['governance_risk', 'change_enablement', 'work_architecture']);
-  assert.equal(r.also_open, undefined);
-  assert.match(r.next_question ?? '', /Three things decide it/);
-});
-
-test('all four supplied scores return a verdict with no euro figure', () => {
-  const fix = assessInitiative({ proposal: retailer, scores: allFour });
-  assert.equal(fix.verdict?.classification, 'Fix');
-  const go = assessInitiative({ proposal: retailer, scores: allFour, work_architecture: ready });
-  assert.equal(go.status, 'verdict');
+test('supplied 0 to 100 scores still work and take precedence over an answer', () => {
+  const go = assessInitiative({ proposal: retailer, ...ok, scores: allFour, work_architecture: ready });
   assert.equal(go.verdict?.classification, 'Accelerate');
-  assert.deepEqual(go.verdict?.scores_supplied, allFour);
   assert.equal(go.verdict?.confidence, 71);
-  assert.ok(go.verdict?.verdict_flips?.length);
-  assert.ok(go.verdict?.audit.rules_fired.includes('front_door:value_withheld'));
-  assert.ok(!go.verdict?.audit.rules_fired.some((rule) => rule.startsWith('value:')));
-  assert.match(go.verdict?.value_note ?? '', /own volumes, hours and costs/);
-  assert.doesNotMatch(JSON.stringify(go), /net_value|gross_value|net_low_eur|multipliers|estimated/);
+  assert.deepEqual(go.verdict?.scores_supplied, allFour);
+  assert.deepEqual(go.verdict?.answers_given, {});
+
+  const gap = assessInitiative({
+    proposal: retailer, ...ok, scores: allFour,
+    work_architecture: { workflow_redesigned: true, roles_redesigned: false, decision_rights_defined: true, measures_updated: true },
+  });
+  assert.equal(gap.verdict?.classification, 'Fix');
+  assert.deepEqual(gap.verdict?.work_architecture.gaps, ['affected roles and accountabilities redesigned']);
+
+  const mixed = assessInitiative({ proposal: retailer, ...ok, scores: { governance_risk: 82 }, answers: { governance_risk: 'd' } });
+  assert.equal(mixed.verdict?.classification, 'Stop');
+  assert.deepEqual(mixed.verdict?.scores_supplied, { governance_risk: 82 });
+});
+
+test('the same input returns the same result', () => {
+  const input = { proposal: firm, ...ok, answers: { financial_return: 'c', governance_risk: 'b' } } as const;
+  assert.deepEqual(assessInitiative(input), assessInitiative(input));
 });
