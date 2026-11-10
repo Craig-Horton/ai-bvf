@@ -100,6 +100,22 @@ test('ordinary words count as a short direct answer and never inside a long desc
   assert.equal(mapToTaxonomy({ ai_tier: 'our contact centre agents spend too long on notes' }).ai_tier?.resolved, null);
 });
 
+test('a proposal that repeats a phrase tens of thousands of times is read in near-linear time', () => {
+  const started = performance.now();
+  const repeated = mapToTaxonomy({ function: 'sales '.repeat(80_000) }).function;
+  const mixed = mapToTaxonomy({ industry: 'retail bank '.repeat(40_000) }).industry;
+  assert.ok(performance.now() - started < 3_000);
+  assert.equal(repeated?.resolved, 'sales');
+  assert.equal(mixed?.resolved, 'financial');
+});
+
+test('overlapping and nested phrases resolve the same way after the ordered sweep', () => {
+  assert.equal(mapToTaxonomy({ industry: 'a retail bank and a retailer' }).industry?.resolved, null);
+  assert.deepEqual(mapToTaxonomy({ industry: 'a retail bank and a retailer' }).industry?.candidates, ['financial', 'retail']);
+  assert.equal(mapToTaxonomy({ function: 'our IT helpdesk team' }).function?.resolved, 'it');
+  assert.equal(mapToTaxonomy({ industry: 'an accountancy firm' }).industry?.matched_on, 'accountancy firm');
+});
+
 test('a proposal padded with long runs of spaces is read in linear time', () => {
   const padded = `A retailer wants a chatbot. ${`revenue${' '.repeat(20_000)}`.repeat(3)}x`;
   const started = performance.now();

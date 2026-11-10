@@ -55,9 +55,11 @@ export function extractRevenueEur(proposal: string): number | undefined {
   const projectRevenueSource = /^\s*(?:(?:in|of)\s+)?(?:(?:annual|incremental|additional|projected|expected|potential|target)\s+)?(?:(?:revenue|turnover)\s+)?(?:from|for|generated\s+by|attributable\s+to)\s+(?:(?:the|this|our|an?)\s+)?(?:pilot|project|initiative)\b/i;
   const periodicRevenueBefore = /\b(?:monthly|quarterly|weekly|daily|Q[1-4])\s+(?:(?:company|organisation|organization)\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
   const periodicRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:(?:revenue|turnover)\s+)?(?:(?:per|a|each|every)\s+(?:month|quarter|week|day)\b|(?:monthly|quarterly|weekly|daily)\b|\/\s*(?:month|quarter|week|day)\b)/i;
-  // "15m euro IT services company": up to three describing words may sit between the
-  // amount and the organisation noun, but never a preposition or verb ("EUR 2m saved by the business").
-  const companyAfter = /^\s*(?:(?!(?:at|for|by|in|to|from|of|on|with|per|and|or|that|which|is|was|are|will|would|saved|spent|invested|raised|paid|lost)\b)[\w&-]+\s+){0,3}?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit|firm|practice|agency|group|provider|msp|charity|startup|consultancy|partnership|council|university|school|studio|clinic)\b/i;
+  // "15m euro IT services company": up to three words may sit between the amount and the
+  // organisation noun, and each must describe an organisation. "EUR 250k chatbot across
+  // the company" names a cost, so any other word in between leaves revenue unread.
+  const descriptor = 'global|international|european|national|regional|local|independent|listed|private|public|family|family-run|family-owned|owner-managed|small|medium|medium-sized|mid-sized|large|b2b|b2c|it|services?|managed|software|saas|technology|tech|digital|retail|financial|professional|consulting|engineering|manufacturing|industrial|logistics|transport|insurance|healthcare|health|care|energy|media|marketing|design|creative|law|legal|accountancy|accounting|recruitment|housing|construction|property|telecoms?|pharma|pharmaceutical|food|travel|hotel|hospitality|education|training';
+  const companyAfter = new RegExp(String.raw`^\s*(?:(?:${descriptor})\s+){0,3}(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit|firm|practice|agency|group|provider|msp|charity|startup|consultancy|partnership|council|university|school|studio|clinic)\b`, 'i');
   const rangeAfter = new RegExp(String.raw`^\s*(?:[-–—/]|to\b|through\b|or\b)\s*(?:(?:${CURRENCY})\s*)?[0-9]`, 'i');
   const foreignCodeSuffix = /^\s*[A-Z]{3}\b/;
   const foreignSuffix = /^\s*(?:dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/i;
