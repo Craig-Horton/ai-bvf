@@ -16,7 +16,15 @@ Added: everyday names for smaller organisations and their work, including accoun
 
 Added: `plainLanguage.test.ts`, a set of 46 proposals written the way regular users write them. Each must be read correctly or left open as a question.
 
-Scope: scoring formulas, thresholds and the EUR value model are unchanged. Package versions have not moved; this entry takes its version numbers at release.
+Changed: `assess_ai_initiative` fills in no pillar score and returns no euro figure. A verdict rests only on scores the user supplied: Accelerate and Fix need all four, and Stop fires as soon as one supplied score forces it.
+
+Added: a third status, `not_enough_to_judge`, with `decides`, up to three questions that settle the outcome, most decisive first, and `also_open` for anything left. A first pass with no scores returns this status in place of a provisional Fix.
+
+Changed: agentic AI in a regulated industry or function no longer returns Stop on an estimated governance score. It returns `not_enough_to_judge`, asks the governance question first and carries a `warning` that it cannot proceed until its controls are shown.
+
+Breaking for `assess_ai_initiative` callers: `verdict` no longer carries `net_value_eur`, `gross_value_eur`, `multipliers`, `drivers`, `scores_used`, `pillar_basis`, `sensitivity`, `benchmark_source` or `caveat`. It carries `scores_supplied`, `verdict_flips`, `value_note`, the work architecture gate and the audit record.
+
+Scope: `score_initiative`, the portfolio tools, the scoring formulas and the thresholds are unchanged, and keep the planning range for advisory work. Package versions have not moved; this entry takes its version numbers at release.
 
 ## 0.14.15 (aibvf-mcp), 0.10.6 (@aibvf/core), 5 November 2026
 

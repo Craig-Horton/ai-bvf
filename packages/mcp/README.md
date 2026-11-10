@@ -16,7 +16,7 @@ Start with one request:
 
 > *"Use assess_ai_initiative to review this proposal: we are a EUR 2.4bn manufacturer considering a GenAI predictive maintenance rollout in our EU plants."*
 
-`assess_ai_initiative` resolves the business context, asks once for any missing decision input, then returns the verdict and the next action. The other twelve tools are specialist routes for a deeper score, work redesign or a portfolio.
+`assess_ai_initiative` resolves the business context and asks once for any missing decision input. It fills in no score and gives no euro figure. Until you supply what a verdict rests on, it names up to three questions that decide the outcome. The other twelve tools are specialist routes for a deeper score, work redesign or a portfolio.
 
 ## Install and run (stdio)
 
@@ -77,7 +77,7 @@ Fully quit and restart the host (on Windows, right-click the Claude tray icon �
 
 > *"Score this AI initiative using AI BVF: we're a €2.4bn manufacturer, planning a GenAI predictive maintenance rollout in our EU plants, we're a traditional hierarchy, strong sponsor, modest change budget."*
 
-Claude will call `assess_ai_initiative`, resolve the proposal, and return the classification, euro range, and reasoning. If one decision input is missing, it asks for that first.
+Claude will call `assess_ai_initiative`, state how it read the proposal, and ask the questions that decide the outcome. Once you answer with your own scores it returns the classification and reasoning. If one decision input is missing, it asks for that first.
 
 ## Troubleshooting
 
@@ -89,7 +89,7 @@ Claude will call `assess_ai_initiative`, resolve the proposal, and return the cl
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Plain-English front door for one initiative. Resolves industry, revenue, function, AI tier and readiness, tests the work architecture, asks once for every unresolved input, then returns Accelerate, Fix or Stop from the same scoring engine. |
+| `assess_ai_initiative` | Plain-English front door for one initiative. Resolves industry, revenue, function, AI tier and readiness, tests the work architecture, asks once for every unresolved input, names what decides the outcome, then returns Accelerate, Fix or Stop from supplied scores only. No estimated score and no euro figure. |
 | `score_initiative` | Return classification, euro range, reasoning and the work architecture gate for one initiative. |
 | `score_portfolio` | Score every initiative in a BVF portfolio in one call and return the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision score, top initiative by value, highest-risk initiative, per-initiative results. Use instead of looping `score_initiative`. |
 | `assemble_portfolio` | Assembles a valid BVF v1.0 portfolio document from loose inputs: names, plain-language functions and tiers, and whatever pillar scores exist. Aliases resolved, ids generated, missing pillars estimated with the estimation reported per initiative, document validated before return. Nothing stored, nothing edited. |
@@ -128,7 +128,7 @@ aibvf-mcp can send an anonymous event on each tool call. Events describe observe
 - `bvf_version` — the protocol version
 - `package_version` — the published `aibvf-mcp` release
 - `entry_route` — `stdio` for a local installation or `remote` for the hosted connector
-- `assessment_stage` — whether `assess_ai_initiative` asked for an input or returned a verdict
+- `assessment_stage` — whether `assess_ai_initiative` asked for an input, reported not enough to judge, or returned a verdict
 - `work_architecture_status` — `ready`, `gap`, or `unknown` when a verdict tests the work around the AI
 - `caller_hash` — a daily-rotated, one-way hash for daily activity counts
 - `install_hash` — a stable one-way hash sent by local stdio installations only, for repeat-use measurement across days
