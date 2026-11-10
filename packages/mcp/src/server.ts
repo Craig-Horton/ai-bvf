@@ -462,7 +462,7 @@ const assessVerdictSchema = {
   properties: {
     bvf_version: { type: 'string' },
     classification: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
-    summary: { type: 'string', description: 'The outcome and its main cause in one plain sentence. Lead with this.' },
+    summary: { type: 'string', description: 'The outcome in one or two plain sentences. A Stop quotes its cause. Lead with this.' },
     holding_back: {
       type: 'array',
       description: 'The answers that keep the initiative from a go-ahead, most decisive first. Empty for Accelerate. Show each with what the user said and what it needs to become.',

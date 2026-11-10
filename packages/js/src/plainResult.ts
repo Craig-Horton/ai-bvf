@@ -52,8 +52,10 @@ export function plainResult(input: PlainResultInput): PlainResult {
   const wording = WORDING[track];
 
   const failing = PILLAR_ORDER.filter((pillar) => supplied[pillar] !== undefined && !clears(pillar, supplied[pillar]!));
-  // An answer that stops the initiative on its own leads the list.
-  failing.sort((x, y) => Number(stops(y, supplied[y]!)) - Number(stops(x, supplied[x]!)));
+  // An answer that stops the initiative on its own leads the list. When both stop it,
+  // risk leads, which is the cause the verdict's reason names.
+  const rank = (pillar: Pillar) => (!stops(pillar, supplied[pillar]!) ? 2 : pillar === 'governance_risk' ? 0 : 1);
+  failing.sort((x, y) => rank(x) - rank(y));
 
   const holdingBack: AssessHoldingBack[] = failing.map((pillar) => {
     const answer = answers[pillar];
@@ -77,13 +79,18 @@ export function plainResult(input: PlainResultInput): PlainResult {
       id: 'work_architecture',
       short: QUESTION_SHORT[track].work_architecture,
       question: wording.work_architecture.question,
-      answer: answer ? answer.label : input.workUnknown || !input.workAnswered ? UNKNOWN_LABEL : `Still to change: ${names.join(', ')}.`,
+      answer: answer ? answer.label : input.workUnknown || !input.workAnswered ? UNKNOWN_LABEL : `Not shown as changed: ${names.join(', ')}.`,
       needed: wording.work_architecture.d,
     });
   }
 
   if (classification === 'Accelerate') {
-    return { summary: 'Go ahead. Your answers clear the bar on every question.', holding_back: [], first_step: GO_AHEAD_STEP };
+    const answered = Object.keys(answers).length > 0;
+    return {
+      summary: answered ? 'Go ahead. Your answers clear the bar on every question.' : 'Go ahead. Every score clears the bar.',
+      holding_back: [],
+      first_step: GO_AHEAD_STEP,
+    };
   }
 
   const first = holdingBack[0];
@@ -104,7 +111,12 @@ export function plainResult(input: PlainResultInput): PlainResult {
         : 'Stop. The risk is above the level where this can go ahead.';
   } else {
     const count = holdingBack.length;
-    summary = `Fix ${COUNT_WORDS[count] ?? count} thing${count === 1 ? '' : 's'} before you go ahead.`;
+    const things = `${COUNT_WORDS[count] ?? count} thing${count === 1 ? '' : 's'}`;
+    // The work question is asked only once the four answers clear, so it is still to come here.
+    const workStillToAsk = work.status !== 'ready' && !workBlocks;
+    summary = workStillToAsk
+      ? `Fix ${things} first. The question on how the work changes comes after that.`
+      : `Fix ${things} before you go ahead.`;
   }
 
   return { summary, holding_back: holdingBack, first_step: firstStep };

@@ -13,15 +13,23 @@ report as (
   select ends_at - interval '30 days' as starts_at, ends_at from report_end
 ),
 web as (
+  -- The guided page first shipped as surface web-2026.11.10. Earlier rows on the same
+  -- route belong to the page that now lives at /review.
   select e.*
   from public.bvf_journey_events e cross join report r
   where e.ts >= r.starts_at and e.ts < r.ends_at
     and e.entry_route = 'start'
+    and e.surface_version >= 'web-2026.11.10'
     and e.activity_cohort <> 'automated_test'
+),
+first_verdict as (
+  select journey_hash, min(ts) as verdict_at
+  from web where event_name = 'verdict_returned'
+  group by journey_hash
 ),
 browsers as (
   select
-    journey_hash,
+    w.journey_hash,
     bool_or(event_name = 'start_page_viewed') as viewed,
     bool_or(event_name = 'assessment_started') as started,
     bool_or(event_name = 'reading_shown') as reading_shown,
@@ -30,11 +38,12 @@ browsers as (
     coalesce(max(step) filter (where event_name = 'question_answered'), 0) as furthest_question,
     bool_or(event_name = 'find_out_returned') as told_to_find_out,
     bool_or(event_name = 'verdict_returned') as reached_verdict,
-    bool_or(event_name in ('decision_record_saved', 'result_printed', 'result_copied')) as saved_or_shared,
-    bool_or(event_name = 'answer_changed') as changed_an_answer,
-    bool_or(event_name = 'feedback_submitted') as gave_feedback
-  from web
-  group by journey_hash
+    -- "After a verdict" means at or after the browser's first verdict in the window.
+    coalesce(bool_or(event_name in ('decision_record_saved', 'result_printed', 'result_copied') and w.ts >= v.verdict_at), false) as saved_or_shared,
+    coalesce(bool_or(event_name = 'answer_changed' and w.ts >= v.verdict_at), false) as changed_an_answer,
+    coalesce(bool_or(event_name = 'feedback_submitted' and w.ts >= v.verdict_at), false) as gave_feedback
+  from web w left join first_verdict v on v.journey_hash = w.journey_hash
+  group by w.journey_hash
 )
 select
   (select starts_at from report) as starts_at,
@@ -55,5 +64,6 @@ select
   count(*) filter (where reached_verdict and changed_an_answer) as changed_an_answer_after_verdict,
   count(*) filter (where reached_verdict and gave_feedback) as gave_feedback_after_verdict,
   (select count(*) from public.bvf_journey_events e cross join report r
-    where e.ts >= r.starts_at and e.ts < r.ends_at and e.activity_cohort = 'automated_test') as automated_test_events_left_out
+    where e.ts >= r.starts_at and e.ts < r.ends_at and e.entry_route = 'start'
+      and e.surface_version >= 'web-2026.11.10' and e.activity_cohort = 'automated_test') as automated_test_events_left_out
 from browsers;

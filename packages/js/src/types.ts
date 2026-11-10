@@ -517,7 +517,7 @@ export interface AssessHoldingBack {
  */
 export interface AssessVerdict {
   classification: Classification;
-  /** The outcome and its main cause in one plain sentence. Show this to the user. */
+  /** The outcome in one or two plain sentences. A Stop quotes its cause. Show this to the user. */
   summary: string;
   /** The answers that keep the initiative from a go-ahead, most decisive first. Empty for Accelerate. */
   holding_back: AssessHoldingBack[];

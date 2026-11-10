@@ -3,7 +3,8 @@
 -- Replace now() in report_end with a timestamptz literal to reproduce a snapshot.
 -- All sections share [starts_at, ends_at). Event timestamps are client supplied.
 -- Browser hashes describe storage instances; local hashes describe persisted seeds.
--- Counts can include internal or automated activity. Diagnostics never exclude rows.
+-- Counts can include internal or automated activity. Web rows from surface web-2026.11.10
+-- carry activity_cohort, which labels automated tests. Diagnostics never exclude rows.
 -- See docs/adoption-metrics.md for event meanings and coverage limits.
 
 with report_end as (
@@ -175,7 +176,7 @@ select
     as latest_browser_event_at,
   (select max(ts) from public.mcp_calls where ts < r.ends_at)
     as latest_mcp_event_at,
-  'Observed IDs and events; internal and automated activity are unlabelled.'
+  'Observed IDs and events; internal activity is unlabelled, automated tests are labelled on web rows from web-2026.11.10.'
     as interpretation,
   w.*,
   round(100.0 * assessment_starter_ids / nullif(start_page_viewer_ids, 0), 1)

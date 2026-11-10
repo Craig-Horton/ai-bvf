@@ -141,7 +141,7 @@ function contextQuestion(field: AssessField, ambiguous: Ambiguous): { text: stri
     : CONTEXT_QUESTION[field];
   const choices: AssessChoice[] = options
     ? options.map((id) => ({ id, label: labels[id] ?? id }))
-    : CONTEXT_CHOICES[field];
+    : CONTEXT_CHOICES[field].map((choice) => ({ ...choice }));
   return { text, question: { id: field, question: text, choices, answer_in: field } };
 }
 

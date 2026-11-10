@@ -48,7 +48,7 @@ const FUNCTION_ALIASES: Record<string, AliasGroup> = {
     weak: ['revenue', 'commercial', 'growth', 'pipeline', 'pricing'],
   },
   it: {
-    strong: ['it team', 'it department', 'it support', 'it helpdesk', 'it help desk', 'it service desk', 'it operations', 'it ops', 'devops', 'service management', 'itsm', 'security operations', 'it infrastructure', 'platform operations'],
+    strong: ['it team', 'it department', 'it support', 'it helpdesk', 'it help desk', 'it service desk', 'it operations', 'it ops', 'devops', 'service management', 'itsm', 'security operations', 'it infrastructure'],
     weak: ['technology', 'infrastructure', 'platform', 'cloud'],
   },
   finance: {
@@ -109,7 +109,7 @@ const INDUSTRY_ALIASES: Record<string, AliasGroup> = {
     weak: ['foundation'],
   },
   universal: {
-    strong: ['cross-industry', 'general business'],
+    strong: ['cross-industry'],
     weak: ['general', 'any', 'other'],
   },
 };

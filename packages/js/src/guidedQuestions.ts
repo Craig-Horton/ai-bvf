@@ -39,7 +39,7 @@ interface Wording { question: string; a: string; b: string; c: string; d: string
 export const QUESTION_WHY: Record<AssessTrack, Record<AssessQuestionId, string>> = {
   smaller_firm: {
     financial_return: 'If it costs more than it saves, the answer is stop.',
-    governance_risk: 'If nobody can check it or switch it off, the answer is stop.',
+    governance_risk: 'If it deals with customers, money or personal data and nobody checks it, the answer is stop.',
     strategic_alignment: 'A go-ahead needs one number, a target and someone responsible.',
     change_enablement: 'A go-ahead needs a named person with time set aside.',
     work_architecture: 'A go-ahead needs all four parts of the job changed.',

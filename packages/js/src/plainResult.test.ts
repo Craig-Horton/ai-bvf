@@ -38,14 +38,14 @@ test('the answer that stops the initiative leads, whatever order the questions c
 test('a fix counts what holds it back and names the first thing to do', () => {
   const one = assessInitiative({ proposal: firm, ...ok, answers: { ...clear, change_enablement: 'b' } }).verdict!;
   assert.equal(one.classification, 'Fix');
-  assert.equal(one.summary, 'Fix one thing before you go ahead.');
+  assert.equal(one.summary, 'Fix one thing first. The question on how the work changes comes after that.');
   assert.deepEqual(one.holding_back.map((h) => h.id), ['change_enablement']);
   assert.equal(one.holding_back[0].answer, 'Someone is named, on top of their normal job.');
   assert.equal(one.holding_back[0].needed, 'Someone is named and has time set aside.');
   assert.equal(one.first_step, 'Name who makes this happen and set time aside for them.');
 
   const three = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'b', governance_risk: 'b', strategic_alignment: 'c', change_enablement: 'b' } }).verdict!;
-  assert.equal(three.summary, 'Fix three things before you go ahead.');
+  assert.equal(three.summary, 'Fix three things first. The question on how the work changes comes after that.');
   assert.deepEqual(three.holding_back.map((h) => h.id), ['financial_return', 'governance_risk', 'change_enablement']);
   assert.equal(three.first_step, FIRST_STEP.smaller_firm.financial_return);
 });
@@ -104,7 +104,7 @@ test('supplied scores and work checks produce a plain result with no answer word
     work_architecture: { workflow_redesigned: true, roles_redesigned: false, decision_rights_defined: true, measures_updated: false },
   }).verdict!;
   assert.equal(gap.classification, 'Fix');
-  assert.equal(gap.holding_back[0].answer, 'Still to change: the roles, the measures people are judged on.');
+  assert.equal(gap.holding_back[0].answer, 'Not shown as changed: the roles, the measures people are judged on.');
   assert.equal(gap.first_step, 'Rewrite the affected roles and accountabilities.');
 });
 
@@ -150,8 +150,34 @@ test('every plain string is free of dashes, framework terms and banned vocabular
   }
 });
 
-test('three phrases the review page relies on resolve to one value', () => {
+test('a property company resolves, and two loose phrases no longer decide a field', () => {
   assert.equal(mapToTaxonomy({ industry: 'A traditional property company with EUR 600m revenue wants automation for accounts payable.' }).industry?.resolved, 'real_estate');
-  assert.equal(mapToTaxonomy({ industry: 'A traditional general business with EUR 500m revenue wants a GenAI assistant for finance.' }).industry?.resolved, 'universal');
-  assert.equal(mapToTaxonomy({ function: 'An agile SaaS company with EUR 400m revenue wants an agentic system for platform operations.' }).function?.resolved, 'it');
+  assert.equal(assessInitiative({ proposal: 'We need help writing the general business case for AI in a bank.' }).resolved_inputs.industry, 'financial');
+  assert.equal(assessInitiative({ proposal: 'An oil and gas company wants AI agents to monitor offshore platform operations.' }).resolved_inputs.function, undefined);
+});
+
+test('when two answers stop it, every plain field names the cause the reason names', () => {
+  const v = assessInitiative({ proposal: firm, ...ok, scores: { financial_return: 10, governance_risk: 90, strategic_alignment: 70, change_enablement: 70 } }).verdict!;
+  assert.equal(v.classification, 'Stop');
+  assert.match(v.reason, /Governance/);
+  assert.equal(v.holding_back[0].id, 'governance_risk');
+  assert.equal(v.summary, 'Stop. The risk is above the level where this can go ahead.');
+  assert.equal(v.first_step, FIRST_STEP.smaller_firm.governance_risk);
+});
+
+test('a go-ahead from supplied scores does not speak of answers nobody gave', () => {
+  const v = assessInitiative({
+    proposal: firm, ...ok,
+    scores: { financial_return: 70, governance_risk: 30, strategic_alignment: 70, change_enablement: 70 },
+    work_architecture: { workflow_redesigned: true, roles_redesigned: true, decision_rights_defined: true, measures_updated: true },
+  }).verdict!;
+  assert.equal(v.classification, 'Accelerate');
+  assert.equal(v.summary, 'Go ahead. Every score clears the bar.');
+});
+
+test('the context choices handed to a caller are copies', () => {
+  const first = assessInitiative({ proposal: 'We want to use AI to improve an internal process.' });
+  first.question!.choices!.length = 0;
+  const second = assessInitiative({ proposal: 'We want to use AI to improve an internal process.' });
+  assert.ok(second.question!.choices!.length > 3);
 });
