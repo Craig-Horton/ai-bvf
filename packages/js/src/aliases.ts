@@ -167,6 +167,30 @@ function findHits(tokens: string[], canon: string, alias: string): Hit[] {
   return hits;
 }
 
+/**
+ * Removes every hit that lies inside a strictly longer hit. One ordered sweep,
+ * so a proposal that repeats a phrase thousands of times stays fast: comparing
+ * every hit with every other hit is quadratic in the length of the input.
+ */
+function dropContained(hits: Hit[]): Hit[] {
+  const ordered = [...hits].sort((x, y) => x.start - y.start || y.end - x.end);
+  const kept: Hit[] = [];
+  let endBefore = -1;   // furthest end among hits that start earlier
+  let groupStart = -1;  // start shared by the current group of hits
+  let groupEnd = -1;    // furthest end within that group, which sorts first
+  for (const hit of ordered) {
+    if (hit.start !== groupStart) {
+      endBefore = Math.max(endBefore, groupEnd);
+      groupStart = hit.start;
+      groupEnd = hit.end;
+    }
+    const insideEarlier = endBefore >= hit.end;
+    const insideSameStart = groupEnd > hit.end;
+    if (!insideEarlier && !insideSameStart) kept.push(hit);
+  }
+  return kept;
+}
+
 function matchOne(
   input: string,
   canon: readonly string[],
@@ -189,13 +213,12 @@ function matchOne(
   const all: Hit[] = [];
   for (const [c, group] of Object.entries(aliases)) {
     for (const a of short ? [...group.strong, ...(group.weak ?? [])] : group.strong) {
-      all.push(...findHits(tokens, c, a));
+      for (const hit of findHits(tokens, c, a)) all.push(hit);
     }
   }
   // A phrase that sits inside a longer matched phrase gives way to it:
   // "retail" inside "retail bank" does not compete with it.
-  const kept = all.filter((h) => !all.some((o) => o !== h
-    && o.start <= h.start && o.end >= h.end && (o.end - o.start) > (h.end - h.start)));
+  const kept = dropContained(all);
   const candidates = [...new Set(kept.map((h) => h.canon))];
   if (candidates.length === 1) {
     const best = kept.reduce((a, b) => ((b.end - b.start) > (a.end - a.start) ? b : a));

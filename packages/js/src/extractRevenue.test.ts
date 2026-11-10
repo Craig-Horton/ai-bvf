@@ -140,3 +140,18 @@ test('a project budget, two different years or an unlabelled spend never become 
   assert.equal(extractRevenueEur('A traditional retailer wants a EUR 250k GenAI assistant for customer service. Its annual revenue is EUR 300m.'), undefined);
   assert.equal(extractRevenueEur('A traditional retailer wants a GenAI assistant for customer service. Pilot cost EUR 250k; annual revenue EUR 300m.'), 300_000_000);
 });
+
+test('a cost followed by other words before an organisation noun is never read as company revenue', () => {
+  for (const proposal of [
+    'A traditional retailer wants a EUR 250k chatbot across the company for customer service.',
+    'We want a EUR 40k assistant for the whole business.',
+    'A EUR 300k copilot rollout inside our firm.',
+    'A EUR 2m programme run by an external agency.',
+  ]) assert.equal(extractRevenueEur(proposal), undefined, proposal);
+  assert.equal(extractRevenueEur('We are a 15m euro IT services company.'), 15_000_000);
+  assert.equal(extractRevenueEur('We are a €3bn global retail group.'), 3_000_000_000);
+  assert.equal(extractRevenueEur('A 500 million euro insurer wants GenAI in claims.'), 500_000_000);
+  // An unlabelled spend beside a stated revenue still asks, as it did before this change.
+  assert.equal(extractRevenueEur('A retailer wants a EUR 250k chatbot across the company. Company annual revenue is EUR 300m.'), undefined);
+  assert.equal(extractRevenueEur('A retailer wants a chatbot across the company. Pilot cost EUR 250k; annual revenue EUR 300m.'), 300_000_000);
+});

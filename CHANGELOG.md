@@ -2,6 +2,14 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.15.1 (aibvf-mcp), 0.11.1 (@aibvf/core), 10 November 2026
+
+Security: plain-language matching compared every phrase hit with every other hit, so an input repeating a recognised phrase tens of thousands of times ran in quadratic time and could hold the server's event loop for seconds. Contained phrases are now removed in one ordered sweep. `'sales '.repeat(40000)` falls from about eight seconds to under 100 ms.
+
+Fixed: `extractRevenueEur` read a cost as company revenue when other words sat between the amount and an organisation noun, as in "a EUR 250k chatbot across the company". The words in between must now describe an organisation, such as "IT services" or "global retail". Anything else leaves revenue unread.
+
+Scope: both defects shipped in 0.15.0 and 0.11.0 and were reported by automated review after that change was merged. The front door does not use revenue, so its verdicts were unaffected by the second.
+
 ## 0.15.0 (aibvf-mcp), 0.11.0 (@aibvf/core), 10 November 2026
 
 This release changes the front door, `assess_ai_initiative`. It reads a proposal without guessing, fills in no score, returns no euro figure, and asks a regular user plain questions.
