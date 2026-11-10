@@ -182,7 +182,10 @@ function proposalFor(
   industryPhrase?: string,
 ): string {
   if (field !== 'function') return proposal;
-  let text = proposal.replace(/(?:annual\s+)?(?:revenue|turnover)\s*(?:of|is|around|about|approximately|approx\.?|:)?\s*(?:EUR|€)?\s*[0-9]+(?:[,.][0-9]+)?\s*(?:k|thousand|m|mn|million|b|bn|billion)?/gi, '');
+  // Whitespace runs are collapsed first so the amount pattern needs only single
+  // optional spaces. Adjacent \s* groups backtrack polynomially on long runs of spaces.
+  let text = proposal.replace(/\s+/g, ' ')
+    .replace(/(?:annual )?(?:revenue|turnover) ?(?:of|is|around|about|approximately|approx\.?|:)? ?(?:EUR|€)? ?[0-9]+(?:[,.][0-9]+)? ?(?:k|thousand|m|mn|million|b|bn|billion)?/gi, '');
   // The words that named the industry ("marketing agency", "recruitment agency")
   // describe what the organisation is. They say nothing about which function owns the work.
   if (industryPhrase && /[\s-]/.test(industryPhrase)) {

@@ -132,3 +132,11 @@ test('revenue is read from a company-size description with describing words in b
   const saved = assessInitiative({ proposal: 'A retailer expects EUR 2m saved by the business from a GenAI assistant in customer service.' });
   assert.equal(saved.resolved_inputs.revenue_eur, undefined);
 });
+
+test('a proposal padded with long runs of spaces is read in linear time', () => {
+  const padded = `A retailer wants a chatbot. ${`revenue${' '.repeat(20_000)}`.repeat(3)}x`;
+  const started = performance.now();
+  const r = assessInitiative({ proposal: padded });
+  assert.ok(performance.now() - started < 1_000);
+  assert.equal(r.resolved_inputs.industry, 'retail');
+});
