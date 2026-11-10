@@ -446,6 +446,12 @@ export interface AssessInitiativeResult {
   missing_fields: AssessField[];
   next_question?: string;
   suggestions?: string[];
+  /** Fields whose wording pointed to more than one value, with the competing values. */
+  ambiguous_fields?: Partial<Record<AssessField, string[]>>;
+  /** Fields read from the wording of the proposal instead of an explicit answer. */
+  inferred_fields: AssessField[];
+  /** Plain statement of how the proposal was read, for the user to correct. */
+  understood: string;
   verdict?: ScoreResult;
 }
 
@@ -454,6 +460,8 @@ export interface TaxonomyMatch {
   input: string;
   resolved: string | null;
   matched_on?: string;
+  /** Present when the wording pointed to more than one value: the competing values. */
+  candidates?: string[];
   suggestions?: string[];
 }
 

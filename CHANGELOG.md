@@ -2,6 +2,22 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## Unreleased
+
+Fixed: plain-language matching reads whole words only. "A company" no longer resolves to cross-industry, "laptops" no longer resolves to supply chain, and a mention of revenue no longer resolves the function to sales.
+
+Fixed: the longest phrase wins, so a retail bank resolves to financial services. Wording that points to two values resolves to neither and returns both as `candidates` for the user to choose between.
+
+Changed: ordinary words such as "people", "support", "technology" and "slow" resolve only as a short direct answer, never inside a longer proposal. An unresolved field becomes a question.
+
+Added: `assess_ai_initiative` returns `understood`, a plain statement of how the proposal was read, with `inferred_fields` and `ambiguous_fields`. Existing response fields and the two statuses are unchanged.
+
+Added: everyday names for smaller organisations and their work, including accountancy firm, MSP, care home, building society, bookkeeping, invoicing and sales team. Revenue is read from descriptions such as "15m euro IT services company".
+
+Added: `plainLanguage.test.ts`, a set of 46 proposals written the way regular users write them. Each must be read correctly or left open as a question.
+
+Scope: scoring formulas, thresholds and the EUR value model are unchanged. Package versions have not moved; this entry takes its version numbers at release.
+
 ## 0.14.15 (aibvf-mcp), 0.10.6 (@aibvf/core), 5 November 2026
 
 Changed: the Registry manifest now advertises the hosted Streamable HTTP endpoint alongside the npm package, so compatible clients can discover the no-install route.
