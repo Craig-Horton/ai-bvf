@@ -67,6 +67,10 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
     assert.ok(judged.verdict.audit);
     assert.ok(judged.verdict.verdict_flips.length > 0);
     assert.equal(judged.verdict.answers_given.change_enablement.score, 45);
+    assert.equal(judged.verdict.summary, 'Fix one thing before you go ahead.');
+    assert.deepEqual(judged.verdict.holding_back.map((item) => item.id), ['change_enablement']);
+    assert.equal(judged.verdict.holding_back[0].needed, 'An owner is named and the change work is funded.');
+    assert.equal(judged.verdict.first_step, 'Name the owner of the change and fund the change work.');
     assert.match(judged.verdict.value_note, /own volumes, hours and costs/);
     assert.doesNotMatch(JSON.stringify(judged), /net_value_eur|gross_value_eur|scores_used|estimated/);
   } finally {

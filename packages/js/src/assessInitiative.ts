@@ -14,6 +14,7 @@ import { score } from './score.js';
 import { buildAudit } from './audit.js';
 import { assessWorkArchitecture } from './workArchitecture.js';
 import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
+import { plainResult } from './plainResult.js';
 import {
   CHOICE_SCORES, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
   WORK_ARCHITECTURE_CHOICES, trackFor,
@@ -60,6 +61,22 @@ const CONTEXT_CHOICE_LABEL: Record<TaxonomyField, Record<string, string>> = {
     gen2: 'GenAI: it drafts, summarises or answers, and a person acts.',
     gen3: 'Agentic AI: it takes actions on its own.',
   },
+};
+
+/**
+ * The choices for each piece of context, in the order a form should show them:
+ * industries and functions by name with cross-industry last, AI types from the
+ * simplest to the most autonomous. A page that lets the user correct the
+ * reading uses these, so its wording matches the engine's.
+ */
+export const CONTEXT_CHOICES: Record<TaxonomyField, AssessChoice[]> = {
+  industry: Object.entries(CONTEXT_CHOICE_LABEL.industry)
+    .map(([id, label]) => ({ id, label }))
+    .sort((x, y) => Number(x.id === 'universal') - Number(y.id === 'universal') || x.label.localeCompare(y.label, 'en', { sensitivity: 'base' })),
+  function: Object.entries(CONTEXT_CHOICE_LABEL.function)
+    .map(([id, label]) => ({ id, label }))
+    .sort((x, y) => x.label.localeCompare(y.label, 'en', { sensitivity: 'base' })),
+  ai_tier: Object.entries(CONTEXT_CHOICE_LABEL.ai_tier).map(([id, label]) => ({ id, label })),
 };
 
 const FIELD_NAME: Record<AssessField, string> = {
@@ -119,11 +136,12 @@ function contextQuestion(field: AssessField, ambiguous: Ambiguous): { text: stri
   }
   const labels = CONTEXT_CHOICE_LABEL[field];
   const options = ambiguous[field];
-  const ids = options ?? Object.keys(labels);
   const text = options
     ? `The proposal points to more than one ${FIELD_NAME[field]}: ${orList(options.map((id) => PLAIN[field][id] ?? id))}. Which one applies?`
     : CONTEXT_QUESTION[field];
-  const choices: AssessChoice[] = ids.map((id) => ({ id, label: labels[id] ?? id }));
+  const choices: AssessChoice[] = options
+    ? options.map((id) => ({ id, label: labels[id] ?? id }))
+    : CONTEXT_CHOICES[field];
   return { text, question: { id: field, question: text, choices, answer_in: field } };
 }
 
@@ -173,7 +191,7 @@ function guidedChoices(track: AssessTrack, id: AssessQuestionId): AssessChoice[]
 }
 
 function decider(track: AssessTrack, id: AssessQuestionId): AssessDecider {
-  return { id, question: WORDING[track][id].question, why: QUESTION_WHY[id], answer_in: ANSWER_IN[id] };
+  return { id, question: WORDING[track][id].question, why: QUESTION_WHY[track][id], answer_in: ANSWER_IN[id] };
 }
 
 export function assessInitiative(input: AssessInitiativeInput): AssessInitiativeResult {
@@ -315,6 +333,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (suppliedCount < 4 && (stopOnGovernance || stopOnReturn)) {
     const verdict: AssessVerdict = {
       classification: 'Stop',
+      ...plainResult({ track, classification: 'Stop', supplied, answers: answersGiven, work: workArchitecture, workAnswered, workUnknown: unknown.includes('work_architecture') }),
       reason: stopOnGovernance ? 'Governance risk above the safe threshold.' : 'Financial return too thin to justify scope.',
       scores_supplied: supplied,
       answers_given: answersGiven,
@@ -342,6 +361,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     const kept = full.audit.rules_fired.filter((rule) => !rule.startsWith('value:'));
     const verdict: AssessVerdict = {
       classification: full.classification,
+      ...plainResult({ track, classification: full.classification, supplied, answers: answersGiven, work: full.work_architecture, workAnswered, workUnknown: unknown.includes('work_architecture') }),
       reason: full.reason,
       scores_supplied: supplied,
       answers_given: answersGiven,
@@ -380,7 +400,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const number = order.length - open.length + 1;
   const w = WORDING[track][next];
   const question: AssessQuestion = {
-    id: next, question: w.question, why: QUESTION_WHY[next], choices: guidedChoices(track, next),
+    id: next, question: w.question, why: QUESTION_WHY[track][next], choices: guidedChoices(track, next),
     answer_in: ANSWER_IN[next], number, of_at_most: MAX_QUESTIONS,
   };
   const decides = open.slice(0, 3).map((id) => decider(track, id));

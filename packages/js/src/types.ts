@@ -498,12 +498,32 @@ export interface AssessAnswer {
   score?: number;
 }
 
+/** One answer that keeps the initiative from a go-ahead. */
+export interface AssessHoldingBack {
+  id: AssessQuestionId;
+  /** A short name for the question, for lists. */
+  short: string;
+  /** The question as it was asked. */
+  question: string;
+  /** What the user answered. */
+  answer: string;
+  /** What the answer has to become to clear the bar. */
+  needed: string;
+}
+
 /**
  * The front-door verdict. It rests only on what the user supplied: no pillar
  * is filled in by the engine and no euro figure is returned.
  */
 export interface AssessVerdict {
   classification: Classification;
+  /** The outcome and its main cause in one plain sentence. Show this to the user. */
+  summary: string;
+  /** The answers that keep the initiative from a go-ahead, most decisive first. Empty for Accelerate. */
+  holding_back: AssessHoldingBack[];
+  /** The one thing to do first. */
+  first_step: string;
+  /** The rule that produced the classification, in framework terms. */
   reason: string;
   /** The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated. */
   scores_supplied: Partial<PillarScores>;

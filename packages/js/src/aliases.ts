@@ -48,7 +48,7 @@ const FUNCTION_ALIASES: Record<string, AliasGroup> = {
     weak: ['revenue', 'commercial', 'growth', 'pipeline', 'pricing'],
   },
   it: {
-    strong: ['it team', 'it department', 'it support', 'it helpdesk', 'it help desk', 'it service desk', 'it operations', 'it ops', 'devops', 'service management', 'itsm', 'security operations', 'it infrastructure'],
+    strong: ['it team', 'it department', 'it support', 'it helpdesk', 'it help desk', 'it service desk', 'it operations', 'it ops', 'devops', 'service management', 'itsm', 'security operations', 'it infrastructure', 'platform operations'],
     weak: ['technology', 'infrastructure', 'platform', 'cloud'],
   },
   finance: {
@@ -97,7 +97,7 @@ const INDUSTRY_ALIASES: Record<string, AliasGroup> = {
     weak: ['school'],
   },
   real_estate: {
-    strong: ['real estate', 'housing association', 'construction', 'proptech', 'property management', 'estate agency'],
+    strong: ['real estate', 'housing association', 'construction', 'proptech', 'property management', 'property company', 'estate agency'],
     weak: ['property', 'housing'],
   },
   creative: {
@@ -109,7 +109,7 @@ const INDUSTRY_ALIASES: Record<string, AliasGroup> = {
     weak: ['foundation'],
   },
   universal: {
-    strong: ['cross-industry'],
+    strong: ['cross-industry', 'general business'],
     weak: ['general', 'any', 'other'],
   },
 };

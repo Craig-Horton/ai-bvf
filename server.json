@@ -4,7 +4,7 @@
   "title": "AI business value framework",
   "description": "Review an AI proposal and return Stop, Fix or Accelerate, the decision gaps and the next action.",
   "status": "active",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "repository": {
     "url": "https://github.com/Craig-Horton/ai-bvf",
     "source": "github"
@@ -20,7 +20,7 @@
     {
       "registryType": "npm",
       "identifier": "aibvf-mcp",
-      "version": "0.15.1",
+      "version": "0.15.2",
       "transport": {
         "type": "stdio"
       }

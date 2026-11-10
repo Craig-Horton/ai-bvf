@@ -18,7 +18,7 @@ The result brings the following questions together. This is an illustrative read
 
 | Part of the brief | What to review |
 |---|---|
-| Verdict | Stop, Fix or Accelerate, with the rule that produced the call. It rests only on your answers. Each answer carries a fixed, published score, and no euro figure is given. |
+| Verdict | Stop, Fix or Accelerate, with the rule that produced the call. It rests only on your answers, and says in plain words what holds the initiative back and what to do first. Each answer carries a fixed, published score, and no euro figure is given. |
 | Evidence gaps | Which inputs were supplied, which were estimated, and what remains unknown about workflow, roles, decision rights and measures. |
 | Planning benefit | A readiness-adjusted EUR scenario. Build costs, operating costs, change costs and financial timing still need a separate business case. |
 | Decision score | A 0 to 100 summary of pillar inputs and input completeness. It has no calibrated probability interpretation. |
@@ -102,9 +102,9 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.15.1 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.15.2 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.11.1 | TypeScript assessment and scoring engine. |
+| [`@aibvf/core`](packages/js) | 0.11.2 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.
