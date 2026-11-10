@@ -241,19 +241,27 @@ const assessInitiativeInputSchema = {
   properties: {
     proposal: {
       type: 'string', minLength: 1,
-      description: 'The AI initiative in ordinary business language. Include the organisation, industry, approximate annual revenue, business function, AI ambition and how the organisation works today when known. The resolver extracts what it can and, when several inputs are missing, asks for all of them in one clarification; it never guesses an unresolved taxonomy value.',
+      description: 'The AI initiative in the user\'s own words. Pass it unchanged on every call. The tool reads industry, business function, AI type and headcount from it and never guesses an unread value.',
     },
-    industry: { type: 'string', description: 'Optional correction or answer in canonical or everyday language, for example retail, hospital, bank or public sector. Overrides anything inferred from proposal.' },
-    revenue_eur: { type: 'number', minimum: 0, description: 'Optional approximate annual revenue in EUR. Overrides any EUR amount extracted from proposal. No currency conversion is performed.' },
-    function: { type: 'string', description: 'Optional correction or answer in canonical or everyday language, for example customer service, procurement, finance or risk. Overrides anything inferred from proposal.' },
-    ai_tier: { type: 'string', description: 'Optional correction or answer: automation/RPA, GenAI/copilot, or agentic/autonomous. Overrides anything inferred from proposal.' },
-    readiness: { type: 'string', description: 'Optional correction or answer: agile, traditional, or siloed, including everyday descriptions such as cross-functional, hierarchical or bureaucratic. Overrides anything inferred from proposal.' },
+    industry: { type: 'string', description: 'Answer or correction in canonical or everyday language, for example retail, hospital, bank or public sector. Overrides anything read from proposal.' },
+    function: { type: 'string', description: 'Answer or correction in canonical or everyday language, for example customer service, procurement, finance or risk. Overrides anything read from proposal.' },
+    ai_tier: { type: 'string', description: 'Answer or correction: automation/RPA, GenAI/copilot, or agentic/autonomous. Overrides anything read from proposal.' },
+    employees: { type: 'number', minimum: 1, description: 'Number of people in the organisation. Under 250 the questions are worded for a smaller firm; the rules are the same for every size.' },
+    confirmed: { type: 'boolean', description: 'Set true only after the user has seen the understood statement and said it is right. Never set it on behalf of the user.' },
+    answers: {
+      type: 'object',
+      description: 'The user\'s answers to the guided questions, by question id. Each value is the id of the choice the user picked: a, b, c, d, or unknown when the user does not know yet. Pass every answer given so far on each call. Never pick an answer on behalf of the user.',
+      properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
+        .map((id) => [id, { type: 'string', enum: ['a', 'b', 'c', 'd', 'unknown'] }])),
+    },
     scores: {
       ...scoreInputSchema.properties.scores,
-      description: 'OPTIONAL. The four AI BVF pillars, each 0 to 100, exactly as the user gave them. Pass only what the user supplied and never invent a number: this tool fills in nothing. Accelerate and Fix need all four. governance_risk at 70 or above, or financial_return at 20 or below, returns Stop on its own. With fewer than four and no Stop, the response is not_enough_to_judge and names what is still open.',
+      description: 'OPTIONAL, for callers that already hold 0 to 100 pillar scores from the user. A regular user answers the guided questions and never needs this. A supplied score takes precedence over an answer. Never invent a number: this tool fills in nothing.',
     },
     signal_completeness: scoreInitiativeInputSchema.properties.signal_completeness,
     work_architecture: workArchitectureInputSchema,
+    revenue_eur: { type: 'number', minimum: 0, description: 'Accepted for compatibility and ignored. The front door verdict does not use revenue.' },
+    readiness: { type: 'string', description: 'Accepted for compatibility and ignored. The front door verdict does not use the operating-model label.' },
   },
 };
 
@@ -449,13 +457,14 @@ const scoreOutputSchema = {
 
 const assessVerdictSchema = {
   type: 'object',
-  description: 'Present only when status is verdict. Rests only on scores the user supplied. Carries no euro figure and no estimated score.',
-  required: ['bvf_version', 'classification', 'reason', 'scores_supplied', 'work_architecture', 'audit', 'value_note'],
+  description: 'Present only when status is verdict. Rests only on what the user answered or supplied. Carries no euro figure and no estimated score.',
+  required: ['bvf_version', 'classification', 'reason', 'scores_supplied', 'answers_given', 'work_architecture', 'audit', 'value_note'],
   properties: {
     bvf_version: { type: 'string' },
     classification: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
     reason: { type: 'string' },
-    scores_supplied: { type: 'object', description: 'The pillar scores the user supplied. Nothing here was estimated.' },
+    scores_supplied: { type: 'object', description: 'The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated.' },
+    answers_given: { type: 'object', description: 'The guided answers behind those scores: the choice, its wording and the published score it carries.' },
     decision_confidence: { type: 'number', description: 'Heuristic decision score, 0 to 100, with no probability calibration. Present only when all four pillars were supplied.' },
     verdict_flips: stringArray('The nearest single-pillar movements that change the verdict. Present only when all four pillars were supplied.'),
     interpretation: { type: 'object', description: 'How to read decision_confidence. Present only when all four pillars were supplied.' },
@@ -467,36 +476,50 @@ const assessVerdictSchema = {
   },
 };
 
+const assessContextFields = ['industry', 'function', 'ai_tier', 'employees'];
+const assessDeciderSchema = {
+  type: 'object',
+  required: ['id', 'question', 'why', 'answer_in'],
+  properties: {
+    id: { type: 'string', enum: ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk', 'work_architecture'] },
+    question: { type: 'string' },
+    why: { type: 'string' },
+    answer_in: { type: 'string', description: 'The input field that carries the answer on the next call.' },
+  },
+};
+
 const assessInitiativeOutputSchema = {
   type: 'object',
   required: ['bvf_version', 'status', 'proposal', 'resolved_inputs', 'resolutions', 'missing_fields', 'inferred_fields', 'understood'],
   properties: {
     bvf_version: { type: 'string' },
-    status: { type: 'string', enum: ['needs_input', 'not_enough_to_judge', 'verdict'], description: 'needs_input: a decision input is unresolved. not_enough_to_judge: the context is clear but the user has not supplied what a verdict rests on. verdict: Accelerate, Fix or Stop from supplied scores only.' },
+    status: { type: 'string', enum: ['needs_input', 'needs_confirmation', 'not_enough_to_judge', 'verdict'], description: 'needs_input: a piece of context is unread, ask question. needs_confirmation: show understood and ask the user to confirm or correct it. not_enough_to_judge: ask question, the next guided question. verdict: Accelerate, Fix or Stop from the user\'s answers only.' },
     proposal: { type: 'string', description: 'The supplied proposal, returned so the next call can preserve it verbatim.' },
-    resolved_inputs: { type: 'object', description: 'Canonical fields resolved so far. Explicit corrections override proposal inference.' },
+    resolved_inputs: { type: 'object', description: 'Context resolved so far: industry, function, ai_tier, employees and track (smaller_firm under 250 people, otherwise enterprise).' },
     resolutions: stringArray('Every deterministic resolution, naming the field, canonical value, source and matched phrase.'),
-    missing_fields: { type: 'array', items: { type: 'string', enum: ['industry', 'revenue_eur', 'function', 'ai_tier', 'readiness'] } },
-    next_question: { type: 'string', description: 'needs_input: one clarification covering every unresolved input. not_enough_to_judge: the questions that decide the outcome, in one sentence. Absent when status is verdict.' },
-    suggestions: stringArray('Accepted values for an explicitly supplied field that could not be resolved.'),
-    ambiguous_fields: { type: 'object', description: 'Fields whose wording pointed to more than one value, each with the competing values. Ask the user to choose; never choose for them.' },
-    inferred_fields: { type: 'array', items: { type: 'string', enum: ['industry', 'revenue_eur', 'function', 'ai_tier', 'readiness'] }, description: 'Fields read from the wording of the proposal instead of an explicit answer.' },
-    understood: { type: 'string', description: 'Plain statement of how the proposal was read. Show it to the user before anything else and invite corrections.' },
-    decides: {
-      type: 'array',
-      description: 'not_enough_to_judge only. Up to three things that decide the outcome, most decisive first. Put each question to the user; do not answer for them.',
-      items: {
-        type: 'object',
-        required: ['id', 'question', 'why', 'answer_in'],
-        properties: {
-          id: { type: 'string', enum: ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk', 'work_architecture'] },
-          question: { type: 'string' },
-          why: { type: 'string' },
-          answer_in: { type: 'string', description: 'The input field that carries the answer on the next call.' },
-        },
+    missing_fields: { type: 'array', items: { type: 'string', enum: assessContextFields } },
+    next_question: { type: 'string', description: 'The one thing to ask the user next, as a sentence. Absent when status is verdict.' },
+    question: {
+      type: 'object',
+      description: 'The same question in structured form. Show the question and every choice label to the user, in the given order, and pass back the id of the choice they pick in the field named by answer_in. Ask one question per turn.',
+      required: ['id', 'question', 'answer_in'],
+      properties: {
+        id: { type: 'string' },
+        question: { type: 'string' },
+        why: { type: 'string', description: 'Why the answer decides the outcome.' },
+        choices: { type: 'array', items: { type: 'object', required: ['id', 'label'], properties: { id: { type: 'string' }, label: { type: 'string' } } } },
+        answer_in: { type: 'string' },
+        number: { type: 'number', description: 'Guided questions only: position in the sequence.' },
+        of_at_most: { type: 'number' },
       },
     },
+    suggestions: stringArray('Accepted values for an explicitly supplied field that could not be resolved.'),
+    ambiguous_fields: { type: 'object', description: 'Fields whose wording pointed to more than one value, each with the competing values. Ask the user to choose; never choose for them.' },
+    inferred_fields: { type: 'array', items: { type: 'string', enum: assessContextFields }, description: 'Fields read from the wording of the proposal instead of an explicit answer.' },
+    understood: { type: 'string', description: 'Plain statement of how the proposal was read. Show it to the user before anything else and invite corrections.' },
+    decides: { type: 'array', description: 'not_enough_to_judge only. Up to three things still to answer, most decisive first.', items: assessDeciderSchema },
     also_open: stringArray('not_enough_to_judge only. Anything still open after the three in decides.'),
+    to_find_out: { type: 'array', description: 'Questions the user answered with "I do not know yet". A verdict waits on these. When no question is left to ask, tell the user to find these out and come back.', items: assessDeciderSchema },
     warning: { type: 'string', description: 'A condition the user must meet first. Lead with it when present.' },
     verdict: assessVerdictSchema,
   },
@@ -1001,7 +1024,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It resolves industry, revenue, business function, AI tier and organisational readiness from the proposal and never guesses an unresolved value. It returns one of three statuses. needs_input: ask next_question once and call again with the answers in the explicit fields. not_enough_to_judge: the context is clear but the user has not supplied what a verdict rests on; put the questions in decides to the user in their own words, lead with warning when present, and call again with their answers in scores and work_architecture. verdict: Accelerate, Fix or Stop, resting only on scores the user supplied. Accelerate and Fix need all four pillar scores; Stop fires as soon as one supplied score forces it. Every response carries understood, a plain statement of how the proposal was read: show it to the user and invite corrections. Wording that points to two values is returned in ambiguous_fields as a question for the user. This tool fills in no pillar score and returns no euro figure: a value has to be worked out from the organisation's own volumes, hours and costs, so never state a euro benefit from this result and never invent a pillar score the user did not give. Use work_architecture to record whether the end-to-end workflow, affected roles, human decision rights and performance measures have been redesigned; a stated gap or an unanswered check blocks Accelerate. Use score_initiative when the canonical fields are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, resting only on the user's answers. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result, never set confirmed and never pick an answer on behalf of the user; when the user is unsure, pass unknown. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const TOOLS = [
@@ -1136,7 +1159,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         await recordCall('assess_ai_initiative', {
           assessment_stage: r.status,
           industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
-          ai_tier: r.resolved_inputs.ai_tier, readiness: r.resolved_inputs.readiness,
+          ai_tier: r.resolved_inputs.ai_tier,
         });
         const payload = { bvf_version: BVF_VERSION, ...r };
         return {
@@ -1152,7 +1175,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         assessment_stage: 'verdict',
         work_architecture_status: s.work_architecture?.status,
         industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
-        ai_tier: r.resolved_inputs.ai_tier, readiness: r.resolved_inputs.readiness,
+        ai_tier: r.resolved_inputs.ai_tier,
         classification: s.classification, confidence: s.confidence,
       });
       const verdict = {
@@ -1160,6 +1183,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         classification: s.classification,
         reason: s.reason,
         scores_supplied: s.scores_supplied,
+        answers_given: s.answers_given,
         ...(s.confidence !== undefined ? { decision_confidence: s.confidence, interpretation: { decision_confidence: SCORE_INTERPRETATION.decision_confidence } } : {}),
         ...(s.verdict_flips ? { verdict_flips: s.verdict_flips } : {}),
         work_architecture: s.work_architecture,
@@ -1587,7 +1611,7 @@ export function createAibvfServer(options: { entryRoute?: EntryRoute } = {}): Se
     { name: 'io.github.Craig-Horton/aibvf-mcp', version: VERSION },
     {
       capabilities: { tools: {} },
-      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. Show the user its understood statement first, and when the user corrects an item call it again with that item in its explicit field. If it returns needs_input, ask its single clarification. If it returns not_enough_to_judge, put the questions in decides to the user and call it again with their answers. It fills in no score and gives no euro figure, so never supply either on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
+      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged and every answer so far. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, LIST_TOOLS_HANDLER);

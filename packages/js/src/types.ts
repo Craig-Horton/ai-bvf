@@ -422,30 +422,80 @@ export interface SequenceResult {
   audit: AuditRecord;
 }
 
-export type AssessField = 'industry' | 'revenue_eur' | 'function' | 'ai_tier' | 'readiness';
+/** The context the front door needs before it can ask its questions. */
+export type AssessField = 'industry' | 'function' | 'ai_tier' | 'employees';
+/** Which wording the questions use. The rules are the same for both. */
+export type AssessTrack = 'smaller_firm' | 'enterprise';
+export type AssessQuestionId = keyof PillarScores | 'work_architecture';
+/** a to d are the four everyday answers, weakest to strongest. unknown leaves the question open. */
+export type AssessChoiceId = 'a' | 'b' | 'c' | 'd' | 'unknown';
+
+export interface AssessContext {
+  industry?: Industry;
+  function?: FunctionId;
+  ai_tier?: AiTier;
+  /** Number of people in the organisation. */
+  employees?: number;
+  /** Set once employees is known: under 250 is smaller_firm. */
+  track?: AssessTrack;
+}
 
 /** Plain-English front door for one proposed AI investment. */
 export interface AssessInitiativeInput {
   proposal: string;
   industry?: string;
-  revenue_eur?: number;
   function?: string;
   ai_tier?: string;
-  readiness?: string;
+  employees?: number;
+  /** True once the user has confirmed how the proposal was read. */
+  confirmed?: boolean;
+  /** The user's answers to the guided questions, by question id. */
+  answers?: Partial<Record<AssessQuestionId, AssessChoiceId>>;
+  /** For callers that already hold 0 to 100 pillar scores. A supplied score takes precedence over an answer. */
   scores?: Partial<PillarScores>;
   signal_completeness?: number;
   work_architecture?: WorkArchitectureInput;
+  /** Accepted for compatibility and ignored: the front door verdict does not use revenue. */
+  revenue_eur?: number;
+  /** Accepted for compatibility and ignored: the front door verdict does not use the operating-model label. */
+  readiness?: string;
+}
+
+export interface AssessChoice {
+  id: string;
+  label: string;
+}
+
+/** The one thing to ask the user next, with its answer choices where there are any. */
+export interface AssessQuestion {
+  id: AssessField | AssessQuestionId | 'confirmation';
+  question: string;
+  why?: string;
+  choices?: AssessChoice[];
+  /** The input field that carries the answer on the next call. */
+  answer_in: string;
+  /** Guided questions only: position in the sequence. */
+  number?: number;
+  of_at_most?: number;
 }
 
 /** One thing the user has to answer before the initiative can be judged. */
 export interface AssessDecider {
-  id: keyof PillarScores | 'work_architecture';
+  id: AssessQuestionId;
   /** The question in everyday words. */
   question: string;
   /** Why the answer decides the outcome. */
   why: string;
   /** The input field that carries the answer on the next call. */
   answer_in: string;
+}
+
+/** What the user answered, with the published score the answer carries. */
+export interface AssessAnswer {
+  choice: Exclude<AssessChoiceId, 'unknown'>;
+  label: string;
+  /** Absent for work_architecture, which is four checks and carries no score. */
+  score?: number;
 }
 
 /**
@@ -455,8 +505,10 @@ export interface AssessDecider {
 export interface AssessVerdict {
   classification: Classification;
   reason: string;
-  /** The pillar scores the user supplied. Nothing here was estimated. */
+  /** The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated. */
   scores_supplied: Partial<PillarScores>;
+  /** The guided answers behind those scores, where the user answered a question. */
+  answers_given: Partial<Record<AssessQuestionId, AssessAnswer>>;
   /** Present only when all four pillars were supplied. */
   confidence?: number;
   /** Present only when all four pillars were supplied. */
@@ -468,18 +520,21 @@ export interface AssessVerdict {
 }
 
 /**
- * needs_input: a decision input is unresolved, ask next_question.
- * not_enough_to_judge: the context is clear but the user has not supplied
- * what a verdict rests on; decides names what would settle it.
- * verdict: Accelerate, Fix or Stop, from supplied scores only.
+ * needs_input: a piece of context is unresolved, ask question.
+ * needs_confirmation: the context was read from the wording; the user confirms or corrects it.
+ * not_enough_to_judge: the user has not yet supplied what a verdict rests on; question is the next one to ask.
+ * verdict: Accelerate, Fix or Stop, from the user's answers only.
  */
 export interface AssessInitiativeResult {
-  status: 'needs_input' | 'not_enough_to_judge' | 'verdict';
+  status: 'needs_input' | 'needs_confirmation' | 'not_enough_to_judge' | 'verdict';
   proposal: string;
-  resolved_inputs: Partial<ScoreInput>;
+  resolved_inputs: AssessContext;
   resolutions: string[];
   missing_fields: AssessField[];
+  /** The next thing to ask, as one sentence. Absent when status is verdict. */
   next_question?: string;
+  /** The same question in structured form, with its answer choices. */
+  question?: AssessQuestion;
   suggestions?: string[];
   /** Fields whose wording pointed to more than one value, with the competing values. */
   ambiguous_fields?: Partial<Record<AssessField, string[]>>;
@@ -487,10 +542,12 @@ export interface AssessInitiativeResult {
   inferred_fields: AssessField[];
   /** Plain statement of how the proposal was read, for the user to correct. */
   understood: string;
-  /** not_enough_to_judge only: up to three things that decide the outcome, most decisive first. */
+  /** not_enough_to_judge only: up to three things still to answer, most decisive first. */
   decides?: AssessDecider[];
   /** not_enough_to_judge only: anything else still open after the three in decides. */
-  also_open?: AssessDecider['id'][];
+  also_open?: AssessQuestionId[];
+  /** Questions the user answered with "I do not know yet". A verdict waits on these. */
+  to_find_out?: AssessDecider[];
   /** Present when the context carries a condition the user must meet first. */
   warning?: string;
   verdict?: AssessVerdict;
