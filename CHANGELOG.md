@@ -2,7 +2,23 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
-## Unreleased
+## 0.15.0 (aibvf-mcp), 0.11.0 (@aibvf/core), 10 November 2026
+
+This release changes the front door, `assess_ai_initiative`. It reads a proposal without guessing, fills in no score, returns no euro figure, and asks a regular user plain questions.
+
+Changed: `assess_ai_initiative` is a guided conversation. It reads industry, business function, AI type and headcount, returns `needs_confirmation` with the reading for the user to confirm or correct, then asks at most five plain questions, one at a time, in `question`.
+
+Added: every guided question carries four everyday answers and "I do not know yet". Each answer maps to a fixed, published score in `CHOICE_SCORES`; the answer, its wording and its score are returned in `answers_given` and recorded in the audit rules. An unknown answer fills nothing in and is listed in `to_find_out`.
+
+Added: two wordings by size. Organisations under 250 people get questions phrased for an owner, larger ones for an executive. The scores, thresholds and work redesign gate are identical for both.
+
+Changed: a verdict rests only on what the user answered or supplied. Accelerate and Fix need all four pillars, and Stop fires as soon as one answer forces it. Until then the status is `not_enough_to_judge`. The work redesign question is asked last, and only when the four pillars clear the Accelerate thresholds.
+
+Changed: no euro figure at the front door. A value has to be worked out from the organisation's own volumes, hours and costs.
+
+Changed: agentic AI in a regulated industry or function no longer returns Stop on an estimated governance score. The governance question is asked first, with a `warning` that it cannot proceed until its controls are shown.
+
+Changed: the front door asks for headcount and no longer asks for annual revenue or the agile, traditional or siloed label. Both inputs are accepted and ignored. Missing context is asked for one item at a time, with choices.
 
 Fixed: plain-language matching reads whole words only. "A company" no longer resolves to cross-industry, "laptops" no longer resolves to supply chain, and a mention of revenue no longer resolves the function to sales.
 
@@ -10,33 +26,22 @@ Fixed: the longest phrase wins, so a retail bank resolves to financial services.
 
 Changed: ordinary words such as "people", "support", "technology" and "slow" resolve only as a short direct answer, never inside a longer proposal. An unresolved field becomes a question.
 
-Added: `assess_ai_initiative` returns `understood`, a plain statement of how the proposal was read, with `inferred_fields` and `ambiguous_fields`. Existing response fields and the two statuses are unchanged.
+Added: everyday names for smaller organisations and their work, including accountancy firm, MSP, care home, building society, bookkeeping, invoicing and sales team.
 
-Added: everyday names for smaller organisations and their work, including accountancy firm, MSP, care home, building society, bookkeeping, invoicing and sales team. Revenue is read from descriptions such as "15m euro IT services company".
+Added: `understood`, a plain statement of how the proposal was read, with `inferred_fields` and `ambiguous_fields`.
+
+Security: the pattern that strips revenue amounts before reading the business function ran in polynomial time on long runs of spaces. It now runs in linear time.
 
 Added: `plainLanguage.test.ts`, a set of 46 proposals written the way regular users write them. Each must be read correctly or left open as a question.
 
-Changed: `assess_ai_initiative` fills in no pillar score and returns no euro figure. A verdict rests only on scores the user supplied: Accelerate and Fix need all four, and Stop fires as soon as one supplied score forces it.
+Breaking for `assess_ai_initiative` callers:
 
-Added: a third status, `not_enough_to_judge`, with `decides`, up to three questions that settle the outcome, most decisive first, and `also_open` for anything left. A first pass with no scores returns this status in place of a provisional Fix.
+- Statuses are `needs_input`, `needs_confirmation`, `not_enough_to_judge` and `verdict`. A plain proposal no longer returns a verdict in one call.
+- `verdict` no longer carries `net_value_eur`, `gross_value_eur`, `multipliers`, `drivers`, `scores_used`, `pillar_basis`, `sensitivity`, `benchmark_source` or `caveat`. It carries `scores_supplied`, `answers_given`, `verdict_flips`, `value_note`, the work architecture gate and the audit record.
+- `resolved_inputs` and `missing_fields` carry `employees` and `track` in place of `revenue_eur` and `readiness`.
+- `next_question` names one item, where it used to name every missing input.
 
-Changed: agentic AI in a regulated industry or function no longer returns Stop on an estimated governance score. It returns `not_enough_to_judge`, asks the governance question first and carries a `warning` that it cannot proceed until its controls are shown.
-
-Breaking for `assess_ai_initiative` callers: `verdict` no longer carries `net_value_eur`, `gross_value_eur`, `multipliers`, `drivers`, `scores_used`, `pillar_basis`, `sensitivity`, `benchmark_source` or `caveat`. It carries `scores_supplied`, `verdict_flips`, `value_note`, the work architecture gate and the audit record.
-
-Changed: `assess_ai_initiative` is a guided conversation. It reads the context, returns `needs_confirmation` with the reading for the user to confirm or correct, then asks at most five plain questions, one at a time, in `question`.
-
-Added: every guided question carries four everyday answers and "I do not know yet". Each answer maps to a fixed, published score in `CHOICE_SCORES`; the answer, its wording and its score are returned in `answers_given` and recorded in the audit rules. An unknown answer fills nothing in and is listed in `to_find_out`.
-
-Added: two wordings by size. Organisations under 250 people get questions phrased for an owner, larger ones for an executive. The scores, thresholds and work redesign gate are identical for both.
-
-Changed: the front door asks for headcount and no longer asks for annual revenue or the agile, traditional or siloed label. Both inputs are accepted and ignored. Missing context is asked for one item at a time, with choices.
-
-Changed: the work redesign question is asked last, and only when the four pillars clear the Accelerate thresholds.
-
-Breaking for `assess_ai_initiative` callers: `resolved_inputs` and `missing_fields` no longer carry `revenue_eur` or `readiness` and now carry `employees` and `track`. A fourth status, `needs_confirmation`, precedes the questions whenever any context was read from the wording.
-
-Scope: `score_initiative`, the portfolio tools, the scoring formulas and the thresholds are unchanged, and keep the planning range for advisory work. Package versions have not moved; this entry takes its version numbers at release.
+Scope: `score_initiative`, the portfolio tools, the scoring formulas and the thresholds are unchanged, and keep the planning range for advisory work. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
 
 ## 0.14.15 (aibvf-mcp), 0.10.6 (@aibvf/core), 5 November 2026
 

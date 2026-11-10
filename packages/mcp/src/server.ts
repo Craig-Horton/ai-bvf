@@ -18,7 +18,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.14.15';
+export const VERSION = '0.15.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 

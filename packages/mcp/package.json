@@ -1,7 +1,7 @@
 {
   "name": "aibvf-mcp",
   "mcpName": "io.github.Craig-Horton/aibvf-mcp",
-  "version": "0.14.15",
+  "version": "0.15.0",
   "description": "AI BVF: review AI proposals with Stop, Fix or Accelerate, evidence gaps and next actions.",
   "keywords": [
     "mcp",
@@ -39,7 +39,7 @@
     "test": "npm run build && node telemetry-test.mjs && node --test output-test.mjs"
   },
   "dependencies": {
-    "@aibvf/core": "0.10.6",
+    "@aibvf/core": "0.11.0",
     "@modelcontextprotocol/sdk": "^1.32.2"
   },
   "devDependencies": {
