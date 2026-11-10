@@ -18,7 +18,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.15.1';
+export const VERSION = '0.15.2';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 
@@ -458,11 +458,28 @@ const scoreOutputSchema = {
 const assessVerdictSchema = {
   type: 'object',
   description: 'Present only when status is verdict. Rests only on what the user answered or supplied. Carries no euro figure and no estimated score.',
-  required: ['bvf_version', 'classification', 'reason', 'scores_supplied', 'answers_given', 'work_architecture', 'audit', 'value_note'],
+  required: ['bvf_version', 'classification', 'summary', 'holding_back', 'first_step', 'reason', 'scores_supplied', 'answers_given', 'work_architecture', 'audit', 'value_note'],
   properties: {
     bvf_version: { type: 'string' },
     classification: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
-    reason: { type: 'string' },
+    summary: { type: 'string', description: 'The outcome in one or two plain sentences. A Stop quotes its cause. Lead with this.' },
+    holding_back: {
+      type: 'array',
+      description: 'The answers that keep the initiative from a go-ahead, most decisive first. Empty for Accelerate. Show each with what the user said and what it needs to become.',
+      items: {
+        type: 'object',
+        required: ['id', 'short', 'question', 'answer', 'needed'],
+        properties: {
+          id: { type: 'string', enum: ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk', 'work_architecture'] },
+          short: { type: 'string', description: 'A short name for the question, for lists.' },
+          question: { type: 'string' },
+          answer: { type: 'string', description: 'What the user answered.' },
+          needed: { type: 'string', description: 'What the answer has to become to clear the bar.' },
+        },
+      },
+    },
+    first_step: { type: 'string', description: 'The one thing to do first. Give it after the summary.' },
+    reason: { type: 'string', description: 'The rule that produced the classification, in framework terms. For audit and advisory use; prefer summary when speaking to the user.' },
     scores_supplied: { type: 'object', description: 'The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated.' },
     answers_given: { type: 'object', description: 'The guided answers behind those scores: the choice, its wording and the published score it carries.' },
     decision_confidence: { type: 'number', description: 'Heuristic decision score, 0 to 100, with no probability calibration. Present only when all four pillars were supplied.' },
@@ -1024,7 +1041,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, resting only on the user's answers. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result, never set confirmed and never pick an answer on behalf of the user; when the user is unsure, pass unknown. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, resting only on the user's answers. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result, never set confirmed and never pick an answer on behalf of the user; when the user is unsure, pass unknown. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const TOOLS = [
@@ -1181,6 +1198,9 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
       const verdict = {
         bvf_version: BVF_VERSION,
         classification: s.classification,
+        summary: s.summary,
+        holding_back: s.holding_back,
+        first_step: s.first_step,
         reason: s.reason,
         scores_supplied: s.scores_supplied,
         answers_given: s.answers_given,

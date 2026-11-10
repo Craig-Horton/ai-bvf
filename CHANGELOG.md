@@ -2,6 +2,22 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.15.2 (aibvf-mcp), 0.11.2 (@aibvf/core), 10 November 2026
+
+Added: the front-door verdict says its result in everyday words. `summary` gives the outcome in plain words, `holding_back` lists each answer that keeps the initiative from a go-ahead with what the user said and what it needs to become, and `first_step` names the one thing to do first. A Stop quotes the answer that caused it. A gap in the work redesign names the first part still to change.
+
+Changed: `reason` keeps the rule in framework terms for audit and advisory use. `summary` is the sentence to show a user.
+
+Changed: each question's `why` states the rule the engine applies, in the wording for the organisation's size. `QUESTION_WHY` is now keyed by track.
+
+Added: `CONTEXT_CHOICES`, the ordered choices for industry, business function and AI type, so a page that lets the user correct the reading uses the engine's wording. `QUESTION_SHORT`, `FIRST_STEP` and `WORK_PART_WORDING` are exported for the same reason.
+
+Added: "property company" resolves to real estate in a full proposal.
+
+Added: the telemetry migration `20261110_guided_journey_events.sql`. It adds event names for each step of the guided Start journey, a `step` number, and an `activity_cohort` label that marks automated browser checks. The answer chosen is never stored. `guided-funnel.sql` reports where browsers stop.
+
+Scope: additive. No existing field is removed or renamed, and the scoring rules are unchanged. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.15.1 (aibvf-mcp), 0.11.1 (@aibvf/core), 10 November 2026
 
 Security: plain-language matching compared every phrase hit with every other hit, so an input repeating a recognised phrase tens of thousands of times ran in quadratic time and could hold the server's event loop for seconds. Contained phrases are now removed in one ordered sweep. `'sales '.repeat(40000)` falls from about eight seconds to under 100 ms.

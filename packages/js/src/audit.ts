@@ -7,7 +7,7 @@
 import type { AuditRecord } from './types.js';
 
 /** Single source of truth for the engine version; bump with package.json. */
-export const CORE_VERSION = '0.11.1';
+export const CORE_VERSION = '0.11.2';
 
 export function buildAudit(rules_fired: string[], inputs_used: Record<string, unknown>): AuditRecord {
   return {

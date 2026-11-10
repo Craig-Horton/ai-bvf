@@ -15,8 +15,11 @@ export { inferReadiness } from './inferReadiness.js';
 export { sequencePortfolio } from './sequencePortfolio.js';
 export { assemblePortfolio } from './assemblePortfolio.js';
 export { mapToTaxonomy } from './aliases.js';
-export { assessInitiative, extractEmployees, extractRevenueEur } from './assessInitiative.js';
-export { CHOICE_SCORES, SMALLER_FIRM_BELOW, WORDING, WORK_ARCHITECTURE_CHOICES } from './guidedQuestions.js';
+export { assessInitiative, extractEmployees, extractRevenueEur, CONTEXT_CHOICES } from './assessInitiative.js';
+export {
+  CHOICE_SCORES, FIRST_STEP, QUESTION_SHORT, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
+  WORK_ARCHITECTURE_CHOICES, WORK_PART_WORDING,
+} from './guidedQuestions.js';
 export { assessWorkArchitecture } from './workArchitecture.js';
 export { buildAudit, CORE_VERSION } from './audit.js';
 export { bvfSchema } from './schema.js';

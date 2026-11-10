@@ -97,7 +97,7 @@ const INDUSTRY_ALIASES: Record<string, AliasGroup> = {
     weak: ['school'],
   },
   real_estate: {
-    strong: ['real estate', 'housing association', 'construction', 'proptech', 'property management', 'estate agency'],
+    strong: ['real estate', 'housing association', 'construction', 'proptech', 'property management', 'property company', 'estate agency'],
     weak: ['property', 'housing'],
   },
   creative: {

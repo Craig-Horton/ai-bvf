@@ -35,13 +35,80 @@ export const WORK_ARCHITECTURE_CHOICES: Record<Exclude<AssessChoiceId, 'unknown'
 
 interface Wording { question: string; a: string; b: string; c: string; d: string }
 
-export const QUESTION_WHY: Record<AssessQuestionId, string> = {
-  financial_return: 'A return too thin for the scope stops the initiative on its own.',
-  governance_risk: 'Risk that nobody controls stops the initiative on its own.',
-  strategic_alignment: 'Accelerate needs a clear link to a result the organisation already tracks.',
-  change_enablement: 'Accelerate needs a named owner and funded change work.',
-  work_architecture: 'Accelerate needs the work redesigned around the AI, with all four parts shown.',
+/** Why each answer decides the outcome, stated as the rule the engine applies. */
+export const QUESTION_WHY: Record<AssessTrack, Record<AssessQuestionId, string>> = {
+  smaller_firm: {
+    financial_return: 'If it costs more than it saves, the answer is stop.',
+    governance_risk: 'If it deals with customers, money or personal data and nobody checks it, the answer is stop.',
+    strategic_alignment: 'A go-ahead needs one number, a target and someone responsible.',
+    change_enablement: 'A go-ahead needs a named person with time set aside.',
+    work_architecture: 'A go-ahead needs all four parts of the job changed.',
+  },
+  enterprise: {
+    financial_return: 'A return below the cost stops the initiative on its own.',
+    governance_risk: 'Risk that nobody controls stops the initiative on its own.',
+    strategic_alignment: 'A go-ahead needs a tracked result with a target and a named owner.',
+    change_enablement: 'A go-ahead needs a named owner and funded change work.',
+    work_architecture: 'A go-ahead needs the work redesigned in all four parts.',
+  },
 };
+
+/** A short name for each question, for lists of answers. */
+export const QUESTION_SHORT: Record<AssessTrack, Record<AssessQuestionId, string>> = {
+  smaller_firm: {
+    financial_return: 'Cost and return',
+    governance_risk: 'What could go wrong',
+    strategic_alignment: 'What gets better',
+    change_enablement: 'Who makes it happen',
+    work_architecture: 'How the work changes',
+  },
+  enterprise: {
+    financial_return: 'Cost and return',
+    governance_risk: 'Risk and control',
+    strategic_alignment: 'Business result',
+    change_enablement: 'Ownership of the change',
+    work_architecture: 'Redesign of the work',
+  },
+};
+
+/** The one thing to do first when an answer holds the initiative back. */
+export const FIRST_STEP: Record<AssessTrack, Record<keyof PillarScores, string>> = {
+  smaller_firm: {
+    financial_return: 'Write down what it costs each month and what it saves, and check the numbers.',
+    governance_risk: 'Name one person who checks its work and can switch it off.',
+    strategic_alignment: 'Pick one number in the business this should move, set a target and make someone responsible.',
+    change_enablement: 'Name who makes this happen and set time aside for them.',
+  },
+  enterprise: {
+    financial_return: 'Build the cost and return case on measured figures and have finance check it.',
+    governance_risk: 'Name the owner of the risks, give that person the right to override, and put its work under review.',
+    strategic_alignment: 'Tie it to a result the organisation already tracks, with a target and a named executive owner.',
+    change_enablement: 'Name the owner of the change and fund the change work.',
+  },
+};
+
+/** The four parts of the work redesign, in the order they are done. */
+export const WORK_PARTS = ['workflow_redesigned', 'roles_redesigned', 'decision_rights_defined', 'measures_updated'] as const;
+export type WorkPart = typeof WORK_PARTS[number];
+
+/** Each part of the work redesign in everyday words, and the step that completes it. */
+export const WORK_PART_WORDING: Record<AssessTrack, Record<WorkPart, { name: string; step: string }>> = {
+  smaller_firm: {
+    workflow_redesigned: { name: 'the steps of the job', step: 'Write down the new steps of the job, with the AI in them.' },
+    roles_redesigned: { name: 'who does what', step: 'Agree who does what once the AI is doing its part.' },
+    decision_rights_defined: { name: 'who decides and who can overrule', step: 'Agree who decides, and who can overrule the AI.' },
+    measures_updated: { name: 'how good work is judged', step: 'Change how good work is judged, so people are measured on the new way of working.' },
+  },
+  enterprise: {
+    workflow_redesigned: { name: 'the workflow', step: 'Redesign the end-to-end workflow around the AI and the human judgement that stays.' },
+    roles_redesigned: { name: 'the roles', step: 'Rewrite the affected roles and accountabilities.' },
+    decision_rights_defined: { name: 'the decision and override rights', step: 'Name the people who hold the decision, override and escalation rights.' },
+    measures_updated: { name: 'the measures people are judged on', step: 'Update the performance measures and incentives to match the redesigned work.' },
+  },
+};
+
+/** The first step once every answer clears the bar. */
+export const GO_AHEAD_STEP = 'Go ahead, and answer the same questions again at the first review.';
 
 export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
   enterprise: {
