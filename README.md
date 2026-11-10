@@ -10,7 +10,7 @@ Paste this synthetic example, or describe a proposal you are reviewing:
 
 > We are a EUR 2.4bn manufacturer considering GenAI for predictive maintenance in our supply chain. Our operating model is traditional. We have a sponsor, but the affected roles, human override rights and performance measures still need review.
 
-Run the assessment, check how the proposal was interpreted, and correct the assumptions. The assessment asks for unresolved inputs and marks estimated pillar scores. Keep the action list, name an owner and return with evidence when the work changes.
+Run the assessment, check how the proposal was interpreted, and correct the assumptions. The assessment asks for unresolved inputs and fills in no score on your behalf. Until you supply what a verdict rests on, it says so and names the questions that decide it. Keep the action list, name an owner and return with evidence when the work changes.
 
 ### The decision brief
 
@@ -18,7 +18,7 @@ The result brings the following questions together. This is an illustrative read
 
 | Part of the brief | What to review |
 |---|---|
-| Verdict | Stop, Fix or Accelerate, with the rule that produced the call. An initial proposal with estimated pillars remains provisional. |
+| Verdict | Stop, Fix or Accelerate, with the rule that produced the call. It rests only on scores you supplied. A first proposal with none returns the questions that decide it, with no verdict and no euro figure. |
 | Evidence gaps | Which inputs were supplied, which were estimated, and what remains unknown about workflow, roles, decision rights and measures. |
 | Planning benefit | A readiness-adjusted EUR scenario. Build costs, operating costs, change costs and financial timing still need a separate business case. |
 | Decision score | A 0 to 100 summary of pillar inputs and input completeness. It has no calibrated probability interpretation. |
@@ -82,7 +82,7 @@ Thirteen tools are exposed through local stdio and the hosted Streamable HTTP co
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Resolve a plain-English proposal, request missing decision inputs and return the assessment. |
+| `assess_ai_initiative` | Resolve a plain-English proposal, request missing decision inputs, name what decides the outcome and return a verdict from supplied scores only. |
 | `score_initiative` | Score explicit inputs, apply the work architecture gate, and return reasoning, audit and sensitivity. |
 | `recommend_improvements` | Propose pillar actions and work redesign steps for a Fix or Stop. Re-score evidence before accepting a projected outcome. |
 | `assemble_portfolio` | Structure loose portfolio inputs, resolve aliases and disclose estimated pillars. |

@@ -46,10 +46,26 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
       arguments: { proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.' },
     });
     assert.notEqual(assessment.isError, true);
-    assert.equal(assessment.structuredContent.status, 'verdict');
-    assert.equal(assessment.structuredContent.verdict.classification, 'Fix');
-    assert.ok(assessment.structuredContent.verdict.audit);
-    assert.ok(assessment.structuredContent.verdict.sensitivity);
+    // The front door fills in nothing: with no scores supplied there is no verdict and no euro figure.
+    assert.equal(assessment.structuredContent.status, 'not_enough_to_judge');
+    assert.equal(assessment.structuredContent.verdict, undefined);
+    assert.equal(assessment.structuredContent.decides.length, 3);
+    assert.doesNotMatch(JSON.stringify(assessment.structuredContent), /net_value_eur|gross_value_eur|scores_used|pillar_basis/);
+
+    const judged = await client.callTool({
+      name: 'assess_ai_initiative',
+      arguments: {
+        proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.',
+        scores: { strategic_alignment: 70, financial_return: 64, change_enablement: 48, governance_risk: 35 },
+      },
+    });
+    assert.notEqual(judged.isError, true);
+    assert.equal(judged.structuredContent.status, 'verdict');
+    assert.equal(judged.structuredContent.verdict.classification, 'Fix');
+    assert.ok(judged.structuredContent.verdict.audit);
+    assert.ok(judged.structuredContent.verdict.verdict_flips.length > 0);
+    assert.match(judged.structuredContent.verdict.value_note, /own volumes, hours and costs/);
+    assert.doesNotMatch(JSON.stringify(judged.structuredContent), /net_value_eur|gross_value_eur|scores_used|estimated/);
   } finally {
     await client.close();
     await server.close();
@@ -205,6 +221,7 @@ test('MCP explanations disclose compatibility field limits on tool listings and 
     assert.match(single.interpretation.net_value_eur, /before project build, run and change costs/);
     const assessment = await call('assess_ai_initiative', {
       proposal: 'We are a 300 million euro retailer, a traditional organisation, considering a GenAI assistant for customer service.',
+      scores: { strategic_alignment: 70, financial_return: 64, change_enablement: 48, governance_risk: 35 },
     });
     assert.match(assessment.verdict.interpretation.decision_confidence, /no probability calibration/);
     const improved = await call('recommend_improvements', input);

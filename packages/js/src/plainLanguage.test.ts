@@ -71,7 +71,7 @@ test('every plain-language proposal is read correctly or left open as a question
     const { scores: _s, signal_completeness: _c, work_architecture: _w, ...read } = r.resolved_inputs;
     assert.deepEqual(read, c.resolved, c.proposal);
     assert.deepEqual(r.ambiguous_fields ?? {}, c.ambiguous ?? {}, c.proposal);
-    assert.equal(r.status, r.missing_fields.length ? 'needs_input' : 'verdict', c.proposal);
+    assert.equal(r.status, r.missing_fields.length ? 'needs_input' : 'not_enough_to_judge', c.proposal);
   }
 });
 
@@ -107,7 +107,7 @@ test('the result states how the proposal was read and which fields were inferred
   const r = assessInitiative({
     proposal: 'We are a European retail bank with around 2 billion euros in revenue. We want to deploy autonomous agents in customer service. We are quite hierarchical.',
   });
-  assert.equal(r.status, 'verdict');
+  assert.equal(r.status, 'not_enough_to_judge');
   assert.equal(r.understood, 'Read as: industry financial services; business function customer service; AI type agentic AI; way of working traditional; annual revenue EUR 2,000,000,000. Correct any item by supplying it in its own field.');
   assert.deepEqual(r.inferred_fields, ['industry', 'function', 'ai_tier', 'readiness', 'revenue_eur']);
 

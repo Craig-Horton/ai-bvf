@@ -437,9 +437,44 @@ export interface AssessInitiativeInput {
   work_architecture?: WorkArchitectureInput;
 }
 
-/** Either the next question needed to score, or the deterministic verdict. */
+/** One thing the user has to answer before the initiative can be judged. */
+export interface AssessDecider {
+  id: keyof PillarScores | 'work_architecture';
+  /** The question in everyday words. */
+  question: string;
+  /** Why the answer decides the outcome. */
+  why: string;
+  /** The input field that carries the answer on the next call. */
+  answer_in: string;
+}
+
+/**
+ * The front-door verdict. It rests only on what the user supplied: no pillar
+ * is filled in by the engine and no euro figure is returned.
+ */
+export interface AssessVerdict {
+  classification: Classification;
+  reason: string;
+  /** The pillar scores the user supplied. Nothing here was estimated. */
+  scores_supplied: Partial<PillarScores>;
+  /** Present only when all four pillars were supplied. */
+  confidence?: number;
+  /** Present only when all four pillars were supplied. */
+  verdict_flips?: string[];
+  work_architecture: WorkArchitectureAssessment;
+  audit: AuditRecord;
+  /** Why no euro figure is given. */
+  value_note: string;
+}
+
+/**
+ * needs_input: a decision input is unresolved, ask next_question.
+ * not_enough_to_judge: the context is clear but the user has not supplied
+ * what a verdict rests on; decides names what would settle it.
+ * verdict: Accelerate, Fix or Stop, from supplied scores only.
+ */
 export interface AssessInitiativeResult {
-  status: 'needs_input' | 'verdict';
+  status: 'needs_input' | 'not_enough_to_judge' | 'verdict';
   proposal: string;
   resolved_inputs: Partial<ScoreInput>;
   resolutions: string[];
@@ -452,7 +487,13 @@ export interface AssessInitiativeResult {
   inferred_fields: AssessField[];
   /** Plain statement of how the proposal was read, for the user to correct. */
   understood: string;
-  verdict?: ScoreResult;
+  /** not_enough_to_judge only: up to three things that decide the outcome, most decisive first. */
+  decides?: AssessDecider[];
+  /** not_enough_to_judge only: anything else still open after the three in decides. */
+  also_open?: AssessDecider['id'][];
+  /** Present when the context carries a condition the user must meet first. */
+  warning?: string;
+  verdict?: AssessVerdict;
 }
 
 /** Result of mapping free text onto the canonical taxonomy. */

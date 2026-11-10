@@ -1,9 +1,46 @@
 import { mapToTaxonomy } from './aliases.js';
 import { score } from './score.js';
+import { buildAudit } from './audit.js';
+import { assessWorkArchitecture } from './workArchitecture.js';
+import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import type {
-  AiTier, AssessField, AssessInitiativeInput, AssessInitiativeResult,
-  FunctionId, Industry, Readiness, ScoreInput, TaxonomyMatch,
+  AiTier, AssessDecider, AssessField, AssessInitiativeInput, AssessInitiativeResult,
+  AssessVerdict, FunctionId, Industry, PillarScores, Readiness, ScoreInput, TaxonomyMatch,
 } from './types.js';
+
+const PILLARS = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
+
+const VALUE_NOTE = 'No euro figure is given. A value has to be worked out from the organisation\'s own volumes, hours and costs.';
+
+const DECIDERS: Record<AssessDecider['id'], Omit<AssessDecider, 'id'>> = {
+  governance_risk: {
+    question: 'What could go wrong, and who can stop or override the AI?',
+    why: 'Risk that nobody controls stops the initiative on its own.',
+    answer_in: 'scores.governance_risk, 0 to 100, higher means more risk',
+  },
+  financial_return: {
+    question: 'What does it cost to build and run, and what does it return each year?',
+    why: 'A return too thin for the scope stops the initiative on its own.',
+    answer_in: 'scores.financial_return, 0 to 100',
+  },
+  strategic_alignment: {
+    question: 'Which business result does this move, and by how much?',
+    why: 'Accelerate needs a clear link to a result the organisation already tracks.',
+    answer_in: 'scores.strategic_alignment, 0 to 100',
+  },
+  change_enablement: {
+    question: 'Who owns the change, and are the time and budget to make it happen funded?',
+    why: 'Accelerate needs a named owner and funded change work.',
+    answer_in: 'scores.change_enablement, 0 to 100',
+  },
+  work_architecture: {
+    question: 'What changes in the workflow, the roles, the decision rights and the measures before go-live?',
+    why: 'Accelerate needs the work redesigned around the AI, with all four checks shown.',
+    answer_in: 'work_architecture, four true or false checks',
+  },
+};
+
+const REGULATED_AGENTIC_WARNING = 'Agentic AI in a regulated setting cannot proceed until its controls are shown. Answer the governance question first.';
 
 const REQUIRED_FIELDS: AssessField[] = ['industry', 'revenue_eur', 'function', 'ai_tier', 'readiness'];
 
@@ -262,9 +299,72 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   }
 
   const scoreInput = resolved as ScoreInput;
+  const supplied: Partial<PillarScores> = {};
+  for (const pillar of PILLARS) {
+    const value = input.scores?.[pillar];
+    if (typeof value === 'number' && Number.isFinite(value)) supplied[pillar] = value;
+  }
+  const suppliedCount = Object.keys(supplied).length;
+  const workArchitecture = assessWorkArchitecture(input.work_architecture);
+  const regulatedAgentic = scoreInput.ai_tier === 'gen3'
+    && (REGULATED_INDUSTRIES.has(scoreInput.industry) || REGULATED_FUNCTIONS.has(scoreInput.function));
+  const base = {
+    proposal, resolved_inputs: scoreInput, resolutions,
+    missing_fields: [] as AssessField[], inferred_fields: inferred, understood,
+  };
+
+  // A supplied score can stop the initiative on its own. Nothing else is needed for that.
+  const stopOnGovernance = supplied.governance_risk !== undefined && supplied.governance_risk >= 70;
+  const stopOnReturn = supplied.financial_return !== undefined && supplied.financial_return <= 20;
+  if (suppliedCount < 4 && (stopOnGovernance || stopOnReturn)) {
+    const verdict: AssessVerdict = {
+      classification: 'Stop',
+      reason: stopOnGovernance ? 'Governance risk above the safe threshold.' : 'Financial return too thin to justify scope.',
+      scores_supplied: supplied,
+      work_architecture: workArchitecture,
+      audit: buildAudit(
+        [`supplied:${Object.keys(supplied).join(',')}`, 'classify:Stop', `work_architecture:${workArchitecture.status}`, 'front_door:value_withheld'],
+        { industry: scoreInput.industry, revenue_eur: scoreInput.revenue_eur, function: scoreInput.function, ai_tier: scoreInput.ai_tier, readiness: scoreInput.readiness, scores: supplied, work_architecture: input.work_architecture ?? null },
+      ),
+      value_note: VALUE_NOTE,
+    };
+    return { status: 'verdict', ...base, verdict };
+  }
+
+  if (suppliedCount === 4) {
+    const full = score(scoreInput);
+    const verdict: AssessVerdict = {
+      classification: full.classification,
+      reason: full.reason,
+      scores_supplied: supplied,
+      confidence: full.confidence,
+      verdict_flips: full.sensitivity.verdict_flips,
+      work_architecture: full.work_architecture,
+      audit: {
+        ...full.audit,
+        rules_fired: [...full.audit.rules_fired.filter((rule) => !rule.startsWith('value:')), 'front_door:value_withheld'],
+      },
+      value_note: VALUE_NOTE,
+    };
+    return { status: 'verdict', ...base, verdict };
+  }
+
+  // Not enough supplied to judge. Name what decides it, most decisive first:
+  // the two pillars that can stop the initiative, then the two Accelerate needs.
+  const order: AssessDecider['id'][] = regulatedAgentic
+    ? ['governance_risk', 'financial_return', 'strategic_alignment', 'change_enablement', 'work_architecture']
+    : ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
+  const open = order.filter((id) => (id === 'work_architecture'
+    ? workArchitecture.status !== 'ready'
+    : supplied[id] === undefined));
+  const decides: AssessDecider[] = open.slice(0, 3).map((id) => ({ id, ...DECIDERS[id] }));
+  const alsoOpen = open.slice(3);
+  const count = ['One thing decides', 'Two things decide', 'Three things decide'][decides.length - 1];
+  const decidingQuestion = `Not enough to judge yet. ${count} it. ${decides.map((d, i) => `${i + 1}. ${d.question}`).join(' ')}`;
   return {
-    status: 'verdict', proposal, resolved_inputs: scoreInput,
-    resolutions, missing_fields: [], inferred_fields: inferred, understood,
-    verdict: score(scoreInput),
+    status: 'not_enough_to_judge', ...base,
+    next_question: decidingQuestion, decides,
+    ...(alsoOpen.length ? { also_open: alsoOpen } : {}),
+    ...(regulatedAgentic && supplied.governance_risk === undefined ? { warning: REGULATED_AGENTIC_WARNING } : {}),
   };
 }
