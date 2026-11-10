@@ -23,9 +23,48 @@ const QUESTION_PARTS: Record<AssessField, string> = {
   readiness: 'current operating model (agile, traditional, or siloed)',
 };
 
-function nextQuestion(missing: AssessField[]): string {
-  if (missing.length === 1) return QUESTIONS[missing[0]];
-  const parts = missing.map((field) => QUESTION_PARTS[field]);
+/** Everyday names for the canonical values, used when reading a proposal back. */
+const PLAIN: Record<Exclude<AssessField, 'revenue_eur'>, Record<string, string>> = {
+  industry: {
+    universal: 'cross-industry', creative: 'creative and media', education: 'education',
+    energy: 'energy and utilities', financial: 'financial services', healthcare: 'healthcare',
+    logistics: 'logistics and transport', manufacturing: 'manufacturing', nonprofit: 'non-profit',
+    professional: 'professional services', public_sector: 'public sector',
+    real_estate: 'real estate and construction', retail: 'retail', technology: 'technology',
+  },
+  function: {
+    finance: 'finance', hr: 'HR', sales: 'sales and marketing', supply: 'supply chain',
+    cx: 'customer service', risk: 'risk and compliance', it: 'IT', rd: 'R&D',
+  },
+  ai_tier: { gen1: 'automation', gen2: 'GenAI', gen3: 'agentic AI' },
+  readiness: { agile: 'agile', traditional: 'traditional', siloed: 'siloed' },
+};
+
+const FIELD_NAME: Record<AssessField, string> = {
+  industry: 'industry', revenue_eur: 'annual revenue', function: 'business function',
+  ai_tier: 'AI type', readiness: 'way of working',
+};
+
+type Ambiguous = Partial<Record<AssessField, string[]>>;
+
+function choices(field: AssessField, values: string[]): string {
+  const names = values.map((value) => PLAIN[field as Exclude<AssessField, 'revenue_eur'>][value] ?? value);
+  const final = names.pop();
+  return names.length ? `${names.join(', ')} or ${final}` : `${final}`;
+}
+
+function nextQuestion(missing: AssessField[], ambiguous: Ambiguous): string {
+  if (missing.length === 1) {
+    const field = missing[0];
+    const options = ambiguous[field];
+    return options
+      ? `The proposal points to more than one ${FIELD_NAME[field]}: ${choices(field, options)}. Which one applies?`
+      : QUESTIONS[field];
+  }
+  const parts = missing.map((field) => {
+    const options = ambiguous[field];
+    return options ? `${FIELD_NAME[field]} (the proposal points to ${choices(field, options)})` : QUESTION_PARTS[field];
+  });
   const final = parts.pop();
   return `To return a provisional verdict in one more step, what are the ${parts.join(', ')}, and ${final}?`;
 }
@@ -82,7 +121,9 @@ export function extractRevenueEur(proposal: string): number | undefined {
   const projectRevenueSource = /^\s*(?:(?:in|of)\s+)?(?:(?:annual|incremental|additional|projected|expected|potential|target)\s+)?(?:(?:revenue|turnover)\s+)?(?:from|for|generated\s+by|attributable\s+to)\s+(?:(?:the|this|our|an?)\s+)?(?:pilot|project|initiative)\b/i;
   const periodicRevenueBefore = /\b(?:monthly|quarterly|weekly|daily|Q[1-4])\s+(?:(?:company|organisation|organization)\s+)?(?:revenue|turnover)\s*(?:(?:of|is|was|at|around|about|approximately|approx\.?|equals)\s*)?[:=]?\s*$/i;
   const periodicRevenueAfter = /^\s*(?:(?:in|of)\s+)?(?:(?:revenue|turnover)\s+)?(?:(?:per|a|each|every)\s+(?:month|quarter|week|day)\b|(?:monthly|quarterly|weekly|daily)\b|\/\s*(?:month|quarter|week|day)\b)/i;
-  const companyAfter = /^\s*(?:(?:global|international|European)\s+)?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit)\b/i;
+  // "15m euro IT services company": up to three describing words may sit between the
+  // amount and the organisation noun, but never a preposition or verb ("EUR 2m saved by the business").
+  const companyAfter = /^\s*(?:(?!(?:at|for|by|in|to|from|of|on|with|per|and|or|that|which|is|was|are|will|would|saved|spent|invested|raised|paid|lost)\b)[\w&-]+\s+){0,3}?(?:retailer|company|business|bank|manufacturer|organisation|organization|hospital|insurer|enterprise|non-profit|nonprofit|firm|practice|agency|group|provider|msp|charity|startup|consultancy|partnership|council|university|school|studio|clinic)\b/i;
   const rangeAfter = new RegExp(String.raw`^\s*(?:[-–—/]|to\b|through\b|or\b)\s*(?:(?:${CURRENCY})\s*)?[0-9]`, 'i');
   const foreignCodeSuffix = /^\s*[A-Z]{3}\b/;
   const foreignSuffix = /^\s*(?:dollars?\b|pounds?\b|yen\b|yuan\b|renminbi\b|rupees?\b)/i;
@@ -120,9 +161,36 @@ export function extractRevenueEur(proposal: string): number | undefined {
   return otherAmounts.some((value) => value !== revenue) ? undefined : revenue;
 }
 
-function proposalFor(field: Exclude<AssessField, 'revenue_eur'>, proposal: string): string {
+/** One plain statement of how the proposal was read, so the user can correct it. */
+function understoodStatement(resolved: Partial<ScoreInput>, missing: AssessField[]): string {
+  const read: string[] = [];
+  if (resolved.industry) read.push(`industry ${PLAIN.industry[resolved.industry]}`);
+  if (resolved.function) read.push(`business function ${PLAIN.function[resolved.function]}`);
+  if (resolved.ai_tier) read.push(`AI type ${PLAIN.ai_tier[resolved.ai_tier]}`);
+  if (resolved.readiness) read.push(`way of working ${PLAIN.readiness[resolved.readiness]}`);
+  if (resolved.revenue_eur !== undefined) read.push(`annual revenue EUR ${resolved.revenue_eur.toLocaleString('en-GB')}`);
+  const open = missing.map((field) => FIELD_NAME[field]);
+  const readPart = read.length ? `Read as: ${read.join('; ')}.` : 'Nothing in the proposal could be read with confidence.';
+  const openPart = open.length ? ` Not yet known: ${open.join(', ')}.` : '';
+  const fix = read.length ? ' Correct any item by supplying it in its own field.' : '';
+  return `${readPart}${openPart}${fix}`;
+}
+
+function proposalFor(
+  field: Exclude<AssessField, 'revenue_eur'>,
+  proposal: string,
+  industryPhrase?: string,
+): string {
   if (field !== 'function') return proposal;
-  return proposal.replace(/(?:annual\s+)?(?:revenue|turnover)\s*(?:of|is|around|about|approximately|approx\.?|:)?\s*(?:EUR|€)?\s*[0-9]+(?:[,.][0-9]+)?\s*(?:k|thousand|m|mn|million|b|bn|billion)?/gi, '');
+  let text = proposal.replace(/(?:annual\s+)?(?:revenue|turnover)\s*(?:of|is|around|about|approximately|approx\.?|:)?\s*(?:EUR|€)?\s*[0-9]+(?:[,.][0-9]+)?\s*(?:k|thousand|m|mn|million|b|bn|billion)?/gi, '');
+  // The words that named the industry ("marketing agency", "recruitment agency")
+  // describe what the organisation is. They say nothing about which function owns the work.
+  if (industryPhrase && /[\s-]/.test(industryPhrase)) {
+    const pattern = industryPhrase.trim().split(/[\s_\-/]+/)
+      .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s_\\-/]+');
+    text = text.replace(new RegExp(`\\b${pattern}s?\\b`, 'gi'), ' ');
+  }
+  return text;
 }
 
 function taxonomyMatch(field: Exclude<AssessField, 'revenue_eur'>, value: string): TaxonomyMatch | undefined {
@@ -148,17 +216,23 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const resolved: Partial<ScoreInput> = {};
   const resolutions: string[] = [];
   let firstSuggestions: string[] | undefined;
+  const ambiguous: Ambiguous = {};
+  const inferred: AssessField[] = [];
 
+  let industryPhrase: string | undefined;
   for (const field of ['industry', 'function', 'ai_tier', 'readiness'] as const) {
     const provided = input[field]?.trim();
-    const source = provided || proposalFor(field, proposal);
+    const source = provided || proposalFor(field, proposal, industryPhrase);
     const match = taxonomyMatch(field, source);
+    if (field === 'industry' && !provided && match?.resolved && match.matched_on !== 'exact') industryPhrase = match.matched_on;
     if (match?.resolved) {
       setResolved(resolved, field, match.resolved);
       const origin = provided ? 'provided value' : 'proposal';
+      if (!provided) inferred.push(field);
       resolutions.push(`${field} resolved as ${match.resolved} from ${origin}, matched on "${match.matched_on}".`);
-    } else if (provided && match?.suggestions && !firstSuggestions) {
-      firstSuggestions = match.suggestions;
+    } else {
+      if (match?.candidates) ambiguous[field] = match.candidates;
+      if (provided && match?.suggestions && !firstSuggestions) firstSuggestions = match.suggestions;
     }
   }
 
@@ -166,23 +240,28 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (typeof revenue === 'number' && Number.isFinite(revenue) && revenue >= 0) {
     resolved.revenue_eur = Math.round(revenue);
     resolutions.push(`revenue_eur resolved as ${Math.round(revenue)} from ${input.revenue_eur !== undefined ? 'provided value' : 'proposal'}.`);
+    if (input.revenue_eur === undefined) inferred.push('revenue_eur');
   }
   if (input.scores) resolved.scores = input.scores;
   if (input.signal_completeness !== undefined) resolved.signal_completeness = input.signal_completeness;
   if (input.work_architecture) resolved.work_architecture = input.work_architecture;
 
   const missing = REQUIRED_FIELDS.filter((field) => resolved[field] === undefined);
+  const understood = understoodStatement(resolved, missing);
   if (missing.length) {
     return {
       status: 'needs_input', proposal, resolved_inputs: resolved, resolutions,
-      missing_fields: missing, next_question: nextQuestion(missing),
+      missing_fields: missing, next_question: nextQuestion(missing, ambiguous),
       ...(firstSuggestions ? { suggestions: firstSuggestions } : {}),
+      ...(Object.keys(ambiguous).length ? { ambiguous_fields: ambiguous } : {}),
+      inferred_fields: inferred, understood,
     };
   }
 
   const scoreInput = resolved as ScoreInput;
   return {
     status: 'verdict', proposal, resolved_inputs: scoreInput,
-    resolutions, missing_fields: [], verdict: score(scoreInput),
+    resolutions, missing_fields: [], inferred_fields: inferred, understood,
+    verdict: score(scoreInput),
   };
 }
