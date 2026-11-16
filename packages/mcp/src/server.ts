@@ -3,7 +3,7 @@
  * agnostic. Consumed by index.ts (stdio, the npx path) and by the remote
  * Streamable HTTP endpoint (api/mcp.ts on Vercel).
  */
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,9 +18,21 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.15.2';
+export const VERSION = '0.15.3';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
+type TelemetryContext = { cohort?: string; clientId?: string };
+const opaqueId = (value: unknown): string | null => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value) ? value.toLowerCase() : null;
+const hashId = (domain: string, value: string) => createHash('sha256').update(`${domain} ${value}`).digest('hex').slice(0, 24);
+
+function activityCohort(meta: Record<string, unknown>): string {
+  if (process.env.CI === 'true' || process.env.AIBVF_TELEMETRY_COHORT === 'automated_test' || meta.cohort === 'automated_test') return 'automated_test';
+  if (process.env.AIBVF_TELEMETRY_COHORT === 'internal' || meta.cohort === 'internal') return 'internal';
+  if (meta.entry_route === 'stdio') {
+    try { if (readFileSync(join(homedir(), '.config', 'aibvf', 'telemetry-cohort'), 'utf8').trim() === 'internal') return 'internal'; } catch { /* no local marker */ }
+  }
+  return 'public_unverified';
+}
 
 // ---------------------------------------------------------------------------
 // Anonymous usage telemetry.
@@ -36,9 +48,11 @@ export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 // random bytes generated on first run and persisted to a dotfile, so it is
 // stable per install (real distinct-install dedup) yet high-entropy — unlike a
 // hostname/username fingerprint, the hash cannot be brute-forced back to a
-// machine or person. The installId never leaves the machine; only the daily
-// hash does, and it rotates every 24h so there is no permanent cross-day id.
-// Never collects user IDs, scores, or portfolio content.
+// machine or person. The seed never leaves the machine. A separate stable
+// install_hash supports cross-day local installation counts, not people counts.
+// Hosted clients may opt into a random client UUID header; only its hash is
+// stored. Opaque assessment IDs link continuation calls without proposal text.
+// Cohort markers exclude internal/testing traffic but never certify a customer.
 // ---------------------------------------------------------------------------
 const TELEMETRY_DEFAULT_URL = process.env.AIBVF_TELEMETRY_URL
   ?? 'https://eomlyjtscwxibezoymxg.supabase.co/rest/v1/mcp_calls';
@@ -128,12 +142,17 @@ function feedbackFor(classification: string, industry?: string): { question: str
 export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
   if (TELEMETRY_DISABLED || !TELEMETRY_DEFAULT_URL || !TELEMETRY_DEFAULT_KEY) return;
   const payload = {
+    id: randomUUID(),
     ts: new Date().toISOString(),
     tool_name,
     bvf_version: BVF_VERSION,
     package_version: VERSION,
     caller_hash: callerHash(),
-    install_hash: meta.entry_route === 'stdio' ? installHash() : null,
+    install_hash: meta.entry_route === 'stdio' ? installHash() : opaqueId(meta.clientId) ? hashId('aibvf-remote', opaqueId(meta.clientId)!) : null,
+    activity_cohort: activityCohort(meta),
+    assessment_hash: opaqueId(meta.assessmentId) ? hashId('aibvf-mcp-assessment', opaqueId(meta.assessmentId)!) : null,
+    question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'].includes(String(meta.question_key)) ? meta.question_key : null,
+    outcome: ['ok', 'error'].includes(String(meta.outcome)) ? meta.outcome : 'ok',
     user_role: meta.entry_route === 'stdio' ? configuredUsageRole() : null,
     entry_route: meta.entry_route ?? 'unknown',
     assessment_stage: meta.assessment_stage ?? null,
@@ -239,6 +258,7 @@ const assessInitiativeInputSchema = {
   type: 'object',
   required: ['proposal'],
   properties: {
+    assessment_id: { type: 'string', description: 'Optional opaque ID returned by the previous call. Copy it unchanged while continuing the same assessment; omit it for a new idea. Never derive it from proposal text or a person.' },
     proposal: {
       type: 'string', minLength: 1,
       description: 'The AI initiative in the user\'s own words. Pass it unchanged on every call. The tool reads industry, business function, AI type and headcount from it and never guesses an unread value.',
@@ -1161,10 +1181,11 @@ const TOOLS = [
 
 const LIST_TOOLS_HANDLER = async () => ({ tools: TOOLS });
 
-const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
+const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {}) => async (req: any) => {
   const { name, arguments: args } = req.params;
+  const assessmentId = name === 'assess_ai_initiative' ? opaqueId(args?.assessment_id) || randomUUID() : null;
   const recordCall = async (toolName: string, meta: Record<string, unknown> = {}) => {
-    const request = logCall(toolName, { ...meta, entry_route: entryRoute });
+    const request = logCall(toolName, { ...context, ...meta, assessmentId, entry_route: entryRoute });
     if (entryRoute === 'remote') await request;
   };
 
@@ -1175,10 +1196,11 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
       if (r.status !== 'verdict') {
         await recordCall('assess_ai_initiative', {
           assessment_stage: r.status,
+          question_key: r.question?.id,
           industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
           ai_tier: r.resolved_inputs.ai_tier,
         });
-        const payload = { bvf_version: BVF_VERSION, ...r };
+        const payload = { bvf_version: BVF_VERSION, ...r, assessment_id: assessmentId };
         return {
           content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
           structuredContent: payload,
@@ -1212,7 +1234,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
         ...(advisory ? { advisory_next_step: advisory } : {}),
         ...(feedback ? { feedback } : {}),
       };
-      const payload = { bvf_version: BVF_VERSION, ...r, verdict };
+      const payload = { bvf_version: BVF_VERSION, ...r, verdict, assessment_id: assessmentId };
       return {
         content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
         structuredContent: payload,
@@ -1613,6 +1635,7 @@ const callToolHandler = (entryRoute: EntryRoute) => async (req: any) => {
 
     throw new Error(`Unknown tool: ${name}`);
   } catch (err) {
+    if (TOOLS.some(tool => tool.name === name)) await recordCall(name, { outcome: 'error', assessment_stage: 'error' });
     const msg = err instanceof Error ? err.message : String(err);
     return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
   }
@@ -1626,15 +1649,15 @@ export const telemetryEnabled = !TELEMETRY_DISABLED && !!TELEMETRY_DEFAULT_URL &
  * connection: stdio creates one for the process lifetime, the remote
  * Streamable HTTP endpoint creates one per request (stateless mode).
  */
-export function createAibvfServer(options: { entryRoute?: EntryRoute } = {}): Server {
+export function createAibvfServer(options: { entryRoute?: EntryRoute; telemetry?: TelemetryContext } = {}): Server {
   const server = new Server(
     { name: 'io.github.Craig-Horton/aibvf-mcp', version: VERSION },
     {
       capabilities: { tools: {} },
-      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged and every answer so far. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
+      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, LIST_TOOLS_HANDLER);
-  server.setRequestHandler(CallToolRequestSchema, callToolHandler(options.entryRoute ?? 'unknown'));
+  server.setRequestHandler(CallToolRequestSchema, callToolHandler(options.entryRoute ?? 'unknown', options.telemetry));
   return server;
 }

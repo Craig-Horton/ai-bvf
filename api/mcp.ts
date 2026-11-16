@@ -43,7 +43,12 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const server = createAibvfServer({ entryRoute: 'remote' });
+  // IDs are optional random connector identifiers, never IPs, emails or auth tokens.
+  const query = new URL(req.url || '/', 'https://mcp.aibvf.com').searchParams;
+  const server = createAibvfServer({ entryRoute: 'remote', telemetry: {
+    cohort: String(req.headers?.['x-aibvf-traffic'] || query.get('aibvf_traffic') || ''),
+    clientId: String(req.headers?.['x-aibvf-client-id'] || ''),
+  } });
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless: no sessions, safe behind serverless
     enableJsonResponse: true,      // plain JSON responses, no SSE stream needed

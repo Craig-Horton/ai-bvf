@@ -126,7 +126,7 @@ if (unavailable.size) {
   for (const [source, reason] of unavailable) console.log(`  ${source}: ${reason}`);
 }
 console.log();
-console.log('Usage and return-use evidence: run supabase/queries/adoption-retention.sql.');
+console.log('Usage and return-use report: run supabase/queries/measurement-integrity.sql.');
 console.log('That report separates connection-only IDs, tool-using IDs and repeat tool use.');
 console.log('Browser saves are local to a device; portfolio handoffs and imports are separate.');
 console.log('Telemetry covers observed IDs and can include internal or automated activity.');

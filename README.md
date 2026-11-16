@@ -102,7 +102,7 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.15.2 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.15.3 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
 | [`@aibvf/core`](packages/js) | 0.11.2 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
@@ -115,7 +115,9 @@ The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1
 
 The MCP server can report tool calls and a `server_connect` event. Events include protocol and package versions, entry route, assessment stage, work architecture status, taxonomy fields, a daily-rotated caller hash, and classification plus confidence where supplied.
 
-Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement, derived from a random local seed. Hosted calls send no stable install hash, and a broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
+Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement, derived from a random local seed. Hosted calls have no return identity by default; clients can opt in by supplying a random UUID in `x-aibvf-client-id`, of which only a hash is stored. A broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
+
+The guided tool returns an opaque `assessment_id` to copy into continuation calls, and telemetry stores its hash, the stage, question name, outcome and traffic cohort. Internal and automated checks are reported separately; an unmarked call is not proof of an external person. See [measurement definitions and test exclusions](docs/adoption-metrics.md).
 
 No portfolio content, revenue figures, numeric pillar scores or personal identifiers are included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
 
