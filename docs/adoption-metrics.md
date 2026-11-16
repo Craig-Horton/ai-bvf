@@ -10,6 +10,8 @@ Run [adoption-retention.sql](../supabase/queries/adoption-retention.sql) with re
 
 Run [guided-funnel.sql](../supabase/queries/guided-funnel.sql) to see where browsers stop on the guided Start journey. It returns one row: page viewers, starters, the reading shown, corrected and confirmed, each question reached, verdicts, and what was done after a verdict. It leaves out rows labelled `automated_test`.
 
+Run [feedback-answers.sql](../supabase/queries/feedback-answers.sql) to read the feedback, one row for each answer. It leaves out rows labelled `automated_test` or `internal`. For events before 11 November 2026, when no label existed, it also leaves out browser IDs first seen in an hour when more than 5 new browser IDs appeared. The header of the query states both rules.
+
 The SQL window is `[starts_at, ends_at)`, with a 30-day default. Replace `now()` in the `report_end` CTE with a fixed timestamp to reproduce a snapshot. Latest event timestamps show recorded activity freshness; they are client supplied and cannot establish ingestion health.
 
 ## Interpret the counts
@@ -32,6 +34,8 @@ The SQL window is `[starts_at, ends_at)`, with a 30-day default. Replace `now()`
 | Question answered | A `question_answered` event with its `step`, 1 to 5. The answer chosen is never recorded, and "I do not know yet" counts as an answer. |
 | Told to find out | A browser ID whose answers left at least one question unknown, so no verdict was given. |
 | Saved or shared | A verdict recipient that saved the result in the browser, printed it or copied it. |
+| Feedback answer | One answer to "Did this change what you will do next?" on a result, or to "Were these the right things to go and find out?" on the find-out screen. Rows that share a `feedback_key` are one answer, and the latest row is the answer. The key is random and is not derived from the idea or the answers. |
+| Held back | On feedback about a result only: the first question holding the idea back, from the closed list of five. It is sent when a person chooses to answer the feedback question and on no other event. The answer chosen is never recorded. |
 | Local connection-only ID | A local MCP install hash with connection events and no recorded tool call in the window. |
 | Local tool-using ID | A local MCP install hash with at least one recorded call other than server_connect. |
 | Repeat local tool use | A local install hash with tool calls on at least two distinct UTC dates. Repeat connection events do not satisfy this measure. |
@@ -57,9 +61,9 @@ Browser UTC event-day counts and repeat-day counts reveal whether activity is co
 
 ## Activity cohort
 
-`bvf_journey_events.activity_cohort` labels each browser event. The default is `unknown`. The browser emitter sends `automated_test` when the browser reports that automation is driving it, which covers release checks run against the live site. `internal` and `external` are reserved for authenticated checks and no emitter sends them. Events recorded before 10 November 2026 are `unknown` and stay that way.
+`bvf_journey_events.activity_cohort` labels each browser event. The default is `unknown`. The browser emitter sends `automated_test` when the browser reports that automation is driving it, which covers release checks run against the live site. It sends `internal` from a browser that was marked by opening any page with `?internal=1`, and `?internal=0` clears the mark. `external` is reserved for authenticated checks and no emitter sends it. Events recorded before 10 November 2026 are `unknown` and stay that way.
 
-The label rests on what the browser reports. A person's browser reports `unknown`, and so does an automated client that hides the signal. Treat `automated_test` as a floor for automated traffic.
+The label rests on what the browser reports. A person's browser reports `unknown`, and so does an automated client that hides the signal. The internal mark is self-declared and unauthenticated, and it lives in one browser's storage, so a cleared or second browser reports `unknown` again. Treat `automated_test` and `internal` as floors.
 
 ## Follow-up measurement work
 
