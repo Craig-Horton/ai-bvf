@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 process.env.USERPROFILE = mkdtempSync(join(tmpdir(), 'aibvf-telemetry-'));
+process.env.HOME = process.env.USERPROFILE;
 process.env.AIBVF_TELEMETRY_URL = 'https://telemetry.test/mcp_calls';
 process.env.AIBVF_TELEMETRY_KEY = 'test-key';
 process.env.AIBVF_USAGE_ROLE = 'ai_data_leader';
@@ -43,8 +44,15 @@ assert.equal('proposal' in payloads[0], false);
 assert.equal('revenue_eur' in payloads[0], false);
 
 process.env.AIBVF_TELEMETRY_COHORT = 'internal';
+const ci = process.env.CI;
+delete process.env.CI;
 await logCall('server_connect', { entry_route: 'stdio' });
 assert.equal(payloads.at(-1).activity_cohort, 'internal');
+process.env.CI = 'true';
+await logCall('server_connect', { entry_route: 'stdio' });
+assert.equal(payloads.at(-1).activity_cohort, 'automated_test');
+if (ci === undefined) delete process.env.CI;
+else process.env.CI = ci;
 delete process.env.AIBVF_TELEMETRY_COHORT;
 await logCall('assess_ai_initiative', { entry_route: 'remote', cohort: 'automated_test', clientId: '12345678-1234-4234-8234-123456789abc', assessmentId: '12345678-1234-4234-8234-123456789abd', question_key: 'financial_return', proposal: 'SECRET' });
 assert.equal(payloads.at(-1).activity_cohort, 'automated_test');
