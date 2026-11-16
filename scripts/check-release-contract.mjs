@@ -18,6 +18,10 @@ const [core, mcp, cli, registry, readme, pythonManifest] = await Promise.all([
   read('packages/py/pyproject.toml'),
 ]);
 
+const latestChangelog = (await read('CHANGELOG.md')).split(/^## /m)[1];
+assert.ok(latestChangelog?.includes(mcp.version) && latestChangelog.includes(core.version),
+  'The latest changelog section must name both package versions before publishing.');
+
 // Only the literal name/version fields in [project] are needed from TOML.
 const python = {};
 let inProject = false;
