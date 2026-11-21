@@ -253,3 +253,11 @@ test('the same input returns the same result', () => {
   const input = { proposal: firm, ...ok, answers: { financial_return: 'c', governance_risk: 'b' } } as const;
   assert.deepEqual(assessInitiative(input), assessInitiative(input));
 });
+
+test('everyday wording for customer queries reads as customer service', () => {
+  for (const wording of ['first-line customer queries', 'customer enquiries', 'client queries', 'customer questions']) {
+    const r = assessInitiative({ proposal: `We are a 400-person e-commerce retailer and we want an AI agent to handle ${wording} and take actions.` });
+    assert.equal(r.resolved_inputs.function, 'cx', wording);
+    assert.equal(r.status, 'needs_confirmation', wording);
+  }
+});
