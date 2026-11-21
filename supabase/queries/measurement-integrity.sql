@@ -110,6 +110,20 @@ select p.*,
      and assessment_stage='needs_input' and question_key in ('industry','function','ai_tier','employees')
    group by reporting_cohort,question_key
  ) s) as mcp_context_not_read,
+ -- Who answered: a person, or an agent working alone from evidence it quoted.
+ (select jsonb_agg(to_jsonb(s)) from (
+   select reporting_cohort,answered_by,count(distinct assessment_hash) as assessments,
+     count(distinct assessment_hash) filter(where assessment_stage='verdict') as assessments_with_verdict
+   from m,p where observed_at>=p.report_start and tool_name='assess_ai_initiative' and answered_by is not null
+   group by reporting_cohort,answered_by
+ ) s) as mcp_answered_by,
+ -- What happened after each verdict, as reported at reviews. This is the record of whether
+ -- Accelerate, Fix and Stop matched what happened. All time, because reviews arrive weeks later.
+ (select jsonb_agg(to_jsonb(s)) from (
+   select reporting_cohort,review_previous_verdict,review_outcome,answered_by,count(distinct assessment_hash) as reviews
+   from m where tool_name='assess_ai_initiative' and review_outcome is not null
+   group by reporting_cohort,review_previous_verdict,review_outcome,answered_by
+ ) s) as mcp_verdict_outcomes,
  (select jsonb_agg(to_jsonb(s)) from retention s) as meaningful_return_use,
  (select count(*) from w where received_at is null) as historical_web_rows_without_server_receipt,
  (select count(*) from m where received_at is null) as historical_mcp_rows_without_server_receipt
