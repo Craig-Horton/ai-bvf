@@ -16,7 +16,7 @@ The company is synthetic. Every answer below was chosen by the author to represe
 
 | Question | Answer chosen | Why this answer |
 |---|---|---|
-| Cost and return | It roughly breaks even, or the return rests on assumptions nobody has tested. | No firm has measured figures before a rollout. |
+| Cost and return | The return rests on figures nobody has tested, or it only breaks even. | No firm has measured figures before a rollout. |
 | Risk and control | The risks are known, and no named person owns them. | The security reporting is public, and ownership is the open point. |
 | Business result | A result is named, with no target. | "Productivity" is named in most such requests, with no number. |
 | Ownership of the change | An owner is named and the change work is funded. | Given the benefit of the doubt. |
@@ -34,7 +34,7 @@ OpenClaw is an open-source personal AI agent that lives in your chat apps, reads
 
 So I took the obvious request, roll it out to our staff, and ran it through AI BVF using a company I made up: a 400-person professional services firm that wants to give every employee OpenClaw as a bolt-on to how the firm works today.
 
-I answered the five questions the way a firm at the start of this decision would answer them. The return rests on assumptions nobody has tested, the risks are known and nobody owns them, the result has a name and no target, an owner is named and funded, and nothing in the work itself has been redesigned.
+I answered the five questions the way a firm at the start of this decision would answer them. The return rests on figures nobody has tested, the risks are known and nobody owns them, the result has a name and no target, an owner is named and funded, and nothing in the work itself has been redesigned.
 
 The verdict was Fix, with four things holding it back, and the first step was to build the cost and return case on measured figures and have finance check it.
 

@@ -115,8 +115,8 @@ test('smaller firms and larger organisations get different wording and the same 
   const large = assessInitiative({ proposal: retailer, ...ok });
   assert.equal(small.question?.question, 'What does it cost each month, and what does it save or earn?');
   assert.equal(large.question?.question, 'What does it cost to build and run, and what does it return each year?');
-  assert.equal(small.question?.choices?.[2].label, 'It pays for itself within two years, on numbers we have checked.');
-  assert.equal(large.question?.choices?.[2].label, 'The return covers the cost within two years, on figures finance has checked.');
+  assert.equal(small.question?.choices?.[2].label, 'It pays for itself, on numbers we have checked.');
+  assert.equal(large.question?.choices?.[2].label, 'The return covers the cost, on figures finance has checked.');
 
   const answers = { financial_return: 'c', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'b' } as const;
   const smallVerdict = assessInitiative({ proposal: firm, ...ok, answers }).verdict;

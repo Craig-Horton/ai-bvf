@@ -20,7 +20,7 @@ test('a stop says why in the words of the answer that caused it', () => {
     short: 'Cost and return',
     question: 'What does it cost each month, and what does it save or earn?',
     answer: 'It costs more than it saves.',
-    needed: 'It pays for itself within two years, on numbers we have checked.',
+    needed: 'It pays for itself, on numbers we have checked.',
   }]);
   assert.equal(v.first_step, 'Write down what it costs each month and what it saves, and check the numbers.');
   // The framework reason stays for callers that read it.
