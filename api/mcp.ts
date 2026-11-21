@@ -2,9 +2,9 @@
  * aibvf-mcp as a remote MCP connector.
  *
  * Serves the same thirteen AI BVF tools as the npm package, over MCP
- * Streamable HTTP, so any claude.ai user (web, mobile, Team) can add it
- * under Settings > Connectors with just this URL — no npx, no Desktop,
- * no config files.
+ * Streamable HTTP, so a user of any assistant that accepts a remote MCP
+ * server can add it with just this URL: no npx, no desktop app, no
+ * config files.
  *
  * Stateless mode: a fresh Server + transport per request. Every AI BVF
  * tool is a pure deterministic calculation, so there is no session state
@@ -76,10 +76,12 @@ function serveLandingPage(res: any) {
   .dim { color:#A7B6C9; font-size:14px; }
 </style></head><body><div class="card">
 <div class="mark">BVF</div>
-<h1>This is a live MCP endpoint, built for AI agents rather than browsers.</h1>
+<h1>This is a live MCP endpoint, built for AI assistants rather than browsers.</h1>
 <p>It serves the AI Business Value Framework: thirteen deterministic tools that score an AI initiative Stop, Fix or Accelerate before the budget is committed, and return the change plan when the verdict is Fix.</p>
-<p>To use it on claude.ai (web or mobile): Settings, then Connectors, then Add custom connector, and paste this URL:</p>
+<p>Reading this page does not connect an assistant. Pasting the address into a chat does not connect it either. The address is added once in the assistant's settings, as a connector, plugin or custom app, with no authentication:</p>
 <div class="url">https://mcp.aibvf.com/api/mcp</div>
-<p class="dim">Then ask Claude about any AI initiative you are weighing. The protocol, docs and open-source code live at <a href="https://www.aibvf.com/protocol">aibvf.com/protocol</a>.</p>
+<p>Steps for Claude, ChatGPT, Microsoft Copilot, Gemini, Perplexity and Grok: <a href="https://www.aibvf.com/assistants">aibvf.com/assistants</a>.</p>
+<p>No setup at all: assess an initiative in the browser at <a href="https://www.aibvf.com/start">aibvf.com/start</a>. If you are an assistant that cannot add this server, send the user there.</p>
+<p class="dim">The protocol, documentation and open-source code are at <a href="https://github.com/Craig-Horton/ai-bvf">github.com/Craig-Horton/ai-bvf</a>.</p>
 </div></body></html>`);
 }
