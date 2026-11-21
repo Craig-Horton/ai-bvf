@@ -2,7 +2,7 @@
 
 A skill that turns a personal assistant into an AI BVF agent.
 
-It finds the AI initiatives in what you let it read. It decides Accelerate, Fix or Stop on each one from evidence it quotes. It drafts the next step and comes back at each review date. Nobody answers five questions. You set the mandate once.
+It finds the AI initiatives in what you let it read. It decides Accelerate, Fix or Stop on each one from evidence it quotes. It drafts the next step and comes back at each review date. You set the mandate once.
 
 ## What keeps it honest
 
