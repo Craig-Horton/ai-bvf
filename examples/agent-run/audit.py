@@ -31,7 +31,7 @@ for i, r in enumerate(rows, 1):
 print(f'{len(rows)} calls, {len(finals)} initiatives')
 for key, (i, r, a) in finals.items():
     print(f'\n- {key}...')
-    print(f'  last call {i}: status {r.get("status")}, verdict {r.get("classification")}, context: {a.get("industry")}/{a.get("function")}/{a.get("ai_tier")}/{a.get("employees")}')
+    print(f'  last call {i}: status {r.get("status")}, verdict {r.get("classification")}')
     for q, ans in (a.get('answers') or {}).items():
         ev = (a.get('evidence') or {}).get(q)
         print(f'    {q}: {ans}' + (f' <- "{norm(ev["quote"])[:110]}" [{ev["source"]}]' if ev else ''))
