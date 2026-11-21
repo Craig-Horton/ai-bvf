@@ -17,7 +17,11 @@ export const SMALLER_FIRM_BELOW = 250;
 
 export const UNKNOWN_LABEL = 'I do not know yet.';
 
-/** The score each answer carries. governance_risk is inverted: higher means more risk. */
+/**
+ * The score each answer carries. governance_risk is inverted: higher means more risk.
+ * On cost and return, the evidence decides and the length of the payback does not:
+ * a return on checked figures clears the bar whether it takes two years or five.
+ */
 export const CHOICE_SCORES: Record<keyof PillarScores, Record<Exclude<AssessChoiceId, 'unknown'>, number>> = {
   financial_return:    { a: 15, b: 40, c: 65, d: 85 },
   governance_risk:     { a: 80, b: 55, c: 35, d: 15 },
@@ -115,8 +119,8 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     financial_return: {
       question: 'What does it cost to build and run, and what does it return each year?',
       a: 'It costs more than it returns.',
-      b: 'It roughly breaks even, or the return rests on assumptions nobody has tested.',
-      c: 'The return covers the cost within two years, on figures finance has checked.',
+      b: 'The return rests on figures nobody has tested, or it only breaks even.',
+      c: 'The return covers the cost, on figures finance has checked.',
       d: 'The return covers the cost within a year, on measured figures.',
     },
     governance_risk: {
@@ -152,8 +156,8 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     financial_return: {
       question: 'What does it cost each month, and what does it save or earn?',
       a: 'It costs more than it saves.',
-      b: 'About even, or we are estimating.',
-      c: 'It pays for itself within two years, on numbers we have checked.',
+      b: 'We are estimating, or it only breaks even.',
+      c: 'It pays for itself, on numbers we have checked.',
       d: 'It pays for itself within a year, on numbers we have measured.',
     },
     governance_risk: {
