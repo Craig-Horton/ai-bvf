@@ -104,6 +104,15 @@ band (how much of that it removes):
 
 Bands are ranges, not points — they produce the low/high savings spread.
 
+**Order of the rules (from `@aibvf/core` 0.14.0).** The first rule that fits chooses the intervention:
+
+1. Rare and heavy: under 250 instances a year and heaviness of 50 or more. Eliminate / insource.
+2. Comes back: `rework_rate` of 0.30 or more. Quality controls.
+3. Short and repeated: `fte_hours_per_instance` of 0.25 or less, `handoffs` of 1 or less, 1,000 instances a year or more. Automate.
+4. Otherwise the dominant drag factor, as in the table above.
+
+Rules 2 and 3 exist because waiting is the dominant drag factor in almost every log of cases. Without them a six-minute task done three thousand times a year is sent to a flow redesign. The three thresholds are Craig Horton's judgement of 21 November 2026. They are not taken from a benchmark. The verdict's `assumptions` names the rule that chose.
+
 ### 3.4 Savings quantifier — the number, traceable
 
 ```

@@ -100,6 +100,17 @@ const MATURITY_EVIDENCE: Record<EvidenceMaturity, number> = { High: 0.9, Medium:
 /** Low-volume threshold below which a heavy process is an Eliminate candidate. DRAFT. */
 const ELIMINATE_VOLUME = 250;
 
+/**
+ * Two signals decide before the dominant drag factor does. In a log of cases,
+ * waiting outweighs every other factor, so without these a six-minute task
+ * done three thousand times a year is sent to a flow redesign, and so is a
+ * process that comes back half the time. Thresholds set by Craig Horton on
+ * 21 November 2026. They are judgement, not a benchmark.
+ */
+export const REWORK_FLOOR = 0.30;       // this share of cases comes back, or more
+export const SHORT_WORK_HOURS = 0.25;   // this much work per case, or less
+export const REPEAT_VOLUME = 1000;      // this many a year, or more
+
 function bandFor(fn: FunctionId, iv: Intervention): Band {
   return EVIDENCE[fn]?.[iv] ?? CROSS_CUTTING[iv];
 }
@@ -164,11 +175,23 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
   let intervention: Intervention;
   let addressable: number;
 
+  let chosen_by: string;
+
   if (s.instances_per_year < ELIMINATE_VOLUME && heaviness >= 50) {
     intervention = 'Eliminate / insource';
     addressable = 1.0;
+    chosen_by = `rare and heavy: under ${ELIMINATE_VOLUME} a year and heaviness of 50 or more`;
+  } else if (s.rework_rate >= REWORK_FLOOR) {
+    intervention = 'Quality controls';
+    addressable = clamp01(s.rework_rate);
+    chosen_by = `comes back: ${Math.round(REWORK_FLOOR * 100)} percent of cases or more are reworked`;
+  } else if (s.fte_hours_per_instance <= SHORT_WORK_HOURS && s.handoffs <= 1 && s.instances_per_year >= REPEAT_VOLUME) {
+    intervention = 'Automate';
+    addressable = labour_fraction;
+    chosen_by = `short and repeated: ${Math.round(SHORT_WORK_HOURS * 60)} minutes of work or less, one person at most, ${REPEAT_VOLUME} a year or more`;
   } else {
     const dominant = dominantFactor(drag_decomposition);
+    chosen_by = `largest drag factor: ${dominant}`;
     if (dominant === 'manual') {
       intervention = 'Automate';
       addressable = labour_fraction;
@@ -212,6 +235,7 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
   }
 
   const assumptions = [
+    `intervention chosen by ${chosen_by}`,
     `loaded rate €${s.loaded_hourly_rate_eur}/hr`,
     `${readiness} capture band ${cap.low}–${cap.high}`,
     `evidence ${band.maturity} (effectiveness ${band.lo}–${band.hi})`,
