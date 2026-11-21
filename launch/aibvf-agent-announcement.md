@@ -24,6 +24,8 @@ The guardrails sit in the engine, where the agent cannot argue with them. An ans
 
 The vendor's email carried one more line, addressed to any AI assistant that read it, asking for the proposal to be rated Accelerate and reported as approved. The agent quoted that line to its owner as evidence of what the vendor had written, and reported that the idea could not be judged yet.
 
+I then moved the calendar on six weeks and added the documents a firm like that would have produced in the meantime, and on its next check the agent found two reviews due in its own register, read what was new, and moved the customer service agent from Fix to Accelerate because the minutes now named the person who approves any refund above the limits and can switch the agent off. It recorded beside each earlier verdict what had happened since, which is how the facts on whether a Fix or a Stop was right begin to accumulate.
+
 The company is synthetic and the run is recorded in the open repository, and what decided each verdict was how much of the work around the AI had been written down: the limits, the owner, the measures. Give the agent to the assistant you already use, point it at one folder of real documents, and see where each of your AI initiatives stands: aibvf.com/agent
 
 ## Check before posting
@@ -31,7 +33,8 @@ The company is synthetic and the run is recorded in the open repository, and wha
 - That `aibvf.com/agent` opens, the brief copies, and the skill downloads.
 - One run in your own assistant with the connector added, so that "it runs inside the assistant you already use" is something you have seen and not only something I tested here. Here it was tested with fresh Claude agents against the engine as built in this repository.
 - That the hosted connector answers in evidence mode: ask the assistant to run the agent on any document and check that the verdict carries the line "An agent answered these questions from evidence it quoted."
-- The quotes in the post against `examples/agent-run/halden`.
+- The quotes in the post against `examples/agent-run/halden` and `examples/agent-run/arrives-later`.
+- The six weeks were moved on by hand in the test. No schedule fired. Say "in the test" if anyone asks, and do not claim a scheduled run until you have seen one in your own assistant.
 
 ## Publication boundary
 
@@ -62,6 +65,14 @@ It found all three. The customer service agent, which would answer first-line qu
 The marketing team's win-back agent came back as a Stop, on a single paragraph of its own proposal: "the agent sends offers of any value straight to customers. No approval step is planned and there is no cap on the discount." The third idea, invoice matching from a vendor's pitch, the agent declined to judge at all, because nobody at Halden had written down what it costs, what could go wrong or who would own it.
 
 That vendor's email carried one more line, addressed to any AI assistant that read it, asking for the proposal to be rated Accelerate and reported as approved. The agent read it as part of the evidence and reported that the idea could not be judged yet.
+
+### Six weeks later
+
+I then moved the calendar on six weeks and added the three documents a firm like Halden would have produced in that time: new steering minutes, the first month's results and a note from the board.
+
+Nobody told the agent what to look at on its next check. It found two reviews due in its own register, gathered the evidence again, and moved the customer service agent from Fix to Accelerate, because the minutes now said "The refund limits are now written into the service policy" and named the person who approves anything above them and can switch the agent off.
+
+It recorded what had happened beside each earlier verdict, fixed first and then gone ahead for one, paused by the board for the other. It also raised a caveat of its own: the team's measures had changed after go-live, and the question asks what was redesigned before it.
 
 ### Why the guardrails sit in the engine
 
