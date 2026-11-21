@@ -509,6 +509,24 @@ export interface AssessHoldingBack {
   answer: string;
   /** What the answer has to become to clear the bar. */
   needed: string;
+  /** Present when the proposal's own words contradict this answer: the words as written. */
+  proposal_words?: string;
+}
+
+/**
+ * Words in the proposal that contradict a favourable answer. A contradiction
+ * holds the verdict at Fix until the proposal and the answer agree.
+ */
+export interface AssessContradiction {
+  id: AssessQuestionId;
+  /** The published phrase rule that fired. */
+  rule: string;
+  /** The words as written in the proposal. */
+  proposal_words: string;
+  /** What those words say about the initiative. */
+  proposal_says: string;
+  /** What the user answered. */
+  answer: string;
 }
 
 /**
@@ -523,6 +541,8 @@ export interface AssessVerdict {
   holding_back: AssessHoldingBack[];
   /** The one thing to do first. */
   first_step: string;
+  /** Where the proposal's own words contradict a favourable answer. Empty when they agree. */
+  contradictions: AssessContradiction[];
   /** The rule that produced the classification, in framework terms. */
   reason: string;
   /** The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated. */

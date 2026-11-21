@@ -6,8 +6,10 @@
  * 2. Read it back. The user confirms or corrects it before any question.
  * 3. Ask at most five plain questions, one at a time, each with everyday
  *    answers that carry a fixed, published score.
- * 4. Return Accelerate, Fix or Stop from those answers only. Nothing is
- *    filled in and no euro figure is given.
+ * 4. Return Accelerate, Fix or Stop from those answers. Nothing is filled
+ *    in and no euro figure is given.
+ * 5. Read the proposal against the answers. Where its own words contradict a
+ *    favourable answer, the verdict is held at Fix and the words are quoted.
  */
 import { mapToTaxonomy } from './aliases.js';
 import { score } from './score.js';
@@ -15,12 +17,13 @@ import { buildAudit } from './audit.js';
 import { assessWorkArchitecture } from './workArchitecture.js';
 import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import { plainResult } from './plainResult.js';
+import { readProposal } from './proposalReading.js';
 import {
   CHOICE_SCORES, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
   WORK_ARCHITECTURE_CHOICES, trackFor,
 } from './guidedQuestions.js';
 import type {
-  AiTier, AssessAnswer, AssessChoice, AssessChoiceId, AssessContext, AssessDecider, AssessField,
+  AiTier, AssessAnswer, AssessChoice, AssessContradiction, AssessChoiceId, AssessContext, AssessDecider, AssessField,
   AssessInitiativeInput, AssessInitiativeResult, AssessQuestion, AssessQuestionId, AssessTrack,
   AssessVerdict, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
 } from './types.js';
@@ -326,19 +329,39 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     && (REGULATED_INDUSTRIES.has(resolved.industry!) || REGULATED_FUNCTIONS.has(resolved.function!));
   const judged = { ...base, missing_fields: [] as AssessField[] };
 
-  // ── 4. Judge ───────────────────────────────────────────────────────────
+  // ── 4. Read the proposal against the answers ───────────────────────────
+  // A phrase counts only against an answer that clears the bar. An answer that
+  // already holds the initiative back agrees with the proposal.
+  const favourable = (id: AssessQuestionId): boolean => {
+    if (id === 'work_architecture') return workAnswered && Object.values(workInput ?? {}).some((part) => part === true);
+    const value = supplied[id];
+    return value !== undefined && (id === 'governance_risk' ? value <= 40 : value >= 60);
+  };
+  const findings = readProposal(proposal);
+  const contradictions: AssessContradiction[] = findings.filter((found) => favourable(found.question)).map((found) => ({
+    id: found.question, rule: found.rule, proposal_words: found.proposal_words, proposal_says: found.says,
+    answer: answersGiven[found.question]?.label
+      ?? (found.question === 'work_architecture' ? 'The work is shown as redesigned.' : `A score of ${supplied[found.question as keyof PillarScores]} out of 100.`),
+  }));
+  const proposalRules = [
+    ...findings.map((found) => `proposal_read:${found.rule}`),
+    ...contradictions.map((item) => `contradiction:${item.id}`),
+  ];
+
+  // ── 5. Judge ───────────────────────────────────────────────────────────
   // One answer can stop the initiative on its own. Nothing else is needed for that.
   const stopOnGovernance = supplied.governance_risk !== undefined && supplied.governance_risk >= 70;
   const stopOnReturn = supplied.financial_return !== undefined && supplied.financial_return <= 20;
   if (suppliedCount < 4 && (stopOnGovernance || stopOnReturn)) {
     const verdict: AssessVerdict = {
       classification: 'Stop',
-      ...plainResult({ track, classification: 'Stop', supplied, answers: answersGiven, work: workArchitecture, workAnswered, workUnknown: unknown.includes('work_architecture') }),
+      ...plainResult({ track, classification: 'Stop', supplied, answers: answersGiven, work: workArchitecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
+      contradictions,
       reason: stopOnGovernance ? 'Governance risk above the safe threshold.' : 'Financial return too thin to justify scope.',
       scores_supplied: supplied,
       answers_given: answersGiven,
       work_architecture: workArchitecture,
-      audit: buildAudit([...rules, 'classify:Stop', `work_architecture:${workArchitecture.status}`, 'front_door:value_withheld'], auditInputs),
+      audit: buildAudit([...rules, ...proposalRules, 'classify:Stop', `work_architecture:${workArchitecture.status}`, 'front_door:value_withheld'], auditInputs),
       value_note: VALUE_NOTE,
     };
     return { status: 'verdict', ...judged, verdict };
@@ -359,16 +382,20 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
       ...(input.signal_completeness !== undefined ? { signal_completeness: input.signal_completeness } : {}),
     });
     const kept = full.audit.rules_fired.filter((rule) => !rule.startsWith('value:'));
+    // A go-ahead cannot rest on an answer the proposal itself contradicts.
+    const capped = full.classification === 'Accelerate' && contradictions.length > 0;
+    const classification = capped ? 'Fix' : full.classification;
     const verdict: AssessVerdict = {
-      classification: full.classification,
-      ...plainResult({ track, classification: full.classification, supplied, answers: answersGiven, work: full.work_architecture, workAnswered, workUnknown: unknown.includes('work_architecture') }),
-      reason: full.reason,
+      classification,
+      ...plainResult({ track, classification, supplied, answers: answersGiven, work: full.work_architecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
+      contradictions,
+      reason: capped ? 'The proposal contradicts an answer the go-ahead rests on.' : full.reason,
       scores_supplied: supplied,
       answers_given: answersGiven,
       confidence: full.confidence,
       verdict_flips: full.sensitivity.verdict_flips,
       work_architecture: full.work_architecture,
-      audit: buildAudit([...rules, ...kept, 'front_door:value_withheld'], auditInputs),
+      audit: buildAudit([...rules, ...kept, ...proposalRules, ...(capped ? ['cap:Fix(contradiction)'] : []), 'front_door:value_withheld'], auditInputs),
       value_note: VALUE_NOTE,
     };
     return { status: 'verdict', ...judged, verdict };

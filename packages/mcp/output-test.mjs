@@ -236,3 +236,33 @@ test('MCP explanations disclose compatibility field limits on tool listings and 
     assert.match(improved.interpretation.target_classification, /conditional on work-architecture readiness/);
   });
 });
+
+test('MCP declines out-of-range, mistyped and missing arguments with the field named', { timeout: 10000 }, async () => {
+  await withMcp(async (_call, client) => {
+    const declined = async (name, args, pattern) => {
+      const response = await client.callTool({ name, arguments: args });
+      assert.equal(response.isError, true, `${name} accepted invalid input`);
+      assert.match(response.content[0].text, pattern);
+    };
+    await declined('score_initiative', { ...input, scores: { ...input.scores, strategic_alignment: 900 } }, /scores\.strategic_alignment must be <= 100/);
+    await declined('score_initiative', { ...input, revenue_eur: '2.4bn' }, /revenue_eur must be a number/);
+    await declined('score_initiative', { ...input, industry: 'Manufacturing' }, /industry must be one of .*map_to_taxonomy/);
+    await declined('get_benchmark', { industry: 'retail', function: 'customer service' }, /function must be one of/);
+    await declined('diagnose_process', { function: 'finance' }, /instances_per_year is required/);
+    await declined('score_initiative', {}, /industry is required/);
+  });
+});
+
+test('MCP front door holds a best-answer verdict at Fix when the proposal contradicts it', { timeout: 10000 }, async () => {
+  await withMcp(async (call) => {
+    const best = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'd', change_enablement: 'd', work_architecture: 'd' };
+    const context = { industry: 'financial', function: 'risk', ai_tier: 'gen3', employees: 3500, confirmed: true, answers: best };
+    const held = await call('assess_ai_initiative', { proposal: 'Autonomous agents approve consumer loans without human review.', ...context });
+    assert.equal(held.verdict.classification, 'Fix');
+    assert.equal(held.verdict.contradictions[0].proposal_words, 'without human review');
+    assert.equal(held.verdict.holding_back[0].proposal_words, 'without human review');
+    const clear = await call('assess_ai_initiative', { proposal: 'Agents draft consumer loan decisions and an underwriter approves each one.', ...context });
+    assert.equal(clear.verdict.classification, 'Accelerate');
+    assert.deepEqual(clear.verdict.contradictions, []);
+  });
+});

@@ -89,7 +89,7 @@ Claude will call `assess_ai_initiative`, state how it read the proposal and ask 
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Plain-English front door for one initiative. Reads industry, business function, AI type and headcount, confirms the reading, asks at most five plain questions with everyday answers, then returns Accelerate, Fix or Stop from the answers only, with a plain summary, what holds it back and the first step. No estimated score and no euro figure. |
+| `assess_ai_initiative` | Plain-English front door for one initiative. Reads industry, business function, AI type and headcount, confirms the reading, asks at most five plain questions with everyday answers, then returns Accelerate, Fix or Stop from the answers, read against the words of the proposal, with a plain summary, what holds it back and the first step. Words in the proposal that contradict a favourable answer hold the verdict at Fix and are quoted back. No estimated score and no euro figure. |
 | `score_initiative` | Return classification, euro range, reasoning and the work architecture gate for one initiative. |
 | `score_portfolio` | Score every initiative in a BVF portfolio in one call and return the board-level shape: Accelerate/Fix/Stop counts, aggregate EUR value, mean decision score, top initiative by value, highest-risk initiative, per-initiative results. Use instead of looping `score_initiative`. |
 | `assemble_portfolio` | Assembles a valid BVF v1.0 portfolio document from loose inputs: names, plain-language functions and tiers, and whatever pillar scores exist. Aliases resolved, ids generated, missing pillars estimated with the estimation reported per initiative, document validated before return. Nothing stored, nothing edited. |
