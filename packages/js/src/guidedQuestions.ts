@@ -38,7 +38,7 @@ export const WORK_ARCHITECTURE_CHOICES: Record<Exclude<AssessChoiceId, 'unknown'
   d: { workflow_redesigned: true,  roles_redesigned: true,  decision_rights_defined: true,  measures_updated: true },
 };
 
-interface Wording { question: string; a: string; b: string; c: string; d: string }
+export interface Wording { question: string; a: string; b: string; c: string; d: string }
 
 /** Why each answer decides the outcome, stated as the rule the engine applies. */
 export const QUESTION_WHY: Record<AssessTrack, Record<AssessQuestionId, string>> = {
@@ -191,6 +191,51 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     },
   },
 };
+
+/**
+ * Agentic AI takes actions on its own, so its risk question asks what it may do
+ * without a person approving it. Same four scores and the same stop rule as the
+ * standard risk question: only the wording is specific to an agent.
+ */
+export const AGENT_RISK_WORDING: Record<AssessTrack, Wording> = {
+  enterprise: {
+    question: 'What can the agent do without a person approving it, and who can stop it?',
+    a: 'It can spend money, change records or contact customers, with no limit and no approval.',
+    b: 'It works within limits, and nobody has written them down or owns them.',
+    c: 'Its limits are written down, and a named person approves anything above them and can stop it.',
+    d: 'Its limits are tested, a named person can stop it, and every action is logged and can be reversed.',
+  },
+  smaller_firm: {
+    question: 'What can the agent do without someone approving it, and who can step in?',
+    a: 'It can spend money, change records or contact customers, and nobody approves or limits it.',
+    b: 'It has limits, and nobody has written them down.',
+    c: 'Its limits are written down, and one named person approves anything beyond them and can step in.',
+    d: 'Its limits have been tested, one person can switch it off, and everything it does is recorded and can be undone.',
+  },
+};
+
+export const AGENT_RISK_WHY: Record<AssessTrack, string> = {
+  enterprise: 'An agent that acts with no limit and no approval stops the initiative on its own.',
+  smaller_firm: 'If the agent can act without limits and nobody approves it, the answer is stop.',
+};
+
+export const AGENT_RISK_FIRST_STEP: Record<AssessTrack, string> = {
+  enterprise: 'Write down what the agent may do without approval, name the person who approves anything above that, and give that person the right to stop it.',
+  smaller_firm: 'Write down what the agent may do on its own, and name one person who approves the rest and can switch it off.',
+};
+
+const isAgentRisk = (id: AssessQuestionId, aiTier?: string) => id === 'governance_risk' && aiTier === 'gen3';
+
+/** The wording of a question for this organisation and AI type. Use these in place of the tables. */
+export function wordingFor(track: AssessTrack, id: AssessQuestionId, aiTier?: string): Wording {
+  return isAgentRisk(id, aiTier) ? AGENT_RISK_WORDING[track] : WORDING[track][id];
+}
+export function whyFor(track: AssessTrack, id: AssessQuestionId, aiTier?: string): string {
+  return isAgentRisk(id, aiTier) ? AGENT_RISK_WHY[track] : QUESTION_WHY[track][id];
+}
+export function firstStepFor(track: AssessTrack, id: keyof PillarScores, aiTier?: string): string {
+  return isAgentRisk(id, aiTier) ? AGENT_RISK_FIRST_STEP[track] : FIRST_STEP[track][id];
+}
 
 export function trackFor(employees: number): AssessTrack {
   return employees < SMALLER_FIRM_BELOW ? 'smaller_firm' : 'enterprise';

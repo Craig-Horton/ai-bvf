@@ -30,3 +30,4 @@ export const BVF_VERSION = '1.0';
 export { readProposal, PROPOSAL_RULES } from './proposalReading.js';
 export type { ProposalFinding, ProposalRule } from './proposalReading.js';
 export { CONTRADICTION_NEEDED, contradictionStep } from './plainResult.js';
+export { AGENT_RISK_FIRST_STEP, AGENT_RISK_WHY, AGENT_RISK_WORDING, firstStepFor, whyFor, wordingFor } from './guidedQuestions.js';

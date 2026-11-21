@@ -1722,7 +1722,7 @@ export const telemetryEnabled = !TELEMETRY_DISABLED && !!TELEMETRY_DEFAULT_URL &
  */
 export function createAibvfServer(options: { entryRoute?: EntryRoute; telemetry?: TelemetryContext } = {}): Server {
   const server = new Server(
-    { name: 'io.github.Craig-Horton/aibvf-mcp', version: VERSION },
+    { name: 'io.github.Craig-Horton/aibvf-mcp', title: 'AI BVF', version: VERSION },
     {
       capabilities: { tools: {} },
       instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
