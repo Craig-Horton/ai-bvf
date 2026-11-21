@@ -24,7 +24,7 @@ const SHORT_ANSWER_WORDS = 4;
 
 const FUNCTION_ALIASES: Record<string, AliasGroup> = {
   cx: {
-    strong: ['customer service', 'customer support', 'customer care', 'service desk', 'contact centre', 'contact center', 'customer experience', 'call centre', 'call center', 'helpdesk', 'help desk', 'client service', 'customer complaints', 'complaints handling', 'support team', 'cx'],
+    strong: ['customer service', 'customer support', 'customer care', 'service desk', 'contact centre', 'contact center', 'customer experience', 'call centre', 'call center', 'helpdesk', 'help desk', 'client service', 'customer complaints', 'complaints handling', 'support team', 'customer queries', 'customer query', 'customer enquiries', 'customer enquiry', 'customer inquiries', 'customer inquiry', 'customer questions', 'client queries', 'client enquiries', 'client inquiries', 'first-line support', 'first line support', 'cx'],
     weak: ['support', 'complaints'],
   },
   supply: {

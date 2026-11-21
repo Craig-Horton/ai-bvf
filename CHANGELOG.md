@@ -2,6 +2,12 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.16.1 (aibvf-mcp), 0.12.1 (@aibvf/core), 21 November 2026
+
+Fixed: "customer queries", "customer enquiries", "customer questions", "client queries" and "first line support" now read as customer service. A proposal to handle first-line customer queries left the business function unread, so the user was asked an extra question before the five. Found in a live test through Perplexity.
+
+Scope: wording only. Where a proposal names two functions, the engine still asks which one applies. Scoring rules and the 13-tool catalogue are unchanged.
+
 ## 0.16.0 (aibvf-mcp), 0.12.0 (@aibvf/core), 21 November 2026
 
 Changed: the guided verdict reads the proposal against the answers. An independent review showed that a proposal describing AI approving loans with no human review earned a go-ahead when the best answer was picked on every question. Fixed phrases in the proposal that contradict a favourable answer now hold the verdict at Fix.
