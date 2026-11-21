@@ -237,6 +237,24 @@ export function firstStepFor(track: AssessTrack, id: keyof PillarScores, aiTier?
   return isAgentRisk(id, aiTier) ? AGENT_RISK_FIRST_STEP[track] : FIRST_STEP[track][id];
 }
 
+/**
+ * Where the answer to each question is usually written down. Returned with
+ * every question, so a person or an agent knows where to look before saying
+ * "I do not know yet".
+ */
+export const WHERE_TO_LOOK: Record<AssessQuestionId, string> = {
+  financial_return: 'The business case, the budget request, a finance sign-off or the results of a pilot.',
+  governance_risk: 'The risk assessment, the approval or control design, and the record of who can overrule the AI.',
+  strategic_alignment: 'The objectives or plan the initiative is tied to, with its target and its owner.',
+  change_enablement: 'The project plan and its budget: the named owner, the money for the change work and the time people are given.',
+  work_architecture: 'The process design: the new workflow, the roles, who decides and overrides, and the measures people are judged on.',
+};
+export const AGENT_RISK_WHERE_TO_LOOK = 'The limits set for the agent, the rule for approving anything above them, and the record of who can stop it.';
+
+export function whereToLookFor(id: AssessQuestionId, aiTier?: string): string {
+  return id === 'governance_risk' && aiTier === 'gen3' ? AGENT_RISK_WHERE_TO_LOOK : WHERE_TO_LOOK[id];
+}
+
 export function trackFor(employees: number): AssessTrack {
   return employees < SMALLER_FIRM_BELOW ? 'smaller_firm' : 'enterprise';
 }

@@ -15,7 +15,10 @@ export { inferReadiness } from './inferReadiness.js';
 export { sequencePortfolio } from './sequencePortfolio.js';
 export { assemblePortfolio } from './assemblePortfolio.js';
 export { mapToTaxonomy } from './aliases.js';
-export { assessInitiative, extractEmployees, extractRevenueEur, CONTEXT_CHOICES } from './assessInitiative.js';
+export {
+  assessInitiative, extractEmployees, extractRevenueEur, CONTEXT_CHOICES,
+  EVIDENCE_STATEMENT, REVIEW_OUTCOMES, REVIEW_OUTCOME_LABEL,
+} from './assessInitiative.js';
 export {
   CHOICE_SCORES, FIRST_STEP, QUESTION_SHORT, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
   WORK_ARCHITECTURE_CHOICES, WORK_PART_WORDING,
@@ -29,5 +32,11 @@ export type * from './types.js';
 export const BVF_VERSION = '1.0';
 export { readProposal, PROPOSAL_RULES } from './proposalReading.js';
 export type { ProposalFinding, ProposalRule } from './proposalReading.js';
-export { CONTRADICTION_NEEDED, contradictionStep } from './plainResult.js';
-export { AGENT_RISK_FIRST_STEP, AGENT_RISK_WHY, AGENT_RISK_WORDING, firstStepFor, whyFor, wordingFor } from './guidedQuestions.js';
+export { CONTRADICTION_NEEDED, EVIDENCE_CONTRADICTION_NEEDED, contradictionStep } from './plainResult.js';
+export {
+  AGENT_RISK_FIRST_STEP, AGENT_RISK_WHERE_TO_LOOK, AGENT_RISK_WHY, AGENT_RISK_WORDING, WHERE_TO_LOOK,
+  firstStepFor, whereToLookFor, whyFor, wordingFor,
+} from './guidedQuestions.js';
+export { AGENT_BRIEF, AGENT_BRIEF_VERSION, AGENT_CONNECTOR_URL } from './agentBrief.js';
+export { BRIEF_BASE, briefUrl, briefUrlFor } from './briefLink.js';
+export type { BriefLinkInput } from './briefLink.js';

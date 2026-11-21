@@ -79,6 +79,14 @@ Fully quit and restart the host (on Windows, right-click the Claude tray icon �
 
 Claude will call `assess_ai_initiative`, state how it read the proposal and ask you to confirm it. It then asks the questions one at a time. Your answers return the classification, one plain sentence on why, what holds the initiative back and the one thing to do first.
 
+## Run it as an agent
+
+An assistant can run the same assessment alone, under a mandate its owner sets once. It finds the AI initiatives in what it may read, answers each question from evidence, drafts the next step and reviews each verdict on a date.
+
+The server holds the rules. In evidence mode, `answered_by: "evidence"`, an answer of a to d counts only with a quote and its source in `evidence`. Without them the answer is counted as not known. A quote that contradicts its answer holds the verdict at Fix. The verdict carries `provenance`, which states that an agent answered and that no person confirmed it, and `brief_url`, the link to the one-page brief.
+
+The operating brief is served as the MCP prompt `aibvf_agent`. For Claude, Claude Code and OpenClaw it is also packed as a skill: [`skills/aibvf-agent`](https://github.com/Craig-Horton/ai-bvf/tree/main/skills/aibvf-agent).
+
 ## Troubleshooting
 
 - **No tools icon appears after restart.** The config JSON probably has a syntax error. Validate with `python -m json.tool <path-to-config>`.
@@ -135,8 +143,10 @@ aibvf-mcp can send an anonymous event on each tool call. Events describe observe
 - `industry`, `function`, `ai_tier`, `readiness` — the taxonomy values (never the numeric scores, revenue, or portfolio content)
 - `classification`, `confidence`: verdict classification and decision confidence when supplied by the tool
 - `user_role` — an optional broad role sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`; it is never inferred
+- `answered_by`: for a guided assessment, `owner` when a person answered or `evidence` when an agent answered from evidence it quoted
+- `review_previous_verdict`, `review_outcome`: at a review, the earlier verdict and which of five fixed outcomes followed it
 
-Classification and decision confidence are included when the calling tool supplies them. No user IDs, proposal text, revenue figures, pillar scores, portfolio data or stack traces are sent.
+Classification and decision confidence are included when the calling tool supplies them. No user IDs, proposal text, quoted evidence, revenue figures, pillar scores, portfolio data or stack traces are sent.
 
 **How the hashes work.** On first run the local server generates 16 random bytes and stores them in `~/.config/aibvf/install-id`. Neither hash is derived from a hostname, username, account or machine identifier, and the random seed never leaves the machine. `caller_hash` changes every 24 hours for daily activity counts. `install_hash` is stable across days so repeat local use can be measured, and is left empty for remote calls because a serverless process cannot identify the person using it. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent the dotfile and every telemetry event.
 

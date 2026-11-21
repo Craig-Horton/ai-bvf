@@ -266,3 +266,92 @@ test('MCP front door holds a best-answer verdict at Fix when the proposal contra
     assert.deepEqual(clear.verdict.contradictions, []);
   });
 });
+
+test('MCP evidence mode lets an agent answer alone, only from what it can quote', { timeout: 10000 }, async () => {
+  await withMcp(async (call, client) => {
+    const proposal = 'We are a 400-person online retailer. We want an AI agent to answer first-line customer queries and issue refunds up to 50 euros on its own.';
+    const answers = { financial_return: 'c', governance_risk: 'b', strategic_alignment: 'c', change_enablement: 'c', work_architecture: 'c' };
+    const evidence = {
+      financial_return: { quote: 'Finance has checked the saving of 180,000 euros a year against the licence cost.', source: 'Business case v3, 4 November 2026' },
+      governance_risk: { quote: 'Refund limits to be agreed after the pilot.', source: 'Steering minutes, 12 November 2026' },
+      strategic_alignment: { quote: 'Target: first response under two minutes, owned by the customer director.', source: 'Objectives 2027, page 2' },
+      change_enablement: { quote: 'Project lead named, with 40,000 euros set aside for training.', source: 'Project plan, 6 November 2026' },
+      work_architecture: { quote: 'New workflow, team roles and override rights are designed. Team measures stay as they are.', source: 'Process design, 10 November 2026' },
+    };
+    const alone = { proposal, confirmed: true, answered_by: 'evidence', answers };
+
+    const judged = await call('assess_ai_initiative', { ...alone, evidence });
+    assert.equal(judged.status, 'verdict');
+    assert.equal(judged.answered_by, 'evidence');
+    assert.equal(judged.verdict.classification, 'Fix');
+    assert.match(judged.verdict.provenance.statement, /No person has confirmed the answers/);
+    assert.equal(judged.verdict.holding_back[0].evidence.source, 'Steering minutes, 12 November 2026');
+    assert.match(judged.verdict.brief_url, /^https:\/\/www\.aibvf\.com\/verdict#[A-Za-z0-9_-]+$/);
+    const carried = JSON.parse(Buffer.from(judged.verdict.brief_url.split('#')[1], 'base64url').toString('utf8'));
+    assert.equal(carried.b, 'e');
+    assert.equal(carried.p, undefined, 'the proposal wording stays out of the link unless the owner allows it');
+    assert.deepEqual(carried.q.governance_risk, ['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']);
+    const shared = await call('assess_ai_initiative', { ...alone, evidence, brief_includes_proposal: true });
+    assert.equal(JSON.parse(Buffer.from(shared.verdict.brief_url.split('#')[1], 'base64url').toString('utf8')).p, proposal);
+
+    // An answer with nothing to quote is counted as not known, and no verdict rests on it.
+    const { governance_risk: _dropped, ...partial } = evidence;
+    const unsupported = await call('assess_ai_initiative', { ...alone, evidence: partial });
+    assert.equal(unsupported.status, 'not_enough_to_judge');
+    assert.deepEqual(unsupported.evidence_missing, ['governance_risk']);
+    assert.match(unsupported.to_find_out[0].where_to_look, /limits set for the agent/);
+
+    // A number is no evidence.
+    const refused = await client.callTool({ name: 'assess_ai_initiative', arguments: { ...alone, scores: { financial_return: 90 } } });
+    assert.equal(refused.isError, true);
+    assert.match(refused.content[0].text, /quote the evidence/);
+
+    // A review is kept beside the verdict, and an agent has to quote what happened.
+    const reviewed = await call('assess_ai_initiative', { ...alone, evidence, review: { previous_verdict: 'Fix', outcome: 'fixed_then_went_ahead', evidence: { quote: 'Limits signed off on 2 December, agent live from 9 December.', source: 'Steering minutes, 10 December 2026' } } });
+    assert.equal(reviewed.review.accepted, true);
+    assert.equal(reviewed.verdict.classification, 'Fix');
+    const unquoted = await call('assess_ai_initiative', { ...alone, evidence, review: { previous_verdict: 'Fix', outcome: 'delivering' } });
+    assert.equal(unquoted.review.accepted, false);
+
+    // A person-answered verdict is unchanged, and still gets its brief link.
+    const owner = await call('assess_ai_initiative', { proposal, confirmed: true, answers });
+    assert.equal(owner.answered_by, undefined);
+    assert.equal(owner.verdict.provenance, undefined);
+    assert.equal(JSON.parse(Buffer.from(owner.verdict.brief_url.split('#')[1], 'base64url').toString('utf8')).b, undefined);
+  });
+});
+
+test('MCP offers the agent operating brief as a prompt and tells every assistant both ways of working', { timeout: 10000 }, async () => {
+  await withMcp(async (_call, client) => {
+    assert.match(client.getInstructions() || '', /WITH A PERSON PRESENT/);
+    assert.match(client.getInstructions() || '', /WORKING ALONE/);
+    assert.match(client.getInstructions() || '', /aibvf_agent/);
+    const listed = await client.listPrompts();
+    assert.deepEqual(listed.prompts.map((prompt) => prompt.name), ['aibvf_agent']);
+    const brief = await client.getPrompt({ name: 'aibvf_agent' });
+    const text = brief.messages[0].content.text;
+    assert.match(text, /Evidence or unknown\. Never choose an answer you cannot quote\./);
+    assert.match(text, /May do: draft\. Send nothing, spend nothing, change no system\./);
+    await assert.rejects(client.getPrompt({ name: 'nope' }));
+    const tools = await client.listTools();
+    assert.equal(tools.tools.length, 13, 'the prompt adds no tool');
+    const door = tools.tools.find((tool) => tool.name === 'assess_ai_initiative');
+    assert.match(door.description, /WORKING ALONE/);
+    assert.ok(door.inputSchema.properties.answered_by && door.inputSchema.properties.evidence && door.inputSchema.properties.review);
+  });
+});
+
+test('MCP publishes one working call per tool, and each one succeeds the first time', { timeout: 20000 }, async () => {
+  await withMcp(async (_call, client) => {
+    const { tools } = await client.listTools();
+    assert.equal(tools.length, 13);
+    for (const tool of tools) {
+      const example = tool.inputSchema.examples?.[0];
+      assert.ok(example && typeof example === 'object', `${tool.name} publishes no example call`);
+      for (const field of tool.inputSchema.required ?? []) assert.ok(field in example, `${tool.name} example omits required ${field}`);
+      const response = await client.callTool({ name: tool.name, arguments: example });
+      assert.notEqual(response.isError, true, `${tool.name} declined its own example: ${response.content?.[0]?.text}`);
+      assert.ok(response.structuredContent && Object.keys(response.structuredContent).length > 0, `${tool.name} returned nothing for its example`);
+    }
+  });
+});

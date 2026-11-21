@@ -2,6 +2,28 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.17.0 (aibvf-mcp), 0.13.0 (@aibvf/core), 21 November 2026
+
+Added: an agent can run the assessment alone. `assess_ai_initiative` takes `answered_by: "evidence"` with a quote and a source for each answer. An answer of a to d with no quote and source is counted as not known and listed in `evidence_missing`, so an agent cannot pick an answer it cannot quote. Numeric scores are refused in this mode. The verdict carries `provenance`: an agent answered from evidence and no person confirmed the answers.
+
+Added: the engine reads the quoted evidence with the same five published phrase rules it applies to the proposal. A quote that says the opposite of the answer it was given for holds the verdict at Fix and is named in `contradictions` with `found_in: "evidence"`.
+
+Added: the AI BVF agent. One operating brief, exported from `@aibvf/core` as `AGENT_BRIEF`, served by the connector as the MCP prompt `aibvf_agent` and packed as the skill in `skills/aibvf-agent` with `aibvf-agent.zip`. The owner sets the mandate once. The agent then finds the AI initiatives, judges each from evidence, drafts the next step and reviews each verdict on a date. The default mandate is to draft and never send. `scripts/build-agent-skill.mjs` builds the skill from the brief, and CI fails when they differ.
+
+Added: `where_to_look` on every guided question and on `to_find_out`. It says where the answer is usually written down, for a person or an agent, before the answer becomes "I do not know yet".
+
+Added: `brief_url` on the front-door verdict. The tool returns the link to the one-page brief, so an assistant that cannot run code can still hand it over. The context, the answers and any quoted evidence travel after the `#` sign and are stored nowhere. The wording of the proposal stays out unless `brief_includes_proposal` is set. `briefUrl` and `briefUrlFor` are exported from `@aibvf/core`.
+
+Added: `review` on the front door. At a review, pass the earlier verdict and what happened since as one of five fixed outcomes. It comes back beside the new verdict and never changes it. An agent has to quote what happened, or the outcome is not kept.
+
+Added: telemetry records three categories: who answered, a person or an agent from evidence, and at a review the earlier verdict and the outcome. No proposal, quote or source is sent. `measurement-integrity.sql` reports them as `mcp_answered_by` and `mcp_verdict_outcomes`. The migration `20261121130000_mcp_agent_provenance.sql` adds three empty columns and changes no row.
+
+Changed: the server instructions and the tool description name two ways of working. With a person present the assistant asks and never answers for them, as before. Working alone under the owner's mandate, the assistant uses evidence mode.
+
+Added: every tool publishes one complete, working call as `examples` in its input schema. A test calls all 13, so an example cannot go stale. A caller with only the schema to go on, such as an agent or a benchmark, succeeds on its first call.
+
+Scope: a verdict a person answered is unchanged, apart from the added fields `where_to_look` and `brief_url`. The score each answer carries, the thresholds, the stop rules and the 13-tool catalogue are unchanged. The same answers give the same verdict whoever answered. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.16.3 (aibvf-mcp), 0.12.3 (@aibvf/core), 21 November 2026
 
 Changed: the top answer on cost and return no longer names a payback period. It read "within a year, on measured figures". It now reads "The return covers the cost, on results measured in a pilot or in live use." All four answers on this question now judge the evidence alone: a loss, untested figures, figures finance has checked, measured results.

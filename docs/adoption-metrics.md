@@ -34,6 +34,14 @@ The last recorded step and question show where continuation was last observed. A
 
 The MCP tool returns `assessment_id`; the agent must copy it on continuation calls. Omitting it starts another assessment. Historical calls without it cannot be reconstructed into reliable journeys.
 
+## Who answered, and what happened after a verdict
+
+From `aibvf-mcp` 0.17.0 a guided assessment records who answered: `owner` when a person answered, `evidence` when an agent working alone answered from evidence it quoted. The report gives the two apart as `mcp_answered_by`. Earlier versions leave the field empty.
+
+At a review the caller can pass the earlier verdict and what happened since, as one of five fixed outcomes: delivering, falling short, fixed then went ahead, paused or stopped, no decision. The report counts them as `mcp_verdict_outcomes`, by earlier verdict and outcome, across all time, because a review arrives weeks after its verdict. This is the only record of whether Accelerate, Fix and Stop matched what happened.
+
+Read it with its limits. The outcome is what a person or an agent reported, with no check by AI BVF. An agent's outcome is kept only when it quoted evidence for it. A review that was never run leaves no row, so the counts describe initiatives that were followed up, which are likely the better-run ones. Small counts say nothing yet.
+
 ## Whether an installation returns
 
 A meaningful browser action includes answering, changing, saving, reopening or importing a decision. Page loads and MCP connections do not qualify; MCP return use requires a tool call.
