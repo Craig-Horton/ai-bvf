@@ -285,12 +285,12 @@ test('MCP evidence mode lets an agent answer alone, only from what it can quote'
     assert.equal(judged.answered_by, 'evidence');
     assert.equal(judged.verdict.classification, 'Fix');
     assert.match(judged.verdict.provenance.statement, /No person has confirmed the answers/);
-    assert.equal(judged.verdict.holding_back[0].evidence.source, 'Steering minutes, 12 November 2026');
+    assert.equal(judged.verdict.holding_back[0].evidence[0].source, 'Steering minutes, 12 November 2026');
     assert.match(judged.verdict.brief_url, /^https:\/\/www\.aibvf\.com\/verdict#[A-Za-z0-9_-]+$/);
     const carried = JSON.parse(Buffer.from(judged.verdict.brief_url.split('#')[1], 'base64url').toString('utf8'));
     assert.equal(carried.b, 'e');
     assert.equal(carried.p, undefined, 'the proposal wording stays out of the link unless the owner allows it');
-    assert.deepEqual(carried.q.governance_risk, ['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']);
+    assert.deepEqual(carried.q.governance_risk, [['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']]);
     const shared = await call('assess_ai_initiative', { ...alone, evidence, brief_includes_proposal: true });
     assert.equal(JSON.parse(Buffer.from(shared.verdict.brief_url.split('#')[1], 'base64url').toString('utf8')).p, proposal);
 
@@ -300,6 +300,17 @@ test('MCP evidence mode lets an agent answer alone, only from what it can quote'
     assert.equal(unsupported.status, 'not_enough_to_judge');
     assert.deepEqual(unsupported.evidence_missing, ['governance_risk']);
     assert.match(unsupported.to_find_out[0].where_to_look, /limits set for the agent/);
+
+    // An answer that rests on two documents takes a quote from each. A joined quote is not needed.
+    const two = await call('assess_ai_initiative', { ...alone, evidence: { ...evidence, governance_risk: [
+      { quote: 'The agent will work within a refund limit of 50 euros per order.', source: 'Steering minutes, 12 November 2026' },
+      { quote: 'Nobody is named yet to approve refunds above the limit.', source: 'Service policy draft, 14 November 2026' },
+    ] } });
+    assert.equal(two.verdict.holding_back[0].evidence.length, 2);
+    assert.equal(JSON.parse(Buffer.from(two.verdict.brief_url.split('#')[1], 'base64url').toString('utf8')).q.governance_risk.length, 2);
+    const tooMany = await client.callTool({ name: 'assess_ai_initiative', arguments: { ...alone, evidence: { ...evidence, governance_risk: Array(4).fill(evidence.governance_risk) } } });
+    assert.equal(tooMany.isError, true, 'a fourth quote is declined, with the field named');
+    assert.match(tooMany.content[0].text, /evidence\.governance_risk/);
 
     // A number is no evidence.
     const refused = await client.callTool({ name: 'assess_ai_initiative', arguments: { ...alone, scores: { financial_return: 90 } } });

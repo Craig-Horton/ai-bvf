@@ -29,12 +29,12 @@ test('an agent that quotes its evidence gets a verdict that says who answered', 
   const verdict = result.verdict!;
   assert.equal(verdict.classification, 'Fix');
   assert.deepEqual(verdict.provenance, { answered_by: 'evidence', statement: EVIDENCE_STATEMENT, answers_with_evidence: 5 });
-  assert.deepEqual(verdict.answers_given.governance_risk?.evidence, QUOTES.governance_risk);
+  assert.deepEqual(verdict.answers_given.governance_risk?.evidence, [QUOTES.governance_risk]);
   const risk = verdict.holding_back.find((item) => item.id === 'governance_risk');
-  assert.deepEqual(risk?.evidence, QUOTES.governance_risk, 'what holds it back carries the words it rests on');
+  assert.deepEqual(risk?.evidence, [QUOTES.governance_risk], 'what holds it back carries the words it rests on');
   assert.ok(verdict.audit.rules_fired.includes('answered_by:evidence'));
   assert.ok(verdict.audit.rules_fired.includes('evidence:governance_risk'));
-  assert.deepEqual((verdict.audit.inputs_used as any).evidence_sources.financial_return, QUOTES.financial_return.source);
+  assert.deepEqual((verdict.audit.inputs_used as any).evidence_sources.financial_return, [QUOTES.financial_return.source]);
 });
 
 test('the same answers give the same verdict whoever answered', () => {
@@ -104,6 +104,32 @@ test('evidence that says the opposite of its answer holds the verdict at Fix', (
   assert.ok(contradicted.verdict!.audit.rules_fired.includes('cap:Fix(contradiction)'));
 });
 
+test('an answer that rests on two documents carries a quote from each, with its own source', () => {
+  const calm = 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.';
+  const all = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'd', change_enablement: 'd', work_architecture: 'd' } as const;
+  const design = { quote: 'The new workflow is drawn end to end. The roles are rewritten. Override rights are set.', source: 'Process design, 10 November 2026' };
+  const measures = { quote: 'From January the returns team is measured on first response time and on reversed refunds.', source: 'Steering minutes, 10 December 2026' };
+  const input = { ...base, proposal: calm, answers: all, evidence: { ...QUOTES, work_architecture: [design, measures] } };
+  const result = assessInitiative(input);
+  assert.equal(result.verdict!.classification, 'Accelerate');
+  assert.deepEqual(result.verdict!.answers_given.work_architecture?.evidence, [design, measures]);
+  assert.deepEqual((result.verdict!.audit.inputs_used as any).evidence_sources.work_architecture, [design.source, measures.source]);
+  const carried = JSON.parse(Buffer.from(briefUrlFor(input, result, '2026-11-21')!.split('#')[1], 'base64url').toString('utf8'));
+  assert.deepEqual(carried.q.work_architecture, [[design.quote, design.source], [measures.quote, measures.source]]);
+
+  // No more than three quotes are kept, and an entry that is no evidence is dropped.
+  const many = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [design, { quote: 'ok', source: 'x' }, measures, design, measures] } });
+  assert.equal(many.verdict!.answers_given.work_architecture?.evidence?.length, 3);
+  const none = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [{ quote: 'ok', source: 'x' }] } });
+  assert.deepEqual(none.evidence_missing, ['work_architecture']);
+
+  // The second quote is read as closely as the first.
+  const second = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [design, { quote: 'It is a bolt-on to the existing process for now.', source: 'Vendor note, 2 December 2026' }] } });
+  assert.equal(second.verdict!.classification, 'Fix');
+  assert.equal(second.verdict!.contradictions[0].found_in, 'evidence');
+  assert.equal(second.verdict!.contradictions[0].proposal_words, 'bolt-on');
+});
+
 test('every question says where its answer is usually written down', () => {
   const asking = assessInitiative({ proposal: PROPOSAL, confirmed: true });
   assert.equal(asking.question?.where_to_look, WHERE_TO_LOOK.financial_return);
@@ -141,12 +167,12 @@ test('the brief link carries the answers and the evidence, and nothing is stored
   assert.deepEqual(data.a, ANSWERS);
   assert.equal(data.d, '2026-11-21');
   assert.equal(data.b, 'e');
-  assert.deepEqual(data.q.governance_risk, [QUOTES.governance_risk.quote, QUOTES.governance_risk.source]);
+  assert.deepEqual(data.q.governance_risk, [[QUOTES.governance_risk.quote, QUOTES.governance_risk.source]]);
   assert.equal(data.p, undefined, 'the wording of the proposal stays out unless the owner says otherwise');
   // A quote pasted with line breaks travels as the engine kept it: one line, trimmed.
   const untidy = { ...input, evidence: { ...QUOTES, governance_risk: { quote: '  Refund limits to be agreed\n\nafter the pilot. ', source: ' Steering minutes,\n12 November 2026 ' } } };
   const tidy = JSON.parse(Buffer.from(briefUrlFor(untidy, assessInitiative(untidy), '2026-11-21')!.split('#')[1], 'base64url').toString('utf8'));
-  assert.deepEqual(tidy.q.governance_risk, ['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']);
+  assert.deepEqual(tidy.q.governance_risk, [['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']]);
   const shared = JSON.parse(Buffer.from(briefUrlFor(input, result, '2026-11-21', { include_proposal: true })!.split('#')[1], 'base64url').toString('utf8'));
   assert.equal(shared.p, PROPOSAL);
 

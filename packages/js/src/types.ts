@@ -482,8 +482,10 @@ export interface AssessInitiativeInput {
   /**
    * Evidence by question id. In evidence mode an answer of a to d counts only
    * with its quote and source. Without them the answer is counted as not known.
+   * An answer that rests on more than one document takes a list of up to three
+   * quotes, each with its own source.
    */
-  evidence?: Partial<Record<AssessQuestionId, AssessEvidence>>;
+  evidence?: Partial<Record<AssessQuestionId, AssessEvidence | AssessEvidence[]>>;
   /** At a review: the earlier verdict and what happened since. It is echoed back and never changes the verdict. */
   review?: AssessReview;
   /** For callers that already hold 0 to 100 pillar scores. A supplied score takes precedence over an answer. */
@@ -535,8 +537,8 @@ export interface AssessAnswer {
   label: string;
   /** Absent for work_architecture, which is four checks and carries no score. */
   score?: number;
-  /** Evidence mode only: the words the answer rests on, and where they were found. */
-  evidence?: AssessEvidence;
+  /** Evidence mode only: the words the answer rests on, and where they were found. One entry per quote. */
+  evidence?: AssessEvidence[];
 }
 
 /** One answer that keeps the initiative from a go-ahead. */
@@ -552,8 +554,8 @@ export interface AssessHoldingBack {
   needed: string;
   /** Present when the proposal or the evidence contradicts this answer: the words as written. */
   proposal_words?: string;
-  /** Evidence mode only: the words this answer rests on, and where they were found. */
-  evidence?: AssessEvidence;
+  /** Evidence mode only: the words this answer rests on, and where they were found. One entry per quote. */
+  evidence?: AssessEvidence[];
 }
 
 /**

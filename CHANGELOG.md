@@ -4,7 +4,7 @@ All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, i
 
 ## 0.17.0 (aibvf-mcp), 0.13.0 (@aibvf/core), 21 November 2026
 
-Added: an agent can run the assessment alone. `assess_ai_initiative` takes `answered_by: "evidence"` with a quote and a source for each answer. An answer of a to d with no quote and source is counted as not known and listed in `evidence_missing`, so an agent cannot pick an answer it cannot quote. Numeric scores are refused in this mode. The verdict carries `provenance`: an agent answered from evidence and no person confirmed the answers.
+Added: an agent can run the assessment alone. `assess_ai_initiative` takes `answered_by: "evidence"` with a quote and a source for each answer. An answer of a to d with no quote and source is counted as not known and listed in `evidence_missing`, so an agent cannot pick an answer it cannot quote. Numeric scores are refused in this mode. An answer that rests on more than one document takes up to three quotes, each with its own source. The verdict carries `provenance`: an agent answered from evidence and no person confirmed the answers.
 
 Added: the engine reads the quoted evidence with the same five published phrase rules it applies to the proposal. A quote that says the opposite of the answer it was given for holds the verdict at Fix and is named in `contradictions` with `found_in: "evidence"`.
 

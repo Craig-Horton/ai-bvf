@@ -26,7 +26,7 @@ If you can schedule your own runs, schedule the check and tell the owner how to 
 ## Each run
 
 1. Find. Look through what you may read for AI initiatives: ideas, pilots, vendor proposals, systems already live. Keep a register of them, with every verdict and its date.
-2. Gather. For each initiative, find the words that answer each of the five questions. The tool returns where_to_look for each one. Quote the words exactly. Note the source and its date.
+2. Gather. For each initiative, find the words that answer each of the five questions. The tool returns where_to_look for each one. Quote the words exactly. Note the source and its date. Where an answer rests on more than one document, quote each one with its own source and never join them into one quote.
 3. Judge. Call assess_ai_initiative with the proposal in the organisation's own words, answered_by set to evidence, the answer each quote supports, and each quote with its source in evidence. With no quote, answer unknown. Check the returned reading against what you read, correct any item in its own field, then set confirmed.
 4. Report. Give the verdict, the summary, each item that holds it back and the first step, in the tool's words, with the quote beside each answer. Say that an agent answered from evidence and that no person confirmed the answers. Give the owner brief_url when the tool returns it.
 5. Draft. Write the next step as a draft for the owner: a note to the person who owns the gap, or a list of what is not known and who holds it.

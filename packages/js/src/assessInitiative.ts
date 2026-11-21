@@ -222,6 +222,8 @@ const QUOTE_MIN = 8;
 const QUOTE_MAX = 400;
 const SOURCE_MIN = 3;
 const SOURCE_MAX = 160;
+/** An answer may rest on more than one document. Each quote keeps its own source. */
+const QUOTES_PER_ANSWER = 3;
 
 /** A quote and a source, trimmed and capped. Anything shorter than a few words is no evidence. */
 function cleanEvidence(given: unknown): AssessEvidence | undefined {
@@ -232,6 +234,12 @@ function cleanEvidence(given: unknown): AssessEvidence | undefined {
   const where = source.replace(/\s+/g, ' ').trim();
   if (words.length < QUOTE_MIN || where.length < SOURCE_MIN) return undefined;
   return { quote: words.slice(0, QUOTE_MAX), source: where.slice(0, SOURCE_MAX) };
+}
+
+/** One quote or a list of them. Entries that are no evidence are dropped, and the list is capped. */
+function cleanEvidenceList(given: unknown): AssessEvidence[] {
+  const items = Array.isArray(given) ? given : [given];
+  return items.map(cleanEvidence).filter((item): item is AssessEvidence => item !== undefined).slice(0, QUOTES_PER_ANSWER);
 }
 
 function reviewRecord(input: AssessInitiativeInput, byEvidence: boolean): AssessReviewRecord | undefined {
@@ -341,7 +349,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const unknown: AssessQuestionId[] = [];
   const rules: string[] = [`track:${track}`, ...(byEvidence ? ['answered_by:evidence'] : [])];
   const evidenceMissing: AssessQuestionId[] = [];
-  const evidenceGiven: Partial<Record<AssessQuestionId, AssessEvidence>> = {};
+  const evidenceGiven: Partial<Record<AssessQuestionId, AssessEvidence[]>> = {};
 
   // In evidence mode an answer of a to d counts only with its quote and source.
   // Without them it is counted as not known, so nothing rests on an answer nobody can check.
@@ -350,8 +358,8 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     if (choice === undefined) return undefined;
     if (!['a', 'b', 'c', 'd', 'unknown'].includes(choice)) throw new Error(`answers.${id} must be one of a, b, c, d or unknown.`);
     if (!byEvidence || choice === 'unknown') return choice;
-    const evidence = cleanEvidence(input.evidence?.[id]);
-    if (!evidence) {
+    const evidence = cleanEvidenceList(input.evidence?.[id]);
+    if (!evidence.length) {
       evidenceMissing.push(id);
       rules.push(`evidence_missing:${id}`);
       return 'unknown';
@@ -399,7 +407,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     employees: resolved.employees, track, scores: supplied, answers: input.answers ?? null,
     work_architecture: workInput ?? null,
     // Evidence mode: which answers carried a quote, and which were counted as not known for want of one.
-    ...(byEvidence ? { answered_by: 'evidence', evidence_sources: Object.fromEntries(Object.entries(evidenceGiven).map(([id, item]) => [id, item!.source])), evidence_missing: evidenceMissing } : {}),
+    ...(byEvidence ? { answered_by: 'evidence', evidence_sources: Object.fromEntries(Object.entries(evidenceGiven).map(([id, items]) => [id, items!.map((item) => item.source)])), evidence_missing: evidenceMissing } : {}),
   };
   const suppliedCount = Object.keys(supplied).length;
   const regulatedAgentic = resolved.ai_tier === 'gen3'
@@ -431,7 +439,9 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   // that says the opposite of the answer it was given for holds the verdict at Fix.
   const evidenceRules: string[] = [];
   for (const id of Object.keys(evidenceGiven) as AssessQuestionId[]) {
-    const found = readProposal(evidenceGiven[id]!.quote).find((finding) => finding.question === id);
+    const found = evidenceGiven[id]!
+      .map((item) => readProposal(item.quote).find((finding) => finding.question === id))
+      .find((finding) => finding !== undefined);
     if (!found) continue;
     evidenceRules.push(`evidence_read:${found.rule}`);
     if (!favourable(id) || contradictions.some((item) => item.id === id)) continue;

@@ -24,8 +24,8 @@ export interface BriefLinkInput {
   /** Without the proposal: the words that contradicted an answer, so the brief reaches the same verdict. */
   contradiction_words?: string[];
   answered_by?: AssessAnsweredBy;
-  /** Evidence mode: the quote and source behind each answer. They travel in the link so the brief can show them. */
-  evidence?: Partial<Record<AssessQuestionId, AssessEvidence>>;
+  /** Evidence mode: the quotes and sources behind each answer. They travel in the link so the brief can show them. */
+  evidence?: Partial<Record<AssessQuestionId, AssessEvidence[]>>;
   /** The page that opens the brief. Defaults to the public one. */
   base?: string;
 }
@@ -43,10 +43,12 @@ export function briefUrl(input: BriefLinkInput): string {
   if (input.proposal) payload.p = input.proposal.slice(0, 2000);
   else if (input.contradiction_words?.length) payload.w = input.contradiction_words.slice(0, 5).map((words) => words.slice(0, 120));
   if (input.answered_by === 'evidence') {
-    const quotes: Partial<Record<AssessQuestionId, [string, string]>> = {};
+    const quotes: Partial<Record<AssessQuestionId, [string, string][]>> = {};
     for (const id of QUESTIONS) {
-      const item = input.evidence?.[id];
-      if (item && answers[id] && answers[id] !== 'unknown') quotes[id] = [item.quote.slice(0, 400), item.source.slice(0, 160)];
+      const items = input.evidence?.[id];
+      if (items?.length && answers[id] && answers[id] !== 'unknown') {
+        quotes[id] = items.slice(0, 3).map((item) => [item.quote.slice(0, 400), item.source.slice(0, 160)]);
+      }
     }
     payload.b = 'e';
     payload.q = quotes;
@@ -75,17 +77,22 @@ export function briefUrlFor(
   const scored = Object.keys(verdict.scores_supplied) as (keyof PillarScores)[];
   if (scored.some((pillar) => !verdict.answers_given[pillar])) return undefined;
   if (Object.keys(input.work_architecture ?? {}).length) return undefined;
-  return briefUrl({
-    context: { industry: context.industry, function: context.function, ai_tier: context.ai_tier, employees: context.employees },
-    answers: input.answers ?? {},
-    date,
-    ...(options.include_proposal ? { proposal: result.proposal } : {}),
-    contradiction_words: verdict.contradictions.filter((item) => item.found_in !== 'evidence').map((item) => item.proposal_words),
-    // The quotes as the engine kept them: trimmed, capped, and only for answers that counted.
-    ...(input.answered_by === 'evidence' ? {
-      answered_by: 'evidence' as const,
-      evidence: Object.fromEntries(Object.entries(verdict.answers_given).flatMap(([id, answer]) => (answer?.evidence ? [[id, answer.evidence]] : []))),
-    } : {}),
-    ...(options.base ? { base: options.base } : {}),
-  });
+  try {
+    return briefUrl({
+      context: { industry: context.industry, function: context.function, ai_tier: context.ai_tier, employees: context.employees },
+      answers: input.answers ?? {},
+      date,
+      ...(options.include_proposal ? { proposal: result.proposal } : {}),
+      contradiction_words: verdict.contradictions.filter((item) => item.found_in !== 'evidence').map((item) => item.proposal_words),
+      // The quotes as the engine kept them: trimmed, capped, and only for answers that counted.
+      ...(input.answered_by === 'evidence' ? {
+        answered_by: 'evidence' as const,
+        evidence: Object.fromEntries(Object.entries(verdict.answers_given).flatMap(([id, answer]) => (answer?.evidence ? [[id, answer.evidence]] : []))),
+      } : {}),
+      ...(options.base ? { base: options.base } : {}),
+    });
+  } catch {
+    // Too long to travel in a link. The verdict stands without one.
+    return undefined;
+  }
 }
