@@ -76,7 +76,7 @@ export function measureLog(csv, map, { fn, rate, spend } = {}) {
   if (!knowsMinutes) notInLog.push('minutes of work on each step, so the work time for each case and the share of time spent working are not counted');
   if (!knowsSystems) notInLog.push('which steps a system does, so the share of automated steps is not counted');
   if (!knowsReopen) notInLog.push('what marks a case that comes back, so the share of reworked cases is not counted');
-  if (rate === undefined) notInLog.push('the hourly cost of the team, with salary and overheads: ask the owner once');
+  if (rate === undefined) notInLog.push('the hourly cost of the team, with salary and overheads');
   if (spend === undefined) notInLog.push('the yearly spend on tools for each process: counted as zero');
 
   // The engine takes nine signals. Volume, time from open to close and people on a case always come from the log.

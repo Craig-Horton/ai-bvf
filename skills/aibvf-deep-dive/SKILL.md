@@ -32,7 +32,7 @@ Tell the owner once: the rows of the log stay on this computer. Only the counts 
    ```
 
    Leave out a flag when the log has no such column. The script lists what it could not count under `not_in_log`. For `--function`, use the id from `map_to_taxonomy`.
-4. Ask once. The hourly cost of the team, with salary and overheads, is never in a log. Ask the owner for it once. With an answer, run the script again with `--rate`. With no answer, give no euro figure.
+4. Ask once, before the report. The hourly cost of the team, with salary and overheads, is never in a log. Ask the owner for it in one short message and wait for the answer. With an answer, run the script again with `--rate`. Only when the owner declines or does not know, go on with no euro figure.
 5. Judge. For each process the script prints `diagnose_process`: the arguments for the tool of that name. Pass them unchanged. When it is `null`, the log lacks a signal the tool needs: say which one, and judge nothing for that process.
 6. Report. Use the form below. Put the largest saving first.
 7. Draft. When the owner says yes, write the change as a draft for a person to carry out: the new steps, who decides, and what to check after a month. Build nothing.
@@ -48,15 +48,16 @@ This is what I found: N processes. Fixed published rules chose each recommendati
 1. PROCESS
    Found: N a year. N minutes of work each. N days from open to close. N people touch a case. N percent come back. A system does N percent of the steps.
    Do: the intervention the tool returned.
-   Why: the first line of the tool's assumptions, which names the rule that chose.
+   Why: the rule that chose, from the first line of the tool's assumptions, without the words "intervention chosen by".
    How: the line for that intervention, from the list below.
    Saves: €LOW–HIGH a year of €BASELINE, about N percent of the effort. Confidence N.
    Would you like me to draft it?
 ```
 
-- When the tool's verdict is Stop, write "Do: leave it. It is light already." and nothing more for that process.
-- With no hourly cost, write "Saves: about N percent of the effort. No euro figure yet: the hourly cost of this team is not in the log."
-- End with what was not in the log, in the script's words.
+- When the tool's verdict is Stop, write "Do: leave it. It is light already." and nothing more for that process. Print the tool's verdict word nowhere else.
+- Give the confidence as the tool returned it, between 0 and 1.
+- With no hourly cost, write "Saves: about N percent of the effort. No euro figure yet: the hourly cost of this team is not in the log. Confidence N."
+- End with what was not in the log, in the script's words. When the hourly cost is still missing, make the last line the question: "What does an hour of this team cost, with salary and overheads?"
 
 How, for each intervention:
 

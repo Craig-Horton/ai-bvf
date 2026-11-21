@@ -27,6 +27,6 @@ The made-up log in [`examples/process-deep-dive`](../../examples/process-deep-di
 
 ## What is not settled
 
-- It has run on one made-up log. No real system export has been read.
+- An OpenClaw agent ran it on 21 November 2026, on the made-up log, and returned the five expected interventions and one process to leave alone. No real system export has been read.
 - It reads CSV. A system that only offers an API needs its rows exported first.
 - A log shows the work that passes through that system. Work done in mail, meetings and spreadsheets is not in it.
