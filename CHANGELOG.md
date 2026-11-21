@@ -2,6 +2,18 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.18.0 (aibvf-mcp), 0.14.0 (@aibvf/core), 21 November 2026
+
+Changed: `diagnose_process` chooses the intervention by the first rule that fits. Rare and heavy still comes first: under 250 instances a year with heaviness of 50 or more is Eliminate / insource. Two rules are new. A process where 30 percent of cases or more are reworked is Quality controls. A process with 15 minutes of work or less on each case, one person at most and 1,000 instances a year or more is Automate. Otherwise the largest drag factor decides, as before.
+
+Why: waiting is the largest drag factor in almost every log of cases. On a ticket log the old rule sent a six-minute task done 3,000 times a year to Consolidate & re-sequence, and did the same with a process that came back half the time. The example in `examples/process-deep-dive` shows both.
+
+Added: the first line of `assumptions` names the rule that chose the intervention.
+
+Added: `REWORK_FLOOR`, `SHORT_WORK_HOURS` and `REPEAT_VOLUME` are exported from `@aibvf/core`. The three thresholds are Craig Horton's judgement. They are not taken from a benchmark.
+
+Scope: a process that fits neither new rule gets the same intervention and the same figures as before. The savings formula, the effectiveness bands, the confidence and the verdict thresholds are unchanged. The 13-tool catalogue, `assess_ai_initiative`, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.17.0 (aibvf-mcp), 0.13.0 (@aibvf/core), 21 November 2026
 
 Added: an agent can run the assessment alone. `assess_ai_initiative` takes `answered_by: "evidence"` with a quote and a source for each answer. An answer of a to d with no quote and source is counted as not known and listed in `evidence_missing`, so an agent cannot pick an answer it cannot quote. Numeric scores are refused in this mode. An answer that rests on more than one document takes up to three quotes, each with its own source. The verdict carries `provenance`: an agent answered from evidence and no person confirmed the answers.

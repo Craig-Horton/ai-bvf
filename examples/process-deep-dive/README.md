@@ -2,7 +2,7 @@
 
 A first working version of the deep dive: an agent goes through one department's system log, lists every process it finds, and reports what to do with each one and what it saves.
 
-It is an example. Nothing here changes `@aibvf/core`, the MCP tools or anything published.
+It is an example. The example itself changes nothing published. Running it led to the rule change in `@aibvf/core` 0.14.0.
 
 ## What it does
 
@@ -29,6 +29,6 @@ node examples/process-deep-dive/deep-dive.mjs --rate 38 --write
 ## What is not settled
 
 - **GenAI comes second.** Craig's rule of 21 November: the first report never recommends GenAI. A process is redesigned and judged again first.
-- **Two calls a practitioner would question.** The engine sends "Order status query" and "Address change" to Consolidate and re-sequence, because waiting outweighs every other signal in a ticket log. The first is six minutes of identical work and the second comes back half the time.
+- **The three thresholds are judgement.** Before `@aibvf/core` 0.14.0 the engine sent "Order status query" and "Address change" to Consolidate and re-sequence, because waiting outweighs every other signal in a ticket log. Two rules now decide first: work that comes back, and short repeated work. Their thresholds are Craig's, not a benchmark's.
 - **The log is made up.** No real system has been read. A real log needs its columns mapped first.
 - **Nothing is built.** Craig's rule of 21 November: the first version drafts the change for a person to carry out. The report asks "Would you like me to draft it?" and stops there.

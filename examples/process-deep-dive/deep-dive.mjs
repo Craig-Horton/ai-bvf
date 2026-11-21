@@ -115,9 +115,11 @@ export function report(measured, judged, { department, organisation, rate }) {
       return;
     }
     lines.push(`   Do: ${verdict.intervention}.`);
-    lines.push(verdict.intervention === 'Eliminate / insource'
-      ? `   Why: it is rare and heavy. It runs ${item.instances_per_year} times a year and scores ${verdict.heaviness} of 100 for heaviness.`
-      : `   Why: ${DRAG[heaviest[0]]} is the largest part of what makes it heavy, at ${percent(heaviest[1])}.`);
+    // The engine names the rule that chose. Where the largest drag factor chose, say which one and how large.
+    const rule = verdict.assumptions[0].replace('intervention chosen by ', '');
+    lines.push(rule.startsWith('largest drag factor')
+      ? `   Why: ${DRAG[heaviest[0]]} is the largest part of what makes it heavy, at ${percent(heaviest[1])}.`
+      : `   Why: ${rule.replace(': ', '. The rule: ')}.`);
     lines.push(`   How: ${HOW[verdict.intervention]}`);
     lines.push(item.sized
       ? `   Saves: ${euro(verdict.net_saving_low_eur)}–${Math.round(verdict.net_saving_high_eur).toLocaleString('en-GB')} a year of ${euro(verdict.baseline_cost_eur)}, about ${verdict.efficiency_gain_pct} percent of the effort. Confidence ${verdict.decision_confidence}.`

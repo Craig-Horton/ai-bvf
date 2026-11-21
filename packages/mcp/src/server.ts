@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.17.0';
+export const VERSION = '0.18.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -1283,7 +1283,7 @@ const TOOLS = [
   },
   {
     name: 'diagnose_process',
-    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The friction signals select the intervention: low automation points to Automate, many hand-offs or wait to Consolidate & re-sequence, rework to Quality controls, low-volume heavy work to Eliminate / insource. signal_completeness must fall when inputs are estimated, because it directly reduces decision score. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The intervention is chosen by the first rule that fits: under 250 instances a year with heaviness of 50 or more is Eliminate / insource; 30 percent rework or more is Quality controls; 15 minutes of work or less with one person at most and 1,000 instances a year or more is Automate; otherwise the largest drag factor decides, with manual work pointing to Automate, rework to Quality controls, and hand-offs, wait or cycle time to Consolidate & re-sequence. assumptions names the rule that chose. signal_completeness must fall when inputs are estimated, because it directly reduces decision score. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: diagnoseInputSchema,
     outputSchema: diagnoseOutputSchema,
     annotations: { title: 'Diagnose business process', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

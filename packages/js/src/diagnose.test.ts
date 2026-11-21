@@ -100,3 +100,47 @@ test('low-volume heavy process → Eliminate / insource', () => {
   const v = diagnoseProcess(niche);
   assert.equal(v.intervention, 'Eliminate / insource');
 });
+
+// A service desk, counted from its ticket log: short cases that wait in a queue.
+// Waiting is the largest drag factor in every one of them.
+const desk: ProcessSignals = {
+  process_id: 'order-status',
+  function: 'cx',
+  instances_per_year: 3_042,
+  fte_hours_per_instance: 0.1,
+  loaded_hourly_rate_eur: 38,
+  cycle_time_days: 0.08,
+  touch_ratio: 0.05,
+  handoffs: 1,
+  rework_rate: 0.02,
+  automation_level: 0.34,
+  direct_spend_eur: 0,
+  signal_completeness: 0.89,
+};
+
+test('short and repeated work → Automate, though waiting is the largest drag factor', () => {
+  const v = diagnoseProcess(desk);
+  assert.equal(v.intervention, 'Automate');
+  assert.match(v.assumptions[0], /^intervention chosen by short and repeated: 15 minutes of work or less, one person at most, 1000 a year or more$/);
+  // One more person on each case, more work on each case, or fewer cases: the rule no longer fits, and waiting decides again.
+  for (const change of [{ handoffs: 2 }, { fte_hours_per_instance: 0.3 }, { instances_per_year: 900 }]) {
+    const other = diagnoseProcess({ ...desk, ...change });
+    assert.equal(other.intervention, 'Consolidate & re-sequence', JSON.stringify(change));
+    assert.equal(other.assumptions[0], 'intervention chosen by largest drag factor: wait');
+  }
+});
+
+test('work that comes back → Quality controls, before any other rule but rare and heavy', () => {
+  const comesBack = diagnoseProcess({ ...desk, process_id: 'address-change', rework_rate: 0.53, fte_hours_per_instance: 0.25 });
+  assert.equal(comesBack.intervention, 'Quality controls');
+  assert.equal(comesBack.assumptions[0], 'intervention chosen by comes back: 30 percent of cases or more are reworked');
+  // Just under the floor, the short and repeated rule takes it.
+  assert.equal(diagnoseProcess({ ...desk, rework_rate: 0.29 }).intervention, 'Automate');
+  // Rare and heavy still comes first.
+  const rare = diagnoseProcess({ ...desk, process_id: 'supplier-claim', instances_per_year: 122, fte_hours_per_instance: 3.5, cycle_time_days: 9.8, handoffs: 5, rework_rate: 0.33, automation_level: 0.05 });
+  assert.equal(rare.intervention, 'Eliminate / insource');
+});
+
+test('every verdict says which rule chose the intervention', () => {
+  assert.equal(diagnoseProcess(heavyFinance).assumptions[0], 'intervention chosen by largest drag factor: manual');
+});
