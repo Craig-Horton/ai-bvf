@@ -54,7 +54,8 @@ mcps as (
  count(distinct assessment_hash) filter(where assessment_stage='verdict') as linked_assessments_with_verdict,
  count(*) filter(where tool_name='assess_ai_initiative' and assessment_hash is null) as unlinked_assessment_calls,
  count(*) filter(where install_hash is null) as events_without_return_identity,
- count(*) filter(where outcome='error') as error_calls,max(observed_at) as latest_event_at
+ count(*) filter(where outcome='error') as error_calls,
+ count(*) filter(where outcome='refused') as refused_calls,max(observed_at) as latest_event_at
  from m,p where observed_at>=p.report_start group by reporting_cohort,entry_route
 ),
 mcp_stops as (

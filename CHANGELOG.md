@@ -2,6 +2,16 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.15.4 (aibvf-mcp), 0.11.2 (@aibvf/core), 21 November 2026
+
+Changed: telemetry records a declined input as `refused`. `infer_readiness` with fewer than two signals and `sequence_portfolio` without an organisation or initiatives decline by design, and each one was counted as an `error`. In the first five days of 0.15.3 the hosted endpoint logged 65 errors in 267 public calls, 41 of them these two refusals from automated callers sending only the required fields.
+
+Changed: `error` now means a fault in the server. `measurement-integrity.sql` reports `refused_calls` beside `error_calls`. The migration `20261121_mcp_refused_outcome.sql` widens the stored outcome values and changes no existing row.
+
+Added: `publish-pypi.yml` builds the Python package, checks the wheel and publishes it through PyPI trusted publishing. PyPI has served 0.2.0 since May while this repository moved to 0.2.2; the workflow closes that gap once the trusted publisher is registered.
+
+Scope: tool behaviour, tool messages, scoring rules, core 0.11.2 and the 13-tool catalogue are unchanged. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.15.3 (aibvf-mcp), 0.11.2 (@aibvf/core), 16 November 2026
 
 Added: an opaque assessment ID links calls in a guided assessment without sending the proposal to telemetry. Copy the returned `assessment_id` on continuation calls and omit it for a different idea.
