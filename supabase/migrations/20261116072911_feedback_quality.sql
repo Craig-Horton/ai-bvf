@@ -8,6 +8,11 @@
 --               closed list of five. Sent when a person chooses to answer the feedback
 --               question, and never on any other event.
 -- find_out_feedback_submitted  Feedback on the "find out and come back" screen.
+--
+-- As applied on 16 November 2026. This file rebuilt the event allowlist from a fixed list
+-- and so dropped the seven events that measurement_integrity had added the day before.
+-- 20261116074830_preserve_measurement_events.sql restores them. A later migration should
+-- extend the live constraint and never restate the list.
 
 begin;
 

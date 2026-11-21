@@ -2,6 +2,18 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.15.3 (aibvf-mcp), 0.11.2 (@aibvf/core), 16 November 2026
+
+Added: an opaque assessment ID links calls in a guided assessment without sending the proposal to telemetry. Copy the returned `assessment_id` on continuation calls and omit it for a different idea.
+
+Added: internal and automated traffic exclusions, private retrospective installation labels, server receipt times and a report that keeps unverified public and unknown activity separate. Return measures use meaningful actions and wait until each installation has had 24 hours or seven days to return.
+
+Added: hosted clients can opt into return measurement with a random UUID in `x-aibvf-client-id`; only its hash is retained. Hosted calls without it remain unidentifiable across visits, and no browser or installation count is described as people or organisations.
+
+Changed: the former browser-ID-only reports are retired in favour of `measurement-integrity.sql`, with rollback-only regression checks for separate assessments, last questions, return timing, duplicate delivery and private access.
+
+Scope: scoring rules, core 0.11.2 and the 13-tool catalogue are unchanged.
+
 ## 0.15.2 (aibvf-mcp), 0.11.2 (@aibvf/core), 10 November 2026
 
 Added: the front-door verdict says its result in everyday words. `summary` gives the outcome in plain words, `holding_back` lists each answer that keeps the initiative from a go-ahead with what the user said and what it needs to become, and `first_step` names the one thing to do first. A Stop quotes the answer that caused it. A gap in the work redesign names the first part still to change.
