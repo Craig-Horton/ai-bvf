@@ -17,12 +17,12 @@ The company is synthetic. Every answer below was chosen by the author to represe
 | Question | Answer chosen | Why this answer |
 |---|---|---|
 | Cost and return | The return rests on figures nobody has tested, or it only breaks even. | No firm has measured figures before a rollout. |
-| Risk and control | The risks are known, and no named person owns them. | The security reporting is public, and ownership is the open point. |
+| Risk and control | It works within limits, and nobody has written them down or owns them. | Staff set their own agent up, and no firm-wide limits exist yet. |
 | Business result | A result is named, with no target. | "Productivity" is named in most such requests, with no number. |
 | Ownership of the change | An owner is named and the change work is funded. | Given the benefit of the doubt. |
 | Redesign of the work | Nothing yet. The AI is added to the existing process. | The proposal says "bolt-on". |
 
-**Result, engine 0.12.0:** Fix. Four things hold it back. First step: "Build the cost and return case on measured figures and have finance check it."
+**Result, engine 0.12.3:** Fix. Four things hold it back. First step: "Build the cost and return case on measured figures and have finance check it."
 
 **Second run, best answer to every question:** still Fix. The proposal says "bolt-on" and the answer claims all four parts of the work were redesigned. The engine quotes the words beside the answer and asks which one is true.
 
@@ -34,7 +34,7 @@ OpenClaw is an open-source personal AI agent that lives in your chat apps, reads
 
 So I took the obvious request, roll it out to our staff, and ran it through AI BVF using a company I made up: a 400-person professional services firm that wants to give every employee OpenClaw as a bolt-on to how the firm works today.
 
-I answered the five questions the way a firm at the start of this decision would answer them. The return rests on figures nobody has tested, the risks are known and nobody owns them, the result has a name and no target, an owner is named and funded, and nothing in the work itself has been redesigned.
+I answered the five questions the way a firm at the start of this decision would answer them. The return rests on figures nobody has tested, the agent works within limits nobody has written down, the result has a name and no target, an owner is named and funded, and nothing in the work itself has been redesigned.
 
 The verdict was Fix, with four things holding it back, and the first step was to build the cost and return case on measured figures and have finance check it.
 

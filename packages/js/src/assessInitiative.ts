@@ -19,8 +19,8 @@ import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import { plainResult } from './plainResult.js';
 import { readProposal } from './proposalReading.js';
 import {
-  CHOICE_SCORES, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
-  WORK_ARCHITECTURE_CHOICES, trackFor,
+  CHOICE_SCORES, SMALLER_FIRM_BELOW, UNKNOWN_LABEL,
+  WORK_ARCHITECTURE_CHOICES, trackFor, whyFor, wordingFor,
 } from './guidedQuestions.js';
 import type {
   AiTier, AssessAnswer, AssessChoice, AssessContradiction, AssessChoiceId, AssessContext, AssessDecider, AssessField,
@@ -185,16 +185,16 @@ function taxonomyMatch(field: TaxonomyField, value: string): TaxonomyMatch | und
   return mapToTaxonomy({ [field]: value })[field];
 }
 
-function guidedChoices(track: AssessTrack, id: AssessQuestionId): AssessChoice[] {
-  const w = WORDING[track][id];
+function guidedChoices(track: AssessTrack, id: AssessQuestionId, aiTier?: string): AssessChoice[] {
+  const w = wordingFor(track, id, aiTier);
   return [
     { id: 'a', label: w.a }, { id: 'b', label: w.b }, { id: 'c', label: w.c }, { id: 'd', label: w.d },
     { id: 'unknown', label: UNKNOWN_LABEL },
   ];
 }
 
-function decider(track: AssessTrack, id: AssessQuestionId): AssessDecider {
-  return { id, question: WORDING[track][id].question, why: QUESTION_WHY[track][id], answer_in: ANSWER_IN[id] };
+function decider(track: AssessTrack, id: AssessQuestionId, aiTier?: string): AssessDecider {
+  return { id, question: wordingFor(track, id, aiTier).question, why: whyFor(track, id, aiTier), answer_in: ANSWER_IN[id] };
 }
 
 export function assessInitiative(input: AssessInitiativeInput): AssessInitiativeResult {
@@ -298,7 +298,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     } else if (choice) {
       const value = CHOICE_SCORES[pillar][choice];
       supplied[pillar] = value;
-      answersGiven[pillar] = { choice, label: WORDING[track][pillar][choice], score: value };
+      answersGiven[pillar] = { choice, label: wordingFor(track, pillar, resolved.ai_tier)[choice], score: value };
       rules.push(`answer:${pillar}=${choice}(${value})`);
     }
   }
@@ -314,7 +314,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   } else if (workChoice) {
     workInput = WORK_ARCHITECTURE_CHOICES[workChoice];
     workAnswered = true;
-    answersGiven.work_architecture = { choice: workChoice, label: WORDING[track].work_architecture[workChoice] };
+    answersGiven.work_architecture = { choice: workChoice, label: wordingFor(track, 'work_architecture')[workChoice] };
     rules.push(`answer:work_architecture=${workChoice}`);
   }
   const workArchitecture = assessWorkArchitecture(workInput);
@@ -355,7 +355,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (suppliedCount < 4 && (stopOnGovernance || stopOnReturn)) {
     const verdict: AssessVerdict = {
       classification: 'Stop',
-      ...plainResult({ track, classification: 'Stop', supplied, answers: answersGiven, work: workArchitecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
+      ...plainResult({ track, aiTier: resolved.ai_tier, classification: 'Stop', supplied, answers: answersGiven, work: workArchitecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
       contradictions,
       reason: stopOnGovernance ? 'Governance risk above the safe threshold.' : 'Financial return too thin to justify scope.',
       scores_supplied: supplied,
@@ -387,7 +387,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     const classification = capped ? 'Fix' : full.classification;
     const verdict: AssessVerdict = {
       classification,
-      ...plainResult({ track, classification, supplied, answers: answersGiven, work: full.work_architecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
+      ...plainResult({ track, aiTier: resolved.ai_tier, classification, supplied, answers: answersGiven, work: full.work_architecture, workAnswered, workUnknown: unknown.includes('work_architecture'), contradictions }),
       contradictions,
       reason: capped ? 'The proposal contradicts an answer the go-ahead rests on.' : full.reason,
       scores_supplied: supplied,
@@ -409,7 +409,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const open = order.filter((id) => !unknown.includes(id) && (id === 'work_architecture'
     ? !workAnswered
     : supplied[id] === undefined));
-  const toFindOut = order.filter((id) => unknown.includes(id)).map((id) => decider(track, id));
+  const toFindOut = order.filter((id) => unknown.includes(id)).map((id) => decider(track, id, resolved.ai_tier));
   const pillarsOpen = open.filter((id) => id !== 'work_architecture');
   const next = pillarsOpen[0] ?? (pillarsClear ? open[0] : undefined);
   const warning = regulatedAgentic && supplied.governance_risk === undefined ? { warning: REGULATED_AGENTIC_WARNING } : {};
@@ -425,12 +425,12 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   }
 
   const number = order.length - open.length + 1;
-  const w = WORDING[track][next];
+  const w = wordingFor(track, next, resolved.ai_tier);
   const question: AssessQuestion = {
-    id: next, question: w.question, why: QUESTION_WHY[track][next], choices: guidedChoices(track, next),
+    id: next, question: w.question, why: whyFor(track, next, resolved.ai_tier), choices: guidedChoices(track, next, resolved.ai_tier),
     answer_in: ANSWER_IN[next], number, of_at_most: MAX_QUESTIONS,
   };
-  const decides = open.slice(0, 3).map((id) => decider(track, id));
+  const decides = open.slice(0, 3).map((id) => decider(track, id, resolved.ai_tier));
   const alsoOpen = open.slice(3);
   return {
     status: 'not_enough_to_judge', ...judged,

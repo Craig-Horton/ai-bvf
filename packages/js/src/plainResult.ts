@@ -4,7 +4,7 @@
  * Built only from what the user answered or supplied.
  */
 import {
-  FIRST_STEP, GO_AHEAD_STEP, QUESTION_SHORT, UNKNOWN_LABEL, WORDING, WORK_PARTS, WORK_PART_WORDING,
+  GO_AHEAD_STEP, QUESTION_SHORT, UNKNOWN_LABEL, WORK_PARTS, WORK_PART_WORDING, firstStepFor, wordingFor,
 } from './guidedQuestions.js';
 import type {
   AssessAnswer, AssessContradiction, AssessHoldingBack, AssessQuestionId, AssessTrack, Classification, PillarScores,
@@ -27,6 +27,8 @@ function stops(pillar: Pillar, value: number): boolean {
 
 export interface PlainResultInput {
   track: AssessTrack;
+  /** The AI type. Agentic AI gets risk wording specific to an agent. */
+  aiTier?: string;
   classification: Classification;
   supplied: Partial<PillarScores>;
   answers: Partial<Record<AssessQuestionId, AssessAnswer>>;
@@ -57,7 +59,7 @@ function openWorkParts(work: WorkArchitectureAssessment) {
 
 export function plainResult(input: PlainResultInput): PlainResult {
   const { track, classification, supplied, answers, work } = input;
-  const wording = WORDING[track];
+  const wording = (id: AssessQuestionId) => wordingFor(track, id, input.aiTier);
 
   const failing = PILLAR_ORDER.filter((pillar) => supplied[pillar] !== undefined && !clears(pillar, supplied[pillar]!));
   // An answer that stops the initiative on its own leads the list. When both stop it,
@@ -70,9 +72,9 @@ export function plainResult(input: PlainResultInput): PlainResult {
     return {
       id: pillar,
       short: QUESTION_SHORT[track][pillar],
-      question: wording[pillar].question,
+      question: wording(pillar).question,
       answer: answer ? answer.label : `A score of ${supplied[pillar]} out of 100.`,
-      needed: answer ? wording[pillar].c : pillar === 'governance_risk' ? 'A score of 40 or less.' : 'A score of 60 or more.',
+      needed: answer ? wording(pillar).c : pillar === 'governance_risk' ? 'A score of 40 or less.' : 'A score of 60 or more.',
     };
   });
 
@@ -86,9 +88,9 @@ export function plainResult(input: PlainResultInput): PlainResult {
     holdingBack.push({
       id: 'work_architecture',
       short: QUESTION_SHORT[track].work_architecture,
-      question: wording.work_architecture.question,
+      question: wording('work_architecture').question,
       answer: answer ? answer.label : input.workUnknown || !input.workAnswered ? UNKNOWN_LABEL : `Not shown as changed: ${names.join(', ')}.`,
-      needed: wording.work_architecture.d,
+      needed: wording('work_architecture').d,
     });
   }
 
@@ -100,7 +102,7 @@ export function plainResult(input: PlainResultInput): PlainResult {
     const existing = holdingBack.find((held) => held.id === item.id);
     if (existing) existing.proposal_words = item.proposal_words;
     else holdingBack.push({
-      id: item.id, short: QUESTION_SHORT[track][item.id], question: wording[item.id].question,
+      id: item.id, short: QUESTION_SHORT[track][item.id], question: wording(item.id).question,
       answer: item.answer, needed: CONTRADICTION_NEEDED, proposal_words: item.proposal_words,
     });
   }
@@ -121,7 +123,7 @@ export function plainResult(input: PlainResultInput): PlainResult {
       ? contradictionStep(first.proposal_words)
     : first.id === 'work_architecture'
       ? WORK_PART_WORDING[track][stillOpen[0] ?? 'workflow_redesigned'].step
-      : FIRST_STEP[track][first.id];
+      : firstStepFor(track, first.id, input.aiTier);
 
   let summary: string;
   if (classification === 'Stop') {

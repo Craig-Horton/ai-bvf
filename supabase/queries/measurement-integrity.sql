@@ -100,6 +100,16 @@ select p.*,
    count(*) filter(where last_at<=p.report_end-interval '24 hours' and last_stage not in ('verdict','error')) as inactive_24h
    from mcp_stops,p where last_at>=p.report_start group by reporting_cohort,last_stage,last_question
  ) s) as mcp_last_recorded_steps,
+ -- How often plain wording defeats the reader: the context the engine had to ask for.
+ (select jsonb_agg(to_jsonb(s)) from (
+   select reporting_cohort,question_key as context_not_read,count(*) as times_asked,
+     count(distinct assessment_hash) as assessments_asked,
+     (select count(distinct a.assessment_hash) from m a,p q where a.observed_at>=q.report_start
+        and a.tool_name='assess_ai_initiative' and a.reporting_cohort=m.reporting_cohort) as assessments_in_cohort
+   from m,p where observed_at>=p.report_start and tool_name='assess_ai_initiative'
+     and assessment_stage='needs_input' and question_key in ('industry','function','ai_tier','employees')
+   group by reporting_cohort,question_key
+ ) s) as mcp_context_not_read,
  (select jsonb_agg(to_jsonb(s)) from retention s) as meaningful_return_use,
  (select count(*) from w where received_at is null) as historical_web_rows_without_server_receipt,
  (select count(*) from m where received_at is null) as historical_mcp_rows_without_server_receipt

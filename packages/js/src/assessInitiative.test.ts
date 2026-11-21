@@ -261,3 +261,35 @@ test('everyday wording for customer queries reads as customer service', () => {
     assert.equal(r.status, 'needs_confirmation', wording);
   }
 });
+
+test('agentic AI gets a risk question about what the agent may do without approval', () => {
+  const agent = { proposal: 'We are a 400-person e-commerce retailer and we want an AI agent to handle customer queries and take actions.', confirmed: true } as const;
+  const asked = assessInitiative({ ...agent, answers: { financial_return: 'c' } });
+  assert.equal(asked.question?.id, 'governance_risk');
+  assert.equal(asked.question?.question, 'What can the agent do without a person approving it, and who can stop it?');
+  assert.equal(asked.question?.choices?.[0].label, 'It can spend money, change records or contact customers, with no limit and no approval.');
+  assert.equal(asked.question?.why, 'An agent that acts with no limit and no approval stops the initiative on its own.');
+
+  const stopped = assessInitiative({ ...agent, answers: { governance_risk: 'a' } }).verdict!;
+  assert.equal(stopped.classification, 'Stop');
+  assert.equal(stopped.summary, 'Stop. It can spend money, change records or contact customers, with no limit and no approval.');
+  assert.match(stopped.first_step, /^Write down what the agent may do without approval/);
+  assert.equal(stopped.holding_back[0].needed, 'Its limits are written down, and a named person approves anything above them and can stop it.');
+  assert.equal(stopped.scores_supplied.governance_risk, 80, 'the agent wording carries the same scores');
+
+  const small = assessInitiative({ proposal: 'We are a 40-person accountancy firm and we want an AI agent to do month-end bookkeeping.', confirmed: true, answers: { financial_return: 'c' } });
+  assert.equal(small.question?.question, 'What can the agent do without someone approving it, and who can step in?');
+});
+
+test('other AI types keep the standard risk question', () => {
+  const r = assessInitiative({ proposal: 'We are a 400-person retailer and we want a GenAI chatbot to draft replies in customer service.', confirmed: true, answers: { financial_return: 'c' } });
+  assert.equal(r.question?.id, 'governance_risk');
+  assert.equal(r.question?.question, 'What could go wrong, and who can stop or override the AI?');
+});
+
+test('agent wording carries no em-dashes and no banned vocabulary', async () => {
+  const { AGENT_RISK_WORDING, AGENT_RISK_WHY, AGENT_RISK_FIRST_STEP } = await import('./guidedQuestions.js');
+  const blob = JSON.stringify([AGENT_RISK_WORDING, AGENT_RISK_WHY, AGENT_RISK_FIRST_STEP]);
+  assert.ok(!blob.includes('—'));
+  for (const w of ['boardroom', 'leverage', 'crucial', 'pivotal', 'seamless', 'robust', 'unlock']) assert.ok(!blob.toLowerCase().includes(w), w);
+});

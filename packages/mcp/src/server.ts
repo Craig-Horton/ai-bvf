@@ -20,7 +20,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.16.2';
+export const VERSION = '0.16.3';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -165,7 +165,8 @@ export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
     install_hash: meta.entry_route === 'stdio' ? installHash() : opaqueId(meta.clientId) ? hashId('aibvf-remote', opaqueId(meta.clientId)!) : null,
     activity_cohort: activityCohort(meta),
     assessment_hash: opaqueId(meta.assessmentId) ? hashId('aibvf-mcp-assessment', opaqueId(meta.assessmentId)!) : null,
-    question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'].includes(String(meta.question_key)) ? meta.question_key : null,
+    // The five questions, plus the piece of context the engine had to ask for because it could not read it.
+    question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture', 'industry', 'function', 'ai_tier', 'employees'].includes(String(meta.question_key)) ? meta.question_key : null,
     outcome: ['ok', 'error', 'refused'].includes(String(meta.outcome)) ? meta.outcome : 'ok',
     user_role: meta.entry_route === 'stdio' ? configuredUsageRole() : null,
     entry_route: meta.entry_route ?? 'unknown',
@@ -1721,7 +1722,7 @@ export const telemetryEnabled = !TELEMETRY_DISABLED && !!TELEMETRY_DEFAULT_URL &
  */
 export function createAibvfServer(options: { entryRoute?: EntryRoute; telemetry?: TelemetryContext } = {}): Server {
   const server = new Server(
-    { name: 'io.github.Craig-Horton/aibvf-mcp', version: VERSION },
+    { name: 'io.github.Craig-Horton/aibvf-mcp', title: 'AI BVF', version: VERSION },
     {
       capabilities: { tools: {} },
       instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assessInitiative, CONTEXT_CHOICES } from './assessInitiative.js';
 import {
-  FIRST_STEP, GO_AHEAD_STEP, QUESTION_SHORT, QUESTION_WHY, WORDING, WORK_PART_WORDING,
+  AGENT_RISK_FIRST_STEP, FIRST_STEP, GO_AHEAD_STEP, QUESTION_SHORT, QUESTION_WHY, WORDING, WORK_PART_WORDING,
 } from './guidedQuestions.js';
 import { mapToTaxonomy } from './aliases.js';
 
@@ -31,8 +31,8 @@ test('the answer that stops the initiative leads, whatever order the questions c
   const v = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'b', governance_risk: 'a' } }).verdict!;
   assert.equal(v.classification, 'Stop');
   assert.deepEqual(v.holding_back.map((h) => h.id), ['governance_risk', 'financial_return']);
-  assert.equal(v.summary, 'Stop. It deals with customers, money or personal data, and nobody checks it.');
-  assert.equal(v.first_step, FIRST_STEP.smaller_firm.governance_risk);
+  assert.equal(v.summary, 'Stop. It can spend money, change records or contact customers, and nobody approves or limits it.');
+  assert.equal(v.first_step, AGENT_RISK_FIRST_STEP.smaller_firm);
 });
 
 test('a fix counts what holds it back and names the first thing to do', () => {
@@ -112,7 +112,8 @@ test('each question says why it matters as the rule the engine applies, in the w
   const small = assessInitiative({ proposal: firm, ...ok });
   assert.equal(small.question?.why, 'If it costs more than it saves, the answer is stop.');
   const large = assessInitiative({ proposal: bank, ...ok });
-  assert.equal(large.question?.why, 'Risk that nobody controls stops the initiative on its own.');
+  // The bank proposes autonomous agents, so its risk question is the one about the agent.
+  assert.equal(large.question?.why, 'An agent that acts with no limit and no approval stops the initiative on its own.');
   const unknown = assessInitiative({ proposal: firm, ...ok, answers: { financial_return: 'unknown', governance_risk: 'c', strategic_alignment: 'c', change_enablement: 'unknown' } });
   assert.deepEqual(unknown.to_find_out?.map((f) => f.why), [QUESTION_WHY.smaller_firm.financial_return, QUESTION_WHY.smaller_firm.change_enablement]);
 });
@@ -162,7 +163,8 @@ test('when two answers stop it, every plain field names the cause the reason nam
   assert.match(v.reason, /Governance/);
   assert.equal(v.holding_back[0].id, 'governance_risk');
   assert.equal(v.summary, 'Stop. The risk is above the level where this can go ahead.');
-  assert.equal(v.first_step, FIRST_STEP.smaller_firm.governance_risk);
+  // The firm proposes an AI agent, so the first step is the one written for an agent.
+  assert.equal(v.first_step, AGENT_RISK_FIRST_STEP.smaller_firm);
 });
 
 test('a go-ahead from supplied scores does not speak of answers nobody gave', () => {
