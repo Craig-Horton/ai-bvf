@@ -19,8 +19,9 @@ export const UNKNOWN_LABEL = 'I do not know yet.';
 
 /**
  * The score each answer carries. governance_risk is inverted: higher means more risk.
- * On cost and return, the evidence decides and the length of the payback does not:
- * a return on checked figures clears the bar whether it takes two years or five.
+ * On cost and return, the evidence decides and the length of the payback does not.
+ * The four answers run from a loss, to untested figures, to figures finance has
+ * checked, to results measured in a pilot or in live use.
  */
 export const CHOICE_SCORES: Record<keyof PillarScores, Record<Exclude<AssessChoiceId, 'unknown'>, number>> = {
   financial_return:    { a: 15, b: 40, c: 65, d: 85 },
@@ -121,7 +122,7 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
       a: 'It costs more than it returns.',
       b: 'The return rests on figures nobody has tested, or it only breaks even.',
       c: 'The return covers the cost, on figures finance has checked.',
-      d: 'The return covers the cost within a year, on measured figures.',
+      d: 'The return covers the cost, on results measured in a pilot or in live use.',
     },
     governance_risk: {
       question: 'What could go wrong, and who can stop or override the AI?',
@@ -158,7 +159,7 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
       a: 'It costs more than it saves.',
       b: 'We are estimating, or it only breaks even.',
       c: 'It pays for itself, on numbers we have checked.',
-      d: 'It pays for itself within a year, on numbers we have measured.',
+      d: 'It pays for itself, on results we have measured in a trial or in use.',
     },
     governance_risk: {
       question: 'What could go wrong, and who can step in?',

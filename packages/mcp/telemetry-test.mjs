@@ -78,6 +78,11 @@ assert.match(firstPayload.assessment_id, /^[a-f0-9-]{36}$/);
 await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal: 'We are a retailer with 60 staff considering a GenAI customer service assistant.', confirmed: true, assessment_id: firstPayload.assessment_id } });
 assert.equal(payloads.at(-1).assessment_hash, payloads.at(-2).assessment_hash);
 assert.equal(payloads.at(-1).activity_cohort, 'automated_test');
+// The context the engine could not read is recorded by field name, never by its text.
+await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal: 'We want AI to improve things.' } });
+assert.equal(payloads.at(-1).assessment_stage, 'needs_input');
+assert.ok(['industry', 'function', 'ai_tier', 'employees'].includes(payloads.at(-1).question_key));
+assert.equal(JSON.stringify(payloads.at(-1)).includes('improve things'), false);
 // A deliberate refusal is recorded as refused, a fault as error, and the caller still gets the message.
 const refusal = await client.callTool({ name: 'infer_readiness', arguments: { function: 'finance' } });
 assert.equal(refusal.isError, true);

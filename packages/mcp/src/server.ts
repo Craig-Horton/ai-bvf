@@ -20,7 +20,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.16.2';
+export const VERSION = '0.16.3';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -165,7 +165,8 @@ export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
     install_hash: meta.entry_route === 'stdio' ? installHash() : opaqueId(meta.clientId) ? hashId('aibvf-remote', opaqueId(meta.clientId)!) : null,
     activity_cohort: activityCohort(meta),
     assessment_hash: opaqueId(meta.assessmentId) ? hashId('aibvf-mcp-assessment', opaqueId(meta.assessmentId)!) : null,
-    question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'].includes(String(meta.question_key)) ? meta.question_key : null,
+    // The five questions, plus the piece of context the engine had to ask for because it could not read it.
+    question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture', 'industry', 'function', 'ai_tier', 'employees'].includes(String(meta.question_key)) ? meta.question_key : null,
     outcome: ['ok', 'error', 'refused'].includes(String(meta.outcome)) ? meta.outcome : 'ok',
     user_role: meta.entry_route === 'stdio' ? configuredUsageRole() : null,
     entry_route: meta.entry_route ?? 'unknown',

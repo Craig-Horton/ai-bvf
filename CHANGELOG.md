@@ -2,6 +2,14 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.16.3 (aibvf-mcp), 0.12.3 (@aibvf/core), 21 November 2026
+
+Changed: the top answer on cost and return no longer names a payback period. It read "within a year, on measured figures". It now reads "The return covers the cost, on results measured in a pilot or in live use." All four answers on this question now judge the evidence alone: a loss, untested figures, figures finance has checked, measured results.
+
+Added: telemetry records which piece of context the engine had to ask for because it could not read it from the proposal: industry, business function, AI type or headcount. Only the field name is recorded, never the wording. `measurement-integrity.sql` reports it as `mcp_context_not_read`, with the number of assessments in the same cohort for the rate. The migration `20261121103500_mcp_context_question_key.sql` widens the stored values and changes no row.
+
+Scope: one answer's wording and one telemetry field. Scores, thresholds and the 13-tool catalogue are unchanged.
+
 ## 0.16.2 (aibvf-mcp), 0.12.2 (@aibvf/core), 21 November 2026
 
 Changed: on cost and return, the evidence decides and the length of the payback does not. The third answer read "The return covers the cost within two years, on figures finance has checked", so a three-year payback on measured figures had no answer that fitted and fell to the second, which scores it as an untested estimate. The third answer now reads "The return covers the cost, on figures finance has checked."
