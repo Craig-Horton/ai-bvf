@@ -44,6 +44,14 @@ Local MCP clients use the existing stable random installation hash. Hosted clien
 
 Browser and installation IDs are not people or organisations. Clearing storage, reinstalling or using another device can create another ID, and shared installations can represent several people. There is no fingerprinting or cross-device identity matching.
 
+## Feedback answers
+
+Run [feedback-answers.sql](../supabase/queries/feedback-answers.sql) to read the feedback, one row for each answer. It reads the private reporting view, leaves out the `internal` and `automated_test` groups and shows the group of every row it keeps. Rows in the `unknown` group predate the labels and can include test runs.
+
+The Start page asks "Did this change what you will do next?" on a result and "Were these the right things to go and find out?" on the find-out screen. Each result shown gets a random `feedback_key`, which is not derived from the idea or the answers. Rows that share a key are one answer, and the latest row is the answer.
+
+Feedback on a result also carries `held_back`, the first question holding the idea back, from the closed list of five. It is sent when a person chooses to answer the feedback question and on no other event. The selected answer is still never sent.
+
 ## Privacy and verification
 
 The private reporting schema and labels are unavailable to public and ordinary signed-in clients. Public collection remains insert-only. Free-text feedback is outside this report. Role and industry are optional broad categories, never inferred identities.
