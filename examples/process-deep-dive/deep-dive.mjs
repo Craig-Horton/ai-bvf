@@ -59,7 +59,7 @@ export function measure(csv) {
       handoffs: median(perCase.map((item) => item.people)),
       rework_rate: round(perCase.filter((item) => item.reopened).length / perCase.length),
       automation_level: round(steps.filter((step) => step.actor_type === 'system').length / steps.length),
-      // Not an engine input yet: the share of handling time spent reading or writing free text.
+      // Not an engine input: the share of handling time spent reading or writing free text. Kept for the second judgement, after a redesign.
       text_share: workedTotal ? round(people.filter((step) => step.input === 'text').reduce((sum, step) => sum + Number(step.minutes_worked), 0) / workedTotal) : 0,
     };
   });
@@ -106,7 +106,6 @@ export function report(measured, judged, { department, organisation, rate }) {
     const { verdict } = item;
     const heaviest = Object.entries(verdict.drag_decomposition).sort((a, b) => b[1] - a[1])[0];
     const leave = verdict.verdict === 'Stop';
-    const genai = !leave && verdict.intervention === 'Automate' && item.text_share >= 0.5;
     lines.push('', `${index + 1}. ${item.name}`);
     const minutes = Math.round(item.fte_hours_per_instance * 60);
     const touched = item.handoffs === 0 ? 'Most cases are touched by nobody' : item.handoffs === 1 ? '1 person touches a case' : `${item.handoffs} people touch a case`;
@@ -115,17 +114,17 @@ export function report(measured, judged, { department, organisation, rate }) {
       lines.push('   Do: leave it. It is light already, and a change would save too little to matter.');
       return;
     }
-    lines.push(`   Do: ${verdict.intervention}${genai ? ', with GenAI' : ''}.`);
+    lines.push(`   Do: ${verdict.intervention}.`);
     lines.push(verdict.intervention === 'Eliminate / insource'
       ? `   Why: it is rare and heavy. It runs ${item.instances_per_year} times a year and scores ${verdict.heaviness} of 100 for heaviness.`
       : `   Why: ${DRAG[heaviest[0]]} is the largest part of what makes it heavy, at ${percent(heaviest[1])}.`);
     lines.push(`   How: ${HOW[verdict.intervention]}`);
-    if (genai) lines.push(`   Why GenAI: ${percent(item.text_share)} of the handling time is reading or writing free text. A model drafts the reply from the case and the policy, and a person checks and sends it. This rule is a proposal. It is not in the engine yet.`);
     lines.push(item.sized
       ? `   Saves: ${euro(verdict.net_saving_low_eur)}–${Math.round(verdict.net_saving_high_eur).toLocaleString('en-GB')} a year of ${euro(verdict.baseline_cost_eur)}, about ${verdict.efficiency_gain_pct} percent of the effort. Confidence ${verdict.decision_confidence}.`
       : `   Saves: about ${verdict.efficiency_gain_pct} percent of the effort. No euro figure yet: the hourly cost of this team is not in the log.`);
-    lines.push('   Would you like me to build it?');
+    lines.push('   Would you like me to draft it?');
   });
+  lines.push('', 'GenAI comes second. I recommend it for a process only after that process has been redesigned and judged again.');
   lines.push('');
   lines.push(rate
     ? `Not in the log: the hourly cost, which you gave as ${euro(rate)}, and the yearly spend on tools for each process, which is counted as zero.`

@@ -28,7 +28,7 @@ node examples/process-deep-dive/deep-dive.mjs --rate 38 --write
 
 ## What is not settled
 
-- **The GenAI call is a proposal.** The engine has no rule for it. This example says "with GenAI" when the engine says Automate and half or more of the handling time is reading or writing free text.
+- **GenAI comes second.** Craig's rule of 21 November: the first report never recommends GenAI. A process is redesigned and judged again first.
 - **Two calls a practitioner would question.** The engine sends "Order status query" and "Address change" to Consolidate and re-sequence, because waiting outweighs every other signal in a ticket log. The first is six minutes of identical work and the second comes back half the time.
 - **The log is made up.** No real system has been read. A real log needs its columns mapped first.
-- **Nothing is built.** The report asks "Would you like me to build it?" and stops there.
+- **Nothing is built.** Craig's rule of 21 November: the first version drafts the change for a person to carry out. The report asks "Would you like me to draft it?" and stops there.
