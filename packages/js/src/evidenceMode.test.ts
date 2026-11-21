@@ -143,6 +143,10 @@ test('the brief link carries the answers and the evidence, and nothing is stored
   assert.equal(data.b, 'e');
   assert.deepEqual(data.q.governance_risk, [QUOTES.governance_risk.quote, QUOTES.governance_risk.source]);
   assert.equal(data.p, undefined, 'the wording of the proposal stays out unless the owner says otherwise');
+  // A quote pasted with line breaks travels as the engine kept it: one line, trimmed.
+  const untidy = { ...input, evidence: { ...QUOTES, governance_risk: { quote: '  Refund limits to be agreed\n\nafter the pilot. ', source: ' Steering minutes,\n12 November 2026 ' } } };
+  const tidy = JSON.parse(Buffer.from(briefUrlFor(untidy, assessInitiative(untidy), '2026-11-21')!.split('#')[1], 'base64url').toString('utf8'));
+  assert.deepEqual(tidy.q.governance_risk, ['Refund limits to be agreed after the pilot.', 'Steering minutes, 12 November 2026']);
   const shared = JSON.parse(Buffer.from(briefUrlFor(input, result, '2026-11-21', { include_proposal: true })!.split('#')[1], 'base64url').toString('utf8'));
   assert.equal(shared.p, PROPOSAL);
 

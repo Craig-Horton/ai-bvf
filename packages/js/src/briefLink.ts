@@ -81,7 +81,11 @@ export function briefUrlFor(
     date,
     ...(options.include_proposal ? { proposal: result.proposal } : {}),
     contradiction_words: verdict.contradictions.filter((item) => item.found_in !== 'evidence').map((item) => item.proposal_words),
-    ...(input.answered_by === 'evidence' ? { answered_by: 'evidence' as const, evidence: input.evidence } : {}),
+    // The quotes as the engine kept them: trimmed, capped, and only for answers that counted.
+    ...(input.answered_by === 'evidence' ? {
+      answered_by: 'evidence' as const,
+      evidence: Object.fromEntries(Object.entries(verdict.answers_given).flatMap(([id, answer]) => (answer?.evidence ? [[id, answer.evidence]] : []))),
+    } : {}),
     ...(options.base ? { base: options.base } : {}),
   });
 }

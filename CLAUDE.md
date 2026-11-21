@@ -10,7 +10,7 @@ The fastest tells that a draft fails: em-dashes, "X is not A, it is B" formulas,
 
 ## Design
 
-Product surfaces (AI BVF) use the `aibvf-design` skill: copper `#B87333` on deep navy, Playfair Display, no emoji, no italics. Personal artefacts (Craig Horton Advisory) use the visual identity in the `craig-voice` skill: navy `#1a2a47` and amber `#c97a2b`, Cormorant Garamond and Inter, never italic. Do not mix the two brands.
+Product surfaces (AI BVF) use the `aibvf-design` skill: copper `#B87333` on deep navy, Playfair Display, no emoji, no italics. On navy, set every line of text in white. Craig finds grey text hard to read, so no muted or dimmed greys for captions, sources or labels. Personal artefacts (Craig Horton Advisory) use the visual identity in the `craig-voice` skill: navy `#1a2a47` and amber `#c97a2b`, Cormorant Garamond and Inter, never italic. Do not mix the two brands.
 
 ## Repo facts
 
