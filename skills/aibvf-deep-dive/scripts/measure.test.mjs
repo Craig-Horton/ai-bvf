@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
 import { measureLog, parseCsv } from './measure.mjs';
 import { diagnoseProcess } from '../../../packages/js/dist/index.js';
 
@@ -47,4 +48,20 @@ test('a log without a column leaves that signal uncounted and judges nothing', (
 
 test('cells with commas, quotes and line breaks are read whole', () => {
   assert.deepEqual(parseCsv('a,b\n"x, y","he said ""no"""\n"two\nlines",z\n'), [['a', 'b'], ['x, y', 'he said "no"'], ['two\nlines', 'z']]);
+});
+
+test('the report link carries the counts and no row of the log', () => {
+  const counted = measureLog(log, MAP, { fn: 'cx', rate: 38, department: 'Customer service desk', organisation: 'Halden & Co' });
+  assert.match(counted.report_url, /^https:\/\/www\.aibvf\.com\/deep-dive#[A-Za-z0-9_-]+$/);
+  const carried = JSON.parse(Buffer.from(counted.report_url.split('#')[1], 'base64url').toString('utf8'));
+  assert.equal(carried.n, 'Customer service desk');
+  assert.equal(carried.r, 38);
+  assert.equal(carried.p.length, 6);
+  assert.deepEqual(carried.p.find((row) => row[0] === 'Order status query'), ['Order status query', 3042, 0.1, 0.08, 0.05, 1, 0.02, 0.34, 0.89]);
+  // No case number and no person's name from the log is in the link.
+  const text = JSON.stringify(carried);
+  assert.ok(!/HD-48|Ana|Bram|Chloe|Nora/.test(text));
+  assert.ok(counted.report_url.length < 2000);
+  // Without every signal the engine needs, there is no link.
+  assert.equal(measureLog(log, { case: 'case_id', process: 'category', time: 'timestamp', actor: 'actor' }, { fn: 'cx' }).report_url, null);
 });

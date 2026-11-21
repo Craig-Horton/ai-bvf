@@ -5,11 +5,12 @@
 //   node measure.mjs log.csv --case case_id --process category --time timestamp --actor actor \
 //     [--actor-type actor_type --system-value system] [--system-actors "Web form,Order system"] \
 //     [--minutes minutes_worked] [--step step --reopen-value Reopened] \
-//     [--function cx] [--rate 38] [--spend 0]
+//     [--function cx] [--rate 38] [--spend 0] [--department "Service desk"] [--organisation "Halden & Co"]
 //
 // One row is one step of one case. Prints JSON: what was counted, what was not in the log,
 // and for each process the arguments for diagnose_process, to pass on unchanged.
 import { readFile } from 'node:fs/promises';
+import { Buffer } from 'node:buffer';
 
 /** A small CSV reader: quoted cells, doubled quotes, commas and line breaks inside quotes. */
 export function parseCsv(text) {
@@ -43,7 +44,7 @@ const round = (value, places = 2) => Math.round(value * 10 ** places) / 10 ** pl
  * `map` names the columns: case, process, time and actor are needed. The rest are optional,
  * and each one that is missing leaves a signal uncounted and listed under `not_in_log`.
  */
-export function measureLog(csv, map, { fn, rate, spend } = {}) {
+export function measureLog(csv, map, { fn, rate, spend, department, organisation } = {}) {
   const [head, ...lines] = parseCsv(csv);
   for (const need of ['case', 'process', 'time', 'actor']) {
     if (!map[need]) throw new Error(`Name the ${need} column with --${need}.`);
@@ -121,7 +122,19 @@ export function measureLog(csv, map, { fn, rate, spend } = {}) {
     };
   });
 
+  // The full report as one link to read or forward. It carries the counts for each process and no row of the log.
+  // The page at that address runs the published engine on the counts, in the reader's browser. Nothing is stored.
+  const first = new Date(Math.min(...times)).toISOString().slice(0, 10);
+  const last = new Date(Math.max(...times)).toISOString().slice(0, 10);
+  const linked = complete && fn ? {
+    v: 1, k: 'dd', n: String(department ?? '').slice(0, 80), o: String(organisation ?? '').slice(0, 80), f: first, l: last,
+    c: new Set(rows.map((row) => row[map.case])).size, t: rows.length, fn, r: rate ?? null,
+    p: processes.slice(0, 40).map((item) => [item.name.slice(0, 120), item.counted.instances_per_year, item.counted.fte_hours_per_instance, item.counted.cycle_time_days,
+      item.counted.touch_ratio, item.counted.handoffs, item.counted.rework_rate, item.counted.automation_level, round(counted / 9)]),
+  } : null;
+
   return {
+    report_url: linked ? `https://www.aibvf.com/deep-dive#${Buffer.from(JSON.stringify(linked)).toString('base64url')}` : null,
     period: { first: new Date(Math.min(...times)).toISOString().slice(0, 10), last: new Date(Math.max(...times)).toISOString().slice(0, 10), days: periodDays },
     cases: new Set(rows.map((row) => row[map.case])).size,
     steps: rows.length,
@@ -141,7 +154,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       case: flag('--case'), process: flag('--process'), time: flag('--time'), actor: flag('--actor'),
       actorType: flag('--actor-type'), systemValue: flag('--system-value'), systemActors: flag('--system-actors'),
       minutes: flag('--minutes'), step: flag('--step'), reopenValue: flag('--reopen-value'),
-    }, { fn: flag('--function'), rate: number('--rate'), spend: number('--spend') });
+    }, { fn: flag('--function'), rate: number('--rate'), spend: number('--spend'), department: flag('--department'), organisation: flag('--organisation') });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

@@ -28,7 +28,8 @@ Tell the owner once: the rows of the log stay on this computer. Only the counts 
 
    ```bash
    node {baseDir}/scripts/measure.mjs LOG.csv --case COLUMN --process COLUMN --time COLUMN --actor COLUMN \
-     --actor-type COLUMN --system-value VALUE --minutes COLUMN --step COLUMN --reopen-value VALUE --function ID
+     --actor-type COLUMN --system-value VALUE --minutes COLUMN --step COLUMN --reopen-value VALUE --function ID \
+     --department "NAME" --organisation "NAME"
    ```
 
    Leave out a flag when the log has no such column. The script lists what it could not count under `not_in_log`. For `--function`, use the id from `map_to_taxonomy`.
@@ -39,25 +40,32 @@ Tell the owner once: the rows of the log stay on this computer. Only the counts 
 
 ## The report
 
+Keep the chat message short. The detail is on a page.
+
 ```text
-AI BVF deep dive: DEPARTMENT, ORGANISATION
-
-Source: the SYSTEM log from DATE to DATE. N cases, N steps.
-This is what I found: N processes. Fixed published rules chose each recommendation and sized each saving. Directional, not audited.
-
-1. PROCESS
-   Found: N a year. N minutes of work each. N days from open to close. N people touch a case. N percent come back. A system does N percent of the steps.
-   Do: the intervention the tool returned.
-   Why: the rule that chose, from the first line of the tool's assumptions, without the words "intervention chosen by".
-   How: the line for that intervention, from the list below.
-   Saves: €LOW–HIGH a year of €BASELINE, about N percent of the effort. Confidence N.
-   Would you like me to draft it?
+AI BVF deep dive: DEPARTMENT. N processes found. Fixed published rules chose each recommendation. Directional, not audited.
+1. PROCESS: the intervention the tool returned. Saves €LOW–HIGH a year.
+2. PROCESS: the intervention. Saves €LOW–HIGH a year.
+3. PROCESS: leave it.
+The full report, to read or forward: REPORT_URL
+Which one shall I draft?
 ```
 
-- When the tool's verdict is Stop, write "Do: leave it. It is light already." and nothing more for that process. Print the tool's verdict word nowhere else.
-- Give the confidence as the tool returned it, between 0 and 1.
-- With no hourly cost, write "Saves: about N percent of the effort. No euro figure yet: the hourly cost of this team is not in the log. Confidence N."
-- End with what was not in the log, in the script's words. When the hourly cost is still missing, make the last line the question: "What does an hour of this team cost, with salary and overheads?"
+- Put the largest saving first. Write "leave it" when the tool's verdict is Stop. Print the tool's verdict word nowhere else.
+- `REPORT_URL` is `report_url` from the script, unchanged. Pass `--department` and `--organisation` so that the page carries their names. The link holds the counts for each process and no row of the log.
+- With no hourly cost, leave the euro figures out and end with the question: "What does an hour of this team cost, with salary and overheads?"
+- Add no total. The page adds it.
+
+When the owner asks for the detail of one process in the chat, give it in this form:
+
+```text
+PROCESS
+Today: N a year, N minutes of work each, N people on a case, N hours or days from open to close, N percent come back.
+Do: the intervention.
+Why: the rule that chose, from the first line of the tool's assumptions, in plain words and without "intervention chosen by".
+How: the line for that intervention, from the list below.
+Saves: €LOW–HIGH a year, about N percent of the effort. Confidence N, as the tool returned it.
+```
 
 How, for each intervention:
 
