@@ -42,15 +42,23 @@ claude mcp add --transport http aibvf https://mcp.aibvf.com/api/mcp
 
 ### OpenClaw
 
+Checked against the OpenClaw 2026.11.6 documentation. It has not yet run in a live OpenClaw.
+
+1. Add the skill. In the Control UI open Plugins, then Skills, and import [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/raw/main/aibvf-agent.zip). From a terminal, unzip it and run `openclaw skills install ./aibvf-agent`.
+2. Add the connector. In the Control UI open Settings, then MCP, then Add server. Choose Streamable HTTP, name it `aibvf` and paste `https://mcp.aibvf.com/api/mcp`.
+3. Message your agent: "Run the AI BVF agent." It states its mandate and asks once.
+4. Then: "Do this every Monday at 07:00." It schedules itself and reports in that chat.
+
+From a terminal, steps 2 and 4 are the lines below. The Gateway has to be stopped while a connector is added.
+
 ```bash
-unzip aibvf-agent.zip -d ~/.openclaw/workspace/skills
+openclaw gateway stop
 openclaw mcp add aibvf --url https://mcp.aibvf.com/api/mcp --transport streamable-http
-openclaw mcp doctor aibvf --probe
-openclaw skills list
-openclaw automations create "0 7 * * 1" "Run the aibvf-agent skill. Reply NO_REPLY when nothing changed." --name "AI BVF weekly check"
+openclaw gateway start
+openclaw automations create "0 7 * * 1" "Run the aibvf-agent skill. Reply NO_REPLY when nothing changed." --name "AI BVF weekly check" --tz Europe/Amsterdam
 ```
 
-Add `--tz` with your time zone to the last line, for example `--tz Europe/Amsterdam`.
+An OpenClaw agent can reach the whole computer it runs on. This skill tells it to read only its workspace and what you send it or point it to, until you name more. Put the documents in the workspace folder, send them in the chat, or name the folder.
 
 ## The first run
 
@@ -83,3 +91,13 @@ node scripts/build-agent-skill.mjs
 ```
 
 CI runs the same script with `--check`.
+
+To publish the skill on ClawHub, so that OpenClaw installs it with `openclaw skills install @<owner>/aibvf-agent`:
+
+```bash
+npm i -g clawhub
+clawhub login
+clawhub skill publish ./skills/aibvf-agent --version 1.0.0
+```
+
+The login takes a GitHub account that is at least 14 days old. ClawHub scans each version before it lists it.
