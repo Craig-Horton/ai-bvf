@@ -1,6 +1,6 @@
 {
   "name": "@aibvf/core",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "description": "AI BVF: deterministic AI investment assessment with disclosed assumptions and work design checks.",
   "keywords": [
     "ai",

@@ -99,6 +99,31 @@ assert.equal(isInputRefusal(new InternalFault('fault')), false);
 assert.equal(isInputRefusal('fault'), false);
 await logCall('score_initiative', { entry_route: 'remote', outcome: 'error' });
 assert.equal(payloads.at(-1).outcome, 'error');
+// Who answered is recorded as a category. The quote, its source and the proposal never are.
+const agentCall = {
+  proposal: 'We are a 400-person online retailer. We want an AI agent to answer first-line customer queries.',
+  confirmed: true, answered_by: 'evidence',
+  answers: { governance_risk: 'a' },
+  evidence: { governance_risk: { quote: 'The agent may issue refunds of any amount with no approval step.', source: 'Vendor design note, 3 November 2026' } },
+  review: { previous_verdict: 'Fix', outcome: 'paused_or_stopped', evidence: { quote: 'Programme paused by the board on 1 December.', source: 'Board minutes, 1 December 2026' } },
+};
+await client.callTool({ name: 'assess_ai_initiative', arguments: agentCall });
+assert.equal(payloads.at(-1).answered_by, 'evidence');
+assert.equal(payloads.at(-1).classification, 'Stop');
+assert.equal(payloads.at(-1).review_previous_verdict, 'Fix');
+assert.equal(payloads.at(-1).review_outcome, 'paused_or_stopped');
+for (const secret of ['no approval step', 'Vendor design note', 'Board minutes', 'online retailer']) {
+  assert.equal(JSON.stringify(payloads.at(-1)).includes(secret), false, `telemetry carried "${secret}"`);
+}
+// An outcome an agent could not quote is not recorded.
+await client.callTool({ name: 'assess_ai_initiative', arguments: { ...agentCall, review: { previous_verdict: 'Fix', outcome: 'delivering' } } });
+assert.equal(payloads.at(-1).review_outcome, null);
+assert.equal(payloads.at(-1).review_previous_verdict, null);
+await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal: agentCall.proposal, confirmed: true, answers: { governance_risk: 'a' } } });
+assert.equal(payloads.at(-1).answered_by, 'owner');
+await logCall('score_initiative', { entry_route: 'remote', answered_by: 'someone', review_outcome: 'went well' });
+assert.equal(payloads.at(-1).answered_by, null);
+assert.equal(payloads.at(-1).review_outcome, null);
 await client.close();
 await server.close();
 

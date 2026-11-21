@@ -8,19 +8,22 @@ import { homedir } from 'node:os';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema, GetPromptRequestSchema, ListPromptsRequestSchema, ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { Ajv } from 'ajv';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import {
   score, validate, recommendImprovements, calculatePaceLayerDrag, diagnoseProcess, inferReadiness,
-  sequencePortfolio, mapToTaxonomy, assemblePortfolio, assessInitiative,
+  sequencePortfolio, mapToTaxonomy, assemblePortfolio, assessInitiative, briefUrlFor,
+  AGENT_BRIEF, AGENT_BRIEF_VERSION, REVIEW_OUTCOMES,
   BASE_RATES, BENCHMARK_EVIDENCE_REGISTER, IND_MULT,
   INDUSTRIES, FUNCTIONS, AI_TIERS, READINESS, BVF_VERSION,
 } from '@aibvf/core';
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.16.3';
+export const VERSION = '0.17.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -178,6 +181,11 @@ export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
     readiness: meta.readiness ?? null,
     classification: meta.classification ?? null,
     confidence: meta.confidence ?? null,
+    // Who answered a guided assessment, and at a review what happened after the earlier verdict.
+    // Categories only: no proposal, quote or source is ever sent.
+    answered_by: ['owner', 'evidence'].includes(String(meta.answered_by)) ? meta.answered_by : null,
+    review_previous_verdict: ['Accelerate', 'Fix', 'Stop'].includes(String(meta.review_previous_verdict)) ? meta.review_previous_verdict : null,
+    review_outcome: (REVIEW_OUTCOMES as readonly string[]).includes(String(meta.review_outcome)) ? meta.review_outcome : null,
   };
   // Local callers do not wait for telemetry. Serverless callers can flush the
   // pending request briefly after the scoring response has been written.
@@ -269,6 +277,20 @@ const scoreInitiativeInputSchema = {
   },
 };
 
+const evidenceSchema = {
+  type: 'object',
+  properties: {
+    quote: { type: 'string', maxLength: 2000, description: 'The words as written in the source, at least a few words long.' },
+    source: { type: 'string', maxLength: 500, description: 'The document, message or record the words came from, with its date where known.' },
+  },
+};
+
+// One quote, or up to three when an answer rests on more than one document.
+const evidenceForAnswerSchema = {
+  anyOf: [evidenceSchema, { type: 'array', minItems: 1, maxItems: 3, items: evidenceSchema }],
+};
+const evidenceListSchema = { type: 'array', items: evidenceSchema };
+
 const assessInitiativeInputSchema = {
   type: 'object',
   required: ['proposal'],
@@ -282,13 +304,37 @@ const assessInitiativeInputSchema = {
     function: { type: 'string', description: 'Answer or correction in canonical or everyday language, for example customer service, procurement, finance or risk. Overrides anything read from proposal.' },
     ai_tier: { type: 'string', description: 'Answer or correction: automation/RPA, GenAI/copilot, or agentic/autonomous. Overrides anything read from proposal.' },
     employees: { type: 'number', minimum: 1, description: 'Number of people in the organisation. Under 250 the questions are worded for a smaller firm; the rules are the same for every size.' },
-    confirmed: { type: 'boolean', description: 'Set true only after the user has seen the understood statement and said it is right. Never set it on behalf of the user.' },
+    confirmed: { type: 'boolean', description: 'Set true only after the user has seen the understood statement and said it is right. Never set it on behalf of a user who is present. Working alone in evidence mode, set it yourself after checking the reading against what you read.' },
     answers: {
       type: 'object',
-      description: 'The user\'s answers to the guided questions, by question id. Each value is the id of the choice the user picked: a, b, c, d, or unknown when the user does not know yet. Pass every answer given so far on each call. Never pick an answer on behalf of the user.',
+      description: 'The answers to the guided questions, by question id. Each value is the id of a choice: a, b, c, d, or unknown. Pass every answer given so far on each call. With a person present, pass what the person picked and never pick for them. In evidence mode, pass only the answer your quote supports, and unknown when you found nothing.',
       properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
         .map((id) => [id, { type: 'string', enum: ['a', 'b', 'c', 'd', 'unknown'] }])),
     },
+    answered_by: {
+      type: 'string', enum: ['owner', 'evidence'],
+      description: 'Who chose the answers. Omit it when a person answered. Pass evidence only when you work alone under your owner\'s mandate and answer from evidence you can quote. In evidence mode every answer of a to d needs its entry in evidence, numeric scores are refused, and the verdict says that an agent answered and no person confirmed it.',
+    },
+    evidence: {
+      type: 'object',
+      description: 'Evidence mode: for each answered question, the words the answer rests on and where they were found. An answer of a to d with no quote and source is counted as not known and listed in evidence_missing. Quote the source exactly. Never write a quote yourself. Where an answer rests on more than one document, pass a list of up to three quotes, each with its own source, and never join words from different places into one quote.',
+      properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
+        .map((id) => [id, evidenceForAnswerSchema])),
+    },
+    review: {
+      type: 'object',
+      required: ['previous_verdict', 'outcome'],
+      description: 'At a review of an initiative that was assessed before: the verdict it received then and what happened since. It is returned beside the new verdict and never changes it. In evidence mode it needs its own quote and source, or the outcome is not kept.',
+      properties: {
+        previous_verdict: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
+        outcome: {
+          type: 'string', enum: [...REVIEW_OUTCOMES],
+          description: 'delivering: it went ahead and is delivering what was expected. falling_short: it went ahead and is falling short. fixed_then_went_ahead: it was fixed first, then went ahead. paused_or_stopped: it was paused or stopped. no_decision: no decision has been made.',
+        },
+        evidence: evidenceSchema,
+      },
+    },
+    brief_includes_proposal: { type: 'boolean', description: 'Set true only when the owner says the wording of the proposal may travel in brief_url. Without it the link carries the context, the answers and, in evidence mode, the quotes.' },
     scores: {
       ...scoreInputSchema.properties.scores,
       description: 'OPTIONAL, for callers that already hold 0 to 100 pillar scores from the user. A regular user answers the guided questions and never needs this. A supplied score takes precedence over an answer. Never invent a number: this tool fills in nothing.',
@@ -510,7 +556,8 @@ const assessVerdictSchema = {
           question: { type: 'string' },
           answer: { type: 'string', description: 'What the user answered.' },
           needed: { type: 'string', description: 'What the answer has to become to clear the bar.' },
-          proposal_words: { type: 'string', description: 'Present when the proposal contradicts this answer: the words as written. Quote them to the user.' },
+          proposal_words: { type: 'string', description: 'Present when the proposal or the evidence contradicts this answer: the words as written. Quote them to the user.' },
+          evidence: { ...evidenceListSchema, description: 'Evidence mode: the words this answer rests on and where they were found, one entry per quote. Show them beside the answer.' },
         },
       },
     },
@@ -526,6 +573,7 @@ const assessVerdictSchema = {
           proposal_words: { type: 'string', description: 'The words as written in the proposal.' },
           proposal_says: { type: 'string', description: 'What those words say about the initiative.' },
           answer: { type: 'string', description: 'What the user answered.' },
+          found_in: { type: 'string', enum: ['proposal', 'evidence'], description: 'Where the words were found. Absent means the proposal.' },
         },
       },
     },
@@ -539,6 +587,17 @@ const assessVerdictSchema = {
     work_architecture: scoreOutputSchema.properties.work_architecture,
     audit: scoreOutputSchema.properties.audit,
     value_note: { type: 'string', description: 'Why no euro figure is given.' },
+    provenance: {
+      type: 'object',
+      description: 'Evidence mode only. Say statement with the verdict, so nobody takes an agent\'s reading for a person\'s answer.',
+      required: ['answered_by', 'statement', 'answers_with_evidence'],
+      properties: {
+        answered_by: { type: 'string', enum: ['evidence'] },
+        statement: { type: 'string' },
+        answers_with_evidence: { type: 'number' },
+      },
+    },
+    brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Absent when the verdict rests on a supplied score.' },
     advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
     feedback: scoreOutputSchema.properties.feedback,
   },
@@ -553,6 +612,7 @@ const assessDeciderSchema = {
     question: { type: 'string' },
     why: { type: 'string' },
     answer_in: { type: 'string', description: 'The input field that carries the answer on the next call.' },
+    where_to_look: { type: 'string', description: 'Where the answer is usually written down. Look there before answering unknown.' },
   },
 };
 
@@ -577,6 +637,7 @@ const assessInitiativeOutputSchema = {
         why: { type: 'string', description: 'Why the answer decides the outcome.' },
         choices: { type: 'array', items: { type: 'object', required: ['id', 'label'], properties: { id: { type: 'string' }, label: { type: 'string' } } } },
         answer_in: { type: 'string' },
+        where_to_look: { type: 'string', description: 'Guided questions only: where the answer is usually written down.' },
         number: { type: 'number', description: 'Guided questions only: position in the sequence.' },
         of_at_most: { type: 'number' },
       },
@@ -589,6 +650,20 @@ const assessInitiativeOutputSchema = {
     also_open: stringArray('not_enough_to_judge only. Anything still open after the three in decides.'),
     to_find_out: { type: 'array', description: 'Questions the user answered with "I do not know yet". A verdict waits on these. When no question is left to ask, tell the user to find these out and come back.', items: assessDeciderSchema },
     warning: { type: 'string', description: 'A condition the user must meet first. Lead with it when present.' },
+    answered_by: { type: 'string', enum: ['evidence'], description: 'Present when an agent answered from evidence.' },
+    evidence_missing: stringArray('Evidence mode: answers that came with no quote and source. Each was counted as not known. Find the words, or leave the answer as unknown.'),
+    review: {
+      type: 'object',
+      description: 'Present when a review was passed: the earlier verdict and what happened since. accepted is false when an agent gave an outcome with no evidence.',
+      required: ['previous_verdict', 'outcome', 'accepted', 'note'],
+      properties: {
+        previous_verdict: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
+        outcome: { type: 'string', enum: [...REVIEW_OUTCOMES] },
+        evidence: evidenceSchema,
+        accepted: { type: 'boolean' },
+        note: { type: 'string' },
+      },
+    },
     verdict: assessVerdictSchema,
   },
 };
@@ -1092,8 +1167,46 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result, never set confirmed and never pick an answer on behalf of the user; when the user is unsure, pass unknown. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
+
+const EXAMPLE_ORGANIZATION = { name: 'Example retailer', industry: 'retail', revenue_eur: 300_000_000 };
+const EXAMPLE_SCORES = { strategic_alignment: 70, financial_return: 64, change_enablement: 48, governance_risk: 35 };
+const EXAMPLE_PORTFOLIO = {
+  bvf_version: '1.0',
+  organization: EXAMPLE_ORGANIZATION,
+  initiatives: [
+    { id: 'service-assistant', name: 'Customer service assistant', function: 'cx', ai_tier: 'gen2', scores: EXAMPLE_SCORES },
+    { id: 'invoice-matching', name: 'Invoice matching', function: 'finance', ai_tier: 'gen1', scores: { strategic_alignment: 75, financial_return: 80, change_enablement: 70, governance_risk: 25 } },
+  ],
+};
+
+/**
+ * One complete, working call per tool, published in each input schema as
+ * `examples`. A test calls every one of them, so an example cannot go stale.
+ */
+export const TOOL_EXAMPLES: Record<string, Record<string, unknown>> = {
+  assess_ai_initiative: { proposal: 'We are a 400-person online retailer. We want an AI agent to answer first-line customer queries and issue refunds up to 50 euros on its own.' },
+  score_initiative: { industry: 'retail', revenue_eur: 300_000_000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional' },
+  score_portfolio: { portfolio: EXAMPLE_PORTFOLIO, readiness: 'traditional' },
+  recommend_improvements: { industry: 'retail', revenue_eur: 300_000_000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional', scores: EXAMPLE_SCORES },
+  calculate_pace_layer_drag: { revenue_eur: 300_000_000, ai_tier: 'gen2', readiness: 'traditional' },
+  validate_portfolio: { portfolio: EXAMPLE_PORTFOLIO },
+  get_benchmark: { function: 'cx', industry: 'retail' },
+  list_taxonomy: {},
+  diagnose_process: {
+    process_id: 'invoice-matching', function: 'finance', instances_per_year: 12_000, fte_hours_per_instance: 0.5,
+    loaded_hourly_rate_eur: 45, cycle_time_days: 3, touch_ratio: 0.2, handoffs: 4, rework_rate: 0.12,
+    automation_level: 0.3, direct_spend_eur: 20_000,
+  },
+  infer_readiness: { function: 'finance', handoffs: 4, rework_rate: 0.12, cycle_time_days: 3 },
+  sequence_portfolio: { readiness: 'traditional', portfolio: EXAMPLE_PORTFOLIO },
+  map_to_taxonomy: { industry: 'hospital', function: 'customer service', ai_tier: 'copilot' },
+  assemble_portfolio: {
+    organization: EXAMPLE_ORGANIZATION, readiness: 'traditional',
+    initiatives: [{ name: 'Customer service assistant', function: 'customer service', ai_tier: 'copilot' }],
+  },
+};
 
 const TOOLS = [
   {
@@ -1204,10 +1317,13 @@ const TOOLS = [
     annotations: { title: 'Assemble portfolio document', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
 ].map((tool) => {
-  if (tool.name === 'score_initiative') return { ...tool, description: SCORE_INITIATIVE_DESCRIPTION };
-  if (tool.name === 'assess_ai_initiative') return { ...tool, description: ASSESS_INITIATIVE_DESCRIPTION };
-  if (tool.name === 'recommend_improvements') return { ...tool, description: RECOMMEND_IMPROVEMENTS_DESCRIPTION };
-  return tool;
+  const description = tool.name === 'score_initiative' ? SCORE_INITIATIVE_DESCRIPTION
+    : tool.name === 'assess_ai_initiative' ? ASSESS_INITIATIVE_DESCRIPTION
+    : tool.name === 'recommend_improvements' ? RECOMMEND_IMPROVEMENTS_DESCRIPTION
+    : tool.description;
+  // Each tool publishes one complete call that works as written, so a caller that
+  // has only the schema to go on succeeds the first time.
+  return { ...tool, description, inputSchema: { ...tool.inputSchema, examples: [TOOL_EXAMPLES[tool.name]] } };
 });
 
 const LIST_TOOLS_HANDLER = async () => ({ tools: TOOLS });
@@ -1247,6 +1363,20 @@ export function checkToolInput(name: string, args: unknown): void {
   throw new Error(`${name} input was declined: ${problems.join('; ')}.${taxonomy ? ' Call map_to_taxonomy to turn everyday wording into the allowed values.' : ''}`);
 }
 
+/**
+ * Said to every assistant that connects. Two ways of working: with a person
+ * who answers, and alone under a mandate, where only quoted evidence counts.
+ */
+export const SERVER_INSTRUCTIONS = 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It fills in no score and gives no euro figure, so never state a euro benefit from it. WITH A PERSON PRESENT it is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. Never set confirmed or pick an answer for that person. WORKING ALONE as an agent under your owner\'s mandate, with nobody to ask, use evidence mode: set answered_by to evidence, answer each question only from words you can quote, pass each quote with its source in evidence, and answer unknown where you found none. An answer without a quote is counted as not known. Say the returned provenance statement with every verdict reached this way. The prompt aibvf_agent holds the full operating brief for working alone: the mandate, the run and the rules. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.';
+
+/** The operating brief for an agent working alone, offered to clients that list prompts. */
+export const AGENT_PROMPT = {
+  name: 'aibvf_agent',
+  title: 'AI BVF agent',
+  description: `Run as the AI BVF agent: find the AI initiatives, judge each one from evidence you quote, draft the next step and keep it under review, alone, under a mandate the owner sets once. Operating brief version ${AGENT_BRIEF_VERSION}.`,
+};
+const PROMPTS = [AGENT_PROMPT];
+
 const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {}) => async (req: any) => {
   const { name, arguments: args } = req.params;
   const assessmentId = name === 'assess_ai_initiative' ? opaqueId(args?.assessment_id) || randomUUID() : null;
@@ -1260,12 +1390,14 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
     if (name === 'assess_ai_initiative') {
       const a = args as any;
       const r = assessInitiative(a);
+      const answeredBy = a?.answered_by === 'evidence' ? 'evidence' : 'owner';
       if (r.status !== 'verdict') {
         await recordCall('assess_ai_initiative', {
           assessment_stage: r.status,
           question_key: r.question?.id,
           industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
           ai_tier: r.resolved_inputs.ai_tier,
+          answered_by: answeredBy,
         });
         const payload = { bvf_version: BVF_VERSION, ...r, assessment_id: assessmentId };
         return {
@@ -1283,7 +1415,12 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
         ai_tier: r.resolved_inputs.ai_tier,
         classification: s.classification, confidence: s.confidence,
+        answered_by: answeredBy,
+        // An outcome is recorded only once it is accepted: an agent has to quote what happened.
+        ...(r.review?.accepted ? { review_previous_verdict: r.review.previous_verdict, review_outcome: r.review.outcome } : {}),
       });
+      // The brief is rebuilt from the answers by the page that opens it. The link is made here and stored nowhere.
+      const briefUrl = briefUrlFor(a, r, new Date().toISOString().slice(0, 10), { include_proposal: a?.brief_includes_proposal === true });
       const verdict = {
         bvf_version: BVF_VERSION,
         classification: s.classification,
@@ -1299,6 +1436,8 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         work_architecture: s.work_architecture,
         audit: s.audit,
         value_note: s.value_note,
+        ...(s.provenance ? { provenance: s.provenance } : {}),
+        ...(briefUrl ? { brief_url: briefUrl } : {}),
         ...(advisory ? { advisory_next_step: advisory } : {}),
         ...(feedback ? { feedback } : {}),
       };
@@ -1724,11 +1863,19 @@ export function createAibvfServer(options: { entryRoute?: EntryRoute; telemetry?
   const server = new Server(
     { name: 'io.github.Craig-Horton/aibvf-mcp', title: 'AI BVF', version: VERSION },
     {
-      capabilities: { tools: {} },
-      instructions: 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. It fills in no score and gives no euro figure, so never set confirmed, pick an answer or state a euro benefit on behalf of the user. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.',
+      capabilities: { tools: {}, prompts: {} },
+      instructions: SERVER_INSTRUCTIONS,
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, LIST_TOOLS_HANDLER);
+  server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: PROMPTS }));
+  server.setRequestHandler(GetPromptRequestSchema, async (req: any) => {
+    if (req.params?.name !== AGENT_PROMPT.name) throw new Error(`Unknown prompt: ${String(req.params?.name)}. The only prompt is ${AGENT_PROMPT.name}.`);
+    return {
+      description: AGENT_PROMPT.description,
+      messages: [{ role: 'user', content: { type: 'text', text: AGENT_BRIEF } }],
+    };
+  });
   server.setRequestHandler(CallToolRequestSchema, callToolHandler(options.entryRoute ?? 'unknown', options.telemetry));
   return server;
 }

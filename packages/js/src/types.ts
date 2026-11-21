@@ -441,6 +441,29 @@ export interface AssessContext {
 }
 
 /** Plain-English front door for one proposed AI investment. */
+/** Words an agent found, and where it found them. */
+export interface AssessEvidence {
+  /** The words as written in the source, quoted exactly. */
+  quote: string;
+  /** Where the words were found: the document, message or record, with its date where known. */
+  source: string;
+}
+
+/** Who chose the answers: a person, or an agent working alone from evidence it can quote. */
+export type AssessAnsweredBy = 'owner' | 'evidence';
+
+/** What happened to an initiative after its last verdict, as one of five fixed answers. */
+export type AssessReviewOutcome = 'delivering' | 'falling_short' | 'fixed_then_went_ahead' | 'paused_or_stopped' | 'no_decision';
+
+export interface AssessReview {
+  /** The verdict the initiative received at its last assessment. */
+  previous_verdict: Classification;
+  /** What happened since that verdict. */
+  outcome: AssessReviewOutcome;
+  /** In evidence mode: the words that show the outcome, and where they were found. */
+  evidence?: AssessEvidence;
+}
+
 export interface AssessInitiativeInput {
   proposal: string;
   industry?: string;
@@ -449,8 +472,22 @@ export interface AssessInitiativeInput {
   employees?: number;
   /** True once the user has confirmed how the proposal was read. */
   confirmed?: boolean;
-  /** The user's answers to the guided questions, by question id. */
+  /** The answers to the guided questions, by question id. */
   answers?: Partial<Record<AssessQuestionId, AssessChoiceId>>;
+  /**
+   * Who chose the answers. Omit it, or pass 'owner', when a person answered.
+   * Pass 'evidence' when an agent working alone answered from evidence it can quote.
+   */
+  answered_by?: AssessAnsweredBy;
+  /**
+   * Evidence by question id. In evidence mode an answer of a to d counts only
+   * with its quote and source. Without them the answer is counted as not known.
+   * An answer that rests on more than one document takes a list of up to three
+   * quotes, each with its own source.
+   */
+  evidence?: Partial<Record<AssessQuestionId, AssessEvidence | AssessEvidence[]>>;
+  /** At a review: the earlier verdict and what happened since. It is echoed back and never changes the verdict. */
+  review?: AssessReview;
   /** For callers that already hold 0 to 100 pillar scores. A supplied score takes precedence over an answer. */
   scores?: Partial<PillarScores>;
   signal_completeness?: number;
@@ -474,6 +511,8 @@ export interface AssessQuestion {
   choices?: AssessChoice[];
   /** The input field that carries the answer on the next call. */
   answer_in: string;
+  /** Guided questions only: where the answer is usually written down. */
+  where_to_look?: string;
   /** Guided questions only: position in the sequence. */
   number?: number;
   of_at_most?: number;
@@ -488,6 +527,8 @@ export interface AssessDecider {
   why: string;
   /** The input field that carries the answer on the next call. */
   answer_in: string;
+  /** Where the answer is usually written down. */
+  where_to_look: string;
 }
 
 /** What the user answered, with the published score the answer carries. */
@@ -496,6 +537,8 @@ export interface AssessAnswer {
   label: string;
   /** Absent for work_architecture, which is four checks and carries no score. */
   score?: number;
+  /** Evidence mode only: the words the answer rests on, and where they were found. One entry per quote. */
+  evidence?: AssessEvidence[];
 }
 
 /** One answer that keeps the initiative from a go-ahead. */
@@ -509,8 +552,10 @@ export interface AssessHoldingBack {
   answer: string;
   /** What the answer has to become to clear the bar. */
   needed: string;
-  /** Present when the proposal's own words contradict this answer: the words as written. */
+  /** Present when the proposal or the evidence contradicts this answer: the words as written. */
   proposal_words?: string;
+  /** Evidence mode only: the words this answer rests on, and where they were found. One entry per quote. */
+  evidence?: AssessEvidence[];
 }
 
 /**
@@ -521,12 +566,14 @@ export interface AssessContradiction {
   id: AssessQuestionId;
   /** The published phrase rule that fired. */
   rule: string;
-  /** The words as written in the proposal. */
+  /** The words as written in the proposal, or in the evidence given for this answer. */
   proposal_words: string;
   /** What those words say about the initiative. */
   proposal_says: string;
   /** What the user answered. */
   answer: string;
+  /** Where the words were found. Absent means the proposal. */
+  found_in?: 'proposal' | 'evidence';
 }
 
 /**
@@ -557,6 +604,16 @@ export interface AssessVerdict {
   audit: AuditRecord;
   /** Why no euro figure is given. */
   value_note: string;
+  /** Evidence mode only: who answered, in one plain sentence to show beside the verdict. */
+  provenance?: AssessProvenance;
+}
+
+export interface AssessProvenance {
+  answered_by: 'evidence';
+  /** Say this with the verdict. */
+  statement: string;
+  /** How many answers carried a quote and a source. */
+  answers_with_evidence: number;
 }
 
 /**
@@ -591,6 +648,18 @@ export interface AssessInitiativeResult {
   /** Present when the context carries a condition the user must meet first. */
   warning?: string;
   verdict?: AssessVerdict;
+  /** Echoed when an agent answered from evidence. */
+  answered_by?: 'evidence';
+  /** Evidence mode only: answers that came without a quote and a source. Each was counted as not known. */
+  evidence_missing?: AssessQuestionId[];
+  /** Present when a review was passed: the earlier verdict and what happened since. */
+  review?: AssessReviewRecord;
+}
+
+export interface AssessReviewRecord extends AssessReview {
+  /** False when an agent gave an outcome with no evidence. An outcome without evidence is not kept. */
+  accepted: boolean;
+  note: string;
 }
 
 /** Result of mapping free text onto the canonical taxonomy. */

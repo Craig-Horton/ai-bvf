@@ -1,0 +1,10 @@
+From: Mira Aalto
+To: Jonas Reed, Head of Finance Operations
+Date: 5 November 2026
+Subject: FW: LedgerLight for invoice matching
+
+Jonas, this could be worth a look for accounts payable.
+
+We do not know yet what it costs to run, and nobody has tested their touch-reduction figures on our invoices. Can you find out before we spend time on a trial?
+
+Mira

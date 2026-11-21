@@ -39,12 +39,18 @@ export interface PlainResultInput {
   workUnknown: boolean;
   /** Where the proposal's words contradict a favourable answer. */
   contradictions?: AssessContradiction[];
+  /** 'evidence' when an agent answered from evidence it quoted. The wording then speaks of the evidence, not of "your answers". */
+  answeredBy?: 'owner' | 'evidence';
 }
 
 /** What a contradicted answer needs, and the step that settles it. */
 export const CONTRADICTION_NEEDED = 'The proposal and the answer have to agree. Change whichever one is wrong.';
-export function contradictionStep(words: string): string {
-  return `Your proposal says "${words}" and your answer says otherwise. Settle which one is true, then answer again.`;
+export const EVIDENCE_CONTRADICTION_NEEDED = 'The evidence and the answer have to agree. Change whichever one is wrong.';
+export function contradictionStep(words: string, foundIn: 'proposal' | 'evidence' = 'proposal', answeredBy: 'owner' | 'evidence' = 'owner'): string {
+  if (foundIn === 'evidence') return `The evidence says "${words}" and the answer says otherwise. Settle which one is true, then answer again.`;
+  return answeredBy === 'evidence'
+    ? `The proposal says "${words}" and the answer says otherwise. Settle which one is true, then answer again.`
+    : `Your proposal says "${words}" and your answer says otherwise. Settle which one is true, then answer again.`;
 }
 
 export interface PlainResult {
@@ -75,6 +81,7 @@ export function plainResult(input: PlainResultInput): PlainResult {
       question: wording(pillar).question,
       answer: answer ? answer.label : `A score of ${supplied[pillar]} out of 100.`,
       needed: answer ? wording(pillar).c : pillar === 'governance_risk' ? 'A score of 40 or less.' : 'A score of 60 or more.',
+      ...(answer?.evidence ? { evidence: answer.evidence } : {}),
     };
   });
 
@@ -91,26 +98,32 @@ export function plainResult(input: PlainResultInput): PlainResult {
       question: wording('work_architecture').question,
       answer: answer ? answer.label : input.workUnknown || !input.workAnswered ? UNKNOWN_LABEL : `Not shown as changed: ${names.join(', ')}.`,
       needed: wording('work_architecture').d,
+      ...(answer?.evidence ? { evidence: answer.evidence } : {}),
     });
   }
 
   // A contradicted answer holds the initiative back even though its score clears.
   // When the same question already holds it back, the proposal's words are added to that entry.
-  const contradicted = new Map<AssessQuestionId, string>();
+  const foundIn = new Map<AssessQuestionId, 'proposal' | 'evidence'>();
   for (const item of input.contradictions ?? []) {
-    contradicted.set(item.id, item.proposal_words);
+    foundIn.set(item.id, item.found_in ?? 'proposal');
     const existing = holdingBack.find((held) => held.id === item.id);
     if (existing) existing.proposal_words = item.proposal_words;
     else holdingBack.push({
       id: item.id, short: QUESTION_SHORT[track][item.id], question: wording(item.id).question,
-      answer: item.answer, needed: CONTRADICTION_NEEDED, proposal_words: item.proposal_words,
+      answer: item.answer,
+      needed: item.found_in === 'evidence' ? EVIDENCE_CONTRADICTION_NEEDED : CONTRADICTION_NEEDED,
+      proposal_words: item.proposal_words,
+      ...(answers[item.id]?.evidence ? { evidence: answers[item.id]!.evidence } : {}),
     });
   }
 
   if (classification === 'Accelerate') {
     const answered = Object.keys(answers).length > 0;
     return {
-      summary: answered ? 'Go ahead. Your answers clear the bar on every question.' : 'Go ahead. Every score clears the bar.',
+      summary: input.answeredBy === 'evidence'
+        ? 'Go ahead. The evidence clears the bar on every question.'
+        : answered ? 'Go ahead. Your answers clear the bar on every question.' : 'Go ahead. Every score clears the bar.',
       holding_back: [],
       first_step: GO_AHEAD_STEP,
     };
@@ -119,8 +132,8 @@ export function plainResult(input: PlainResultInput): PlainResult {
   const first = holdingBack[0];
   const firstStep = !first
     ? GO_AHEAD_STEP
-    : first.proposal_words && first.needed === CONTRADICTION_NEEDED
-      ? contradictionStep(first.proposal_words)
+    : first.proposal_words && (first.needed === CONTRADICTION_NEEDED || first.needed === EVIDENCE_CONTRADICTION_NEEDED)
+      ? contradictionStep(first.proposal_words, foundIn.get(first.id), input.answeredBy)
     : first.id === 'work_architecture'
       ? WORK_PART_WORDING[track][stillOpen[0] ?? 'workflow_redesigned'].step
       : firstStepFor(track, first.id, input.aiTier);

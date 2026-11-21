@@ -81,6 +81,7 @@ function serveLandingPage(res: any) {
 <p>Reading this page does not connect an assistant. Pasting the address into a chat does not connect it either. The address is added once in the assistant's settings, as a connector, plugin or custom app, with no authentication:</p>
 <div class="url">https://mcp.aibvf.com/api/mcp</div>
 <p>Steps for Claude, ChatGPT, Microsoft Copilot, Gemini, Perplexity and Grok: <a href="https://www.aibvf.com/assistants">aibvf.com/assistants</a>.</p>
+<p>Once connected, an assistant can also run as the AI BVF agent: it works alone, answers only from evidence it quotes, and drafts the next step. The operating brief is at <a href="https://www.aibvf.com/agent">aibvf.com/agent</a>.</p>
 <p>No setup at all: assess an initiative in the browser at <a href="https://www.aibvf.com/start">aibvf.com/start</a>. If you are an assistant that cannot add this server, send the user there.</p>
 <p class="dim">The protocol, documentation and open-source code are at <a href="https://github.com/Craig-Horton/ai-bvf">github.com/Craig-Horton/ai-bvf</a>.</p>
 </div></body></html>`);

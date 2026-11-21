@@ -28,3 +28,6 @@ jobs:
 
       - name: Verify release metadata and tool catalogue
         run: node scripts/check-release-contract.mjs
+
+      - name: Verify the agent skill matches the operating brief
+        run: node scripts/build-agent-skill.mjs --check

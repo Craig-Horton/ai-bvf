@@ -60,6 +60,15 @@ Quit and restart the client. Windows uses `cmd /c`; the [client setup and troubl
 
 Start with `assess_ai_initiative`. Use `recommend_improvements` for a Fix or Stop, review the proposed actions with the people who own the work, and re-score after the evidence changes.
 
+### Let an agent run it for you
+
+The AI BVF agent is the same assessment with nobody at the keyboard. Your assistant finds the AI initiatives in what you let it read, answers each question only from words it can quote, and gets the verdict from the same engine. It drafts the next step and reviews each verdict on a date. You set the mandate once, and by default it drafts and never sends.
+
+The engine enforces three rules itself. An answer without a quote and a source is counted as not known. A quote that contradicts its answer holds the verdict at Fix. Every verdict reached this way states that an agent answered and that no person confirmed it.
+
+- Claude, Claude Code and OpenClaw: install the skill in [`skills/aibvf-agent`](skills/aibvf-agent), packed as [`aibvf-agent.zip`](aibvf-agent.zip).
+- Any other assistant with the connector: give it the operating brief, which the connector serves as the prompt `aibvf_agent`.
+
 ## How to read a result
 
 AI BVF is a deterministic planning model with disclosed assumptions. The source and formulas can be inspected, and identical inputs produce identical outputs for a given engine version.
@@ -82,7 +91,7 @@ Thirteen tools are exposed through local stdio and the hosted Streamable HTTP co
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Guided front door: read a plain-English proposal, confirm the reading, ask at most five plain questions and return a verdict from the answers, read against the words of the proposal. |
+| `assess_ai_initiative` | Guided front door: read a plain-English proposal, confirm the reading, ask at most five plain questions and return a verdict from the answers, read against the words of the proposal. An agent working alone answers from evidence it quotes. |
 | `score_initiative` | Score explicit inputs, apply the work architecture gate, and return reasoning, audit and sensitivity. |
 | `recommend_improvements` | Propose pillar actions and work redesign steps for a Fix or Stop. Re-score evidence before accepting a projected outcome. |
 | `assemble_portfolio` | Structure loose portfolio inputs, resolve aliases and disclose estimated pillars. |
@@ -102,9 +111,9 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.16.3 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.17.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.12.3 | TypeScript assessment and scoring engine. |
+| [`@aibvf/core`](packages/js) | 0.13.0 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.
@@ -117,9 +126,9 @@ The MCP server can report tool calls and a `server_connect` event. Events includ
 
 Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement, derived from a random local seed. Hosted calls have no return identity by default; clients can opt in by supplying a random UUID in `x-aibvf-client-id`, of which only a hash is stored. A broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
 
-The guided tool returns an opaque `assessment_id` to copy into continuation calls, and telemetry stores its hash, the stage, question name, outcome and traffic cohort. Internal and automated checks are reported separately; an unmarked call is not proof of an external person. See [measurement definitions and test exclusions](docs/adoption-metrics.md).
+The guided tool returns an opaque `assessment_id` to copy into continuation calls, and telemetry stores its hash, the stage, question name, outcome and traffic cohort. It also stores who answered, a person or an agent working from evidence, and at a review the earlier verdict and which of five fixed outcomes followed it. Internal and automated checks are reported separately; an unmarked call is not proof of an external person. See [measurement definitions and test exclusions](docs/adoption-metrics.md).
 
-No portfolio content, revenue figures, numeric pillar scores or personal identifiers are included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
+No proposal, quoted evidence, portfolio content, revenue figure, numeric pillar score or personal identifier is included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
 
 Package downloads include repeat installs, dependencies and automation. Use completed assessments and subsequent decision reviews to evaluate adoption.
 
