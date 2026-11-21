@@ -7,7 +7,7 @@ import {
   FIRST_STEP, GO_AHEAD_STEP, QUESTION_SHORT, UNKNOWN_LABEL, WORDING, WORK_PARTS, WORK_PART_WORDING,
 } from './guidedQuestions.js';
 import type {
-  AssessAnswer, AssessHoldingBack, AssessQuestionId, AssessTrack, Classification, PillarScores,
+  AssessAnswer, AssessContradiction, AssessHoldingBack, AssessQuestionId, AssessTrack, Classification, PillarScores,
   WorkArchitectureAssessment,
 } from './types.js';
 
@@ -35,6 +35,14 @@ export interface PlainResultInput {
   workAnswered: boolean;
   /** True when the user answered the work question with "I do not know yet". */
   workUnknown: boolean;
+  /** Where the proposal's words contradict a favourable answer. */
+  contradictions?: AssessContradiction[];
+}
+
+/** What a contradicted answer needs, and the step that settles it. */
+export const CONTRADICTION_NEEDED = 'The proposal and the answer have to agree. Change whichever one is wrong.';
+export function contradictionStep(words: string): string {
+  return `Your proposal says "${words}" and your answer says otherwise. Settle which one is true, then answer again.`;
 }
 
 export interface PlainResult {
@@ -84,6 +92,19 @@ export function plainResult(input: PlainResultInput): PlainResult {
     });
   }
 
+  // A contradicted answer holds the initiative back even though its score clears.
+  // When the same question already holds it back, the proposal's words are added to that entry.
+  const contradicted = new Map<AssessQuestionId, string>();
+  for (const item of input.contradictions ?? []) {
+    contradicted.set(item.id, item.proposal_words);
+    const existing = holdingBack.find((held) => held.id === item.id);
+    if (existing) existing.proposal_words = item.proposal_words;
+    else holdingBack.push({
+      id: item.id, short: QUESTION_SHORT[track][item.id], question: wording[item.id].question,
+      answer: item.answer, needed: CONTRADICTION_NEEDED, proposal_words: item.proposal_words,
+    });
+  }
+
   if (classification === 'Accelerate') {
     const answered = Object.keys(answers).length > 0;
     return {
@@ -96,6 +117,8 @@ export function plainResult(input: PlainResultInput): PlainResult {
   const first = holdingBack[0];
   const firstStep = !first
     ? GO_AHEAD_STEP
+    : first.proposal_words && first.needed === CONTRADICTION_NEEDED
+      ? contradictionStep(first.proposal_words)
     : first.id === 'work_architecture'
       ? WORK_PART_WORDING[track][stillOpen[0] ?? 'workflow_redesigned'].step
       : FIRST_STEP[track][first.id];

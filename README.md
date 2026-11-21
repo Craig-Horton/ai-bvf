@@ -82,7 +82,7 @@ Thirteen tools are exposed through local stdio and the hosted Streamable HTTP co
 
 | Tool | Purpose |
 |---|---|
-| `assess_ai_initiative` | Guided front door: read a plain-English proposal, confirm the reading, ask at most five plain questions and return a verdict from the answers only. |
+| `assess_ai_initiative` | Guided front door: read a plain-English proposal, confirm the reading, ask at most five plain questions and return a verdict from the answers, read against the words of the proposal. |
 | `score_initiative` | Score explicit inputs, apply the work architecture gate, and return reasoning, audit and sensitivity. |
 | `recommend_improvements` | Propose pillar actions and work redesign steps for a Fix or Stop. Re-score evidence before accepting a projected outcome. |
 | `assemble_portfolio` | Structure loose portfolio inputs, resolve aliases and disclose estimated pillars. |
@@ -102,9 +102,9 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.15.4 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.16.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.11.2 | TypeScript assessment and scoring engine. |
+| [`@aibvf/core`](packages/js) | 0.12.0 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.

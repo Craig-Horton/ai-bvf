@@ -2,6 +2,18 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.16.0 (aibvf-mcp), 0.12.0 (@aibvf/core), 21 November 2026
+
+Changed: the guided verdict reads the proposal against the answers. An independent review showed that a proposal describing AI approving loans with no human review earned a go-ahead when the best answer was picked on every question. Fixed phrases in the proposal that contradict a favourable answer now hold the verdict at Fix.
+
+Added: `contradictions` on the front-door verdict. Each entry quotes the words from the proposal beside the answer they contradict, and `holding_back` carries the same words in `proposal_words`. The first step asks the user to settle which one is true. A contradiction never changes a score.
+
+Added: `readProposal` and `PROPOSAL_RULES` in `@aibvf/core`. Five published phrase rules, one per question: no human check, return not worked out, no named result, no owner or time, work left unchanged. No model reads the text. A phrase negated in the same clause is skipped, and each rule that fires is named in the audit record.
+
+Changed: every MCP tool checks its arguments against its published schema before any calculation. A score of 900, revenue written as text, an unknown industry or a missing required field is declined with the field named. Before this release a score of 900 returned a decision confidence above 100, and `diagnose_process` returned a verdict from one field of eleven. `assemble_portfolio` keeps its own handling, which reports each unusable entry as an issue.
+
+Scope: thresholds, answer scores, the planning range and the 13-tool catalogue are unchanged. A verdict that was Fix or Stop is unchanged. An Accelerate stays an Accelerate unless the proposal contradicts an answer it rests on. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.15.4 (aibvf-mcp), 0.11.2 (@aibvf/core), 21 November 2026
 
 Changed: telemetry records a declined input as `refused`. `infer_readiness` with fewer than two signals and `sequence_portfolio` without an organisation or initiatives decline by design, and each one was counted as an `error`. In the first five days of 0.15.3 the hosted endpoint logged 65 errors in 267 public calls, 41 of them these two refusals from automated callers sending only the required fields.

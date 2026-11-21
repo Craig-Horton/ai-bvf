@@ -27,3 +27,6 @@ export { INDUSTRIES, FUNCTIONS, AI_TIERS, READINESS, INDUSTRY_LABEL, FUNCTION_LA
 export type * from './types.js';
 
 export const BVF_VERSION = '1.0';
+export { readProposal, PROPOSAL_RULES } from './proposalReading.js';
+export type { ProposalFinding, ProposalRule } from './proposalReading.js';
+export { CONTRADICTION_NEEDED, contradictionStep } from './plainResult.js';
