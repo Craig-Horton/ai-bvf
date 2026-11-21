@@ -18,7 +18,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.15.3';
+export const VERSION = '0.15.4';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -139,6 +139,18 @@ function feedbackFor(classification: string, industry?: string): { question: str
   return undefined;
 }
 
+/** A fault inside the server, as opposed to an input the tools decline. */
+export class InternalFault extends Error {}
+
+/**
+ * The engine refuses incomplete or invalid input with a plain Error and a
+ * message that names what is missing. Telemetry records those as refused,
+ * so a deliberate refusal is never counted as a failure of the tool.
+ */
+export function isInputRefusal(err: unknown): boolean {
+  return err instanceof Error && err.constructor === Error;
+}
+
 export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
   if (TELEMETRY_DISABLED || !TELEMETRY_DEFAULT_URL || !TELEMETRY_DEFAULT_KEY) return;
   const payload = {
@@ -152,7 +164,7 @@ export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
     activity_cohort: activityCohort(meta),
     assessment_hash: opaqueId(meta.assessmentId) ? hashId('aibvf-mcp-assessment', opaqueId(meta.assessmentId)!) : null,
     question_key: ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'].includes(String(meta.question_key)) ? meta.question_key : null,
-    outcome: ['ok', 'error'].includes(String(meta.outcome)) ? meta.outcome : 'ok',
+    outcome: ['ok', 'error', 'refused'].includes(String(meta.outcome)) ? meta.outcome : 'ok',
     user_role: meta.entry_route === 'stdio' ? configuredUsageRole() : null,
     entry_route: meta.entry_route ?? 'unknown',
     assessment_stage: meta.assessment_stage ?? null,
@@ -1608,7 +1620,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
             && typeof raw.function === 'string' && typeof raw.ai_tier === 'string'
             && mapToTaxonomy({ function: raw.function }).function?.resolved === initiative.function
             && mapToTaxonomy({ ai_tier: raw.ai_tier }).ai_tier?.resolved === initiative.ai_tier);
-          if (index < 0) throw new Error('Could not retain the source evidence for an assembled initiative.');
+          if (index < 0) throw new InternalFault('Could not retain the source evidence for an assembled initiative.');
           sourceIndex = index + 1;
           const original = a.initiatives[index];
           const estimated = r.estimated_pillars[initiative.id] ?? [];
@@ -1635,7 +1647,10 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
 
     throw new Error(`Unknown tool: ${name}`);
   } catch (err) {
-    if (TOOLS.some(tool => tool.name === name)) await recordCall(name, { outcome: 'error', assessment_stage: 'error' });
+    // A plain Error is the engine or a handler declining an input it will not
+    // guess at. Anything else (TypeError, RangeError, InternalFault) is a fault.
+    const outcome = isInputRefusal(err) ? 'refused' : 'error';
+    if (TOOLS.some(tool => tool.name === name)) await recordCall(name, { outcome, assessment_stage: outcome });
     const msg = err instanceof Error ? err.message : String(err);
     return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
   }
