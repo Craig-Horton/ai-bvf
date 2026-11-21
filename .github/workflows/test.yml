@@ -31,3 +31,6 @@ jobs:
 
       - name: Verify the agent skill matches the operating brief
         run: node scripts/build-agent-skill.mjs --check
+
+      - name: Verify the deep dive script counts the example log
+        run: node --test skills/aibvf-deep-dive/scripts/measure.test.mjs
