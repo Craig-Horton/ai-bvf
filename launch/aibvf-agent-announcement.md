@@ -2,7 +2,7 @@
 
 Audience: senior leaders deciding on AI investment, and the transformation leads who advise them.
 
-Status: prepared for review, not posted. Post only after `@aibvf/core` 0.13.0 and `aibvf-mcp` 0.17.0 are published and `aibvf.com/agent` is live, because the post describes both.
+Status: prepared for review, not posted. `@aibvf/core` 0.13.0 and `aibvf-mcp` 0.17.0 are published and `aibvf.com/agent` is live, as of 21 November 2026.
 
 Image: `launch/aibvf-agent-card.png`, 1080 by 1350, built from `launch/aibvf-agent-card.html`.
 
@@ -16,7 +16,7 @@ Agentic personal agents are seemingly released daily, each one ready to read you
 
 So why not have an agent that helps you decide which of those ideas to accelerate, which to fix and which to stop, with guides and guardrails?
 
-That agent is live today as the AI BVF agent, and it runs inside the assistant you already use. You set its mandate once, what it may read and how far it may go, and from then on it works alone, finding the AI initiatives in your documents, answering five questions about each one only from words it can quote, and handing those answers to fixed, published rules that return the verdict.
+That agent is live today as the AI BVF agent, and it runs inside the AI chat app you already use. You set its mandate once, what it may read and how far it may go, and from then on it works alone, finding the AI initiatives in your documents, answering five questions about each one only from words it can quote, and handing those answers to fixed, published rules that return the verdict.
 
 I tested it on a company I made up, a 400-person online retailer with three AI ideas sitting in its mail and its minutes, and I gave the agent nothing except permission to read. It came back with a Fix for the customer service agent, because the steering minutes said "Refund limits to be agreed after the pilot", a Stop for a marketing agent that would send discounts with "no cap on the discount" and no approval step, and a plain statement that it could not judge the third idea because nobody had written down what it costs or who owns it.
 
@@ -26,15 +26,15 @@ The vendor's email carried one more line, addressed to any AI assistant that rea
 
 I then moved the calendar on six weeks and added the documents a firm like that would have produced in the meantime, and on its next check the agent found two reviews due in its own register, read what was new, and moved the customer service agent from Fix to Accelerate because the minutes now named the person who approves any refund above the limits and can switch the agent off. It recorded beside each earlier verdict what had happened since, which is how the facts on whether a Fix or a Stop was right begin to accumulate.
 
-The company is synthetic and the run is recorded in the open repository, and what decided each verdict was how much of the work around the AI had been written down: the limits, the owner, the measures. Give the agent to the assistant you already use, point it at one folder of real documents, and see where each of your AI initiatives stands: aibvf.com/agent
+The company is synthetic and the run is recorded in the open repository, and what decided each verdict was how much of the work around the AI had been written down: the limits, the owner, the measures. Give the agent to the AI chat app you already use, point it at one folder of real documents, and see where each of your AI initiatives stands: aibvf.com/agent
 
 ## Check before posting
 
-- That `aibvf.com/agent` opens, the brief copies, and the skill downloads.
-- One run in your own assistant with the connector added, so that "it runs inside the assistant you already use" is something you have seen and not only something I tested here. Here it was tested with fresh Claude agents against the engine as built in this repository.
-- That the hosted connector answers in evidence mode: ask the assistant to run the agent on any document and check that the verdict carries the line "An agent answered these questions from evidence it quoted."
+- That `aibvf.com/agent` opens and the brief copies. Checked on the live site on 21 November.
+- One run in your own AI chat app with the connector added, so that "it runs inside the AI chat app you already use" is something you have seen. On 21 November a fresh Claude session ran it through the live connector, with only the brief from the page and the ten Halden files. The connector's own record shows Stop, Fix and one it could not judge, as written down before the run. The quotes of that run were not checked.
+- Only Claude has run the agent. ChatGPT, Copilot, Gemini, Perplexity and Grok have not.
 - The quotes in the post against `examples/agent-run/halden` and `examples/agent-run/arrives-later`.
-- The six weeks were moved on by hand in the test. No schedule fired. Say "in the test" if anyone asks, and do not claim a scheduled run until you have seen one in your own assistant.
+- The six weeks were moved on by hand in the test. No schedule has been seen firing. Say "in the test" if anyone asks, and do not claim a scheduled run until you have seen one in your own AI chat app.
 
 ## Publication boundary
 
@@ -52,7 +52,7 @@ So why not have an agent that helps you decide which ideas to accelerate, which 
 
 ### What I built
 
-The AI BVF agent runs inside the assistant you already use. You set its mandate once, what it may read and how far it may go, and from then on it works alone.
+The AI BVF agent runs inside the AI chat app you already use. You set its mandate once, what it may read and how far it may go, and from then on it works alone.
 
 On each run it finds the AI initiatives in what you let it read, gathers the words that answer five questions about each one, and hands those answers to fixed, published rules that return Accelerate, Fix or Stop. It then drafts the next step for you, sets a review date and comes back on that date without being asked.
 
@@ -90,6 +90,6 @@ The company is made up, and there is no record yet of how these verdicts compare
 
 ### Where to start
 
-- Give the agent to the assistant you already use and let it read one folder of real documents: aibvf.com/agent
+- Give the agent to the AI chat app you already use and let it read one folder of real documents: aibvf.com/agent
 - Read its first report with the person who owns the initiative it held or stopped.
 - Write down the one thing it says is missing, and let it come back in six weeks.
