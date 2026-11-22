@@ -83,6 +83,49 @@ test('numeric scores are refused in evidence mode', () => {
   assert.throws(() => assessInitiative({ ...base, answered_by: 'me' as any }), /owner or evidence/);
 });
 
+test('the refusal of the four work checks says how to answer instead', () => {
+  assert.throws(
+    () => assessInitiative({ ...base, work_architecture: { workflow_redesigned: true } }),
+    /answer work_architecture in answers with a to d, and quote it in evidence/,
+  );
+});
+
+test('an agent is shown every open question with its choices, so it answers all five in one call', () => {
+  const first = assessInitiative(base);
+  assert.equal(first.status, 'not_enough_to_judge');
+  assert.deepEqual(first.open_questions?.map((q) => q.id).sort(), ['change_enablement', 'financial_return', 'governance_risk', 'strategic_alignment', 'work_architecture']);
+  for (const q of first.open_questions!) {
+    assert.deepEqual(q.choices.map((c) => c.id), ['a', 'b', 'c', 'd', 'unknown'], `${q.id} lists its choices`);
+    assert.ok(q.where_to_look.length > 20, `${q.id} says where to look`);
+    assert.equal(q.answer_in, `answers.${q.id}`);
+  }
+  // The four pillars alone give the verdict. The question on how the work changes stays open, and says so.
+  const { work_architecture: _work, ...four } = ANSWERS;
+  const judged = assessInitiative({ ...base, answers: four, evidence: QUOTES });
+  assert.equal(judged.status, 'verdict');
+  assert.deepEqual(judged.open_questions?.map((q) => q.id), ['work_architecture']);
+  assert.equal(judged.verdict!.answers_given.work_architecture, undefined);
+  // Answered from the choices shown, it is kept with its quote and the verdict stands.
+  const full = assessInitiative({ ...base, answers: ANSWERS, evidence: QUOTES });
+  assert.equal(full.open_questions, undefined);
+  assert.equal(full.verdict!.classification, judged.verdict!.classification);
+  assert.deepEqual(full.verdict!.answers_given.work_architecture?.evidence, [QUOTES.work_architecture]);
+});
+
+test('a question answered unknown, or with no quote, stays in the open list', () => {
+  const result = assessInitiative({ ...base, answers: { ...ANSWERS, work_architecture: 'unknown', change_enablement: 'c' }, evidence: { ...QUOTES, change_enablement: undefined as any } });
+  assert.deepEqual(result.open_questions?.map((q) => q.id), ['change_enablement', 'work_architecture']);
+});
+
+test('a person is asked one question at a time and never sees the open list', () => {
+  const result = assessInitiative({ proposal: PROPOSAL, confirmed: true });
+  assert.equal(result.status, 'not_enough_to_judge');
+  assert.equal(result.open_questions, undefined);
+  const judged = assessInitiative({ proposal: PROPOSAL, confirmed: true, answers: { financial_return: 'c', governance_risk: 'b', strategic_alignment: 'c', change_enablement: 'c' } });
+  assert.equal(judged.status, 'verdict');
+  assert.equal(judged.open_questions, undefined);
+});
+
 test('evidence that says the opposite of its answer holds the verdict at Fix', () => {
   const all = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'd', change_enablement: 'd', work_architecture: 'd' } as const;
   const clean = assessInitiative({ ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: all, evidence: QUOTES });
@@ -189,7 +232,7 @@ test('the brief link carries the answers and the evidence, and nothing is stored
 });
 
 test('the operating brief names the tool fields it relies on and keeps the house voice', () => {
-  for (const field of ['assess_ai_initiative', 'answered_by', 'evidence', 'confirmed', 'where_to_look', 'brief_url', 'review', 'unknown']) {
+  for (const field of ['assess_ai_initiative', 'answered_by', 'evidence', 'confirmed', 'where_to_look', 'open_questions', 'brief_url', 'review', 'unknown']) {
     assert.ok(AGENT_BRIEF.includes(field), `the brief does not mention ${field}`);
   }
   assert.ok(AGENT_BRIEF.includes(AGENT_CONNECTOR_URL));

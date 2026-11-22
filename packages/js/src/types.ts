@@ -531,6 +531,11 @@ export interface AssessDecider {
   where_to_look: string;
 }
 
+/** Evidence mode: a question still without an answer, with the choices to answer it from. */
+export interface AssessOpenQuestion extends AssessDecider {
+  choices: AssessChoice[];
+}
+
 /** What the user answered, with the published score the answer carries. */
 export interface AssessAnswer {
   choice: Exclude<AssessChoiceId, 'unknown'>;
@@ -652,6 +657,12 @@ export interface AssessInitiativeResult {
   answered_by?: 'evidence';
   /** Evidence mode only: answers that came without a quote and a source. Each was counted as not known. */
   evidence_missing?: AssessQuestionId[];
+  /**
+   * Evidence mode only: every guided question still without an answer, each with
+   * its choices, so an agent can answer them all in one call. On a verdict,
+   * nothing waits on them.
+   */
+  open_questions?: AssessOpenQuestion[];
   /** Present when a review was passed: the earlier verdict and what happened since. */
   review?: AssessReviewRecord;
 }
