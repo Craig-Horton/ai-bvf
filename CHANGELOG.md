@@ -14,6 +14,10 @@ Changed: the refusal of the four work checks in evidence mode says what to do: a
 
 Changed: the operating brief is version 2. It tells the agent to answer all five questions in one call. The tool description, the server instructions and the skill in `skills/aibvf-agent` say the same, and `aibvf-agent.zip` is rebuilt.
 
+Changed: a Fix or Stop verdict no longer offers a call. `advisory_next_step` read "Book a 20-minute teardown", with a booking address and an email address. It now reads "Every rule behind this Fix verdict is published. Read the method and the code", with the address of this repository. The field keeps its name so that existing callers do not break.
+
+Why: AI BVF is free and its author earns nothing from it. A tool that judges an initiative and then offers a call reads as a sales route.
+
 Scope: a person is still asked one question at a time and never sees `open_questions`. The score each answer carries, the thresholds, the stop rules, the order of the questions and the 13-tool catalogue are unchanged. The same answers give the same verdict as before. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
 
 ## 0.18.0 (aibvf-mcp), 0.14.0 (@aibvf/core), 21 November 2026

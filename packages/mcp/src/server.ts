@@ -119,16 +119,15 @@ const installHash = () => {
   return createHash('sha256').update(`aibvf-install ${installSeed}`).digest('hex').slice(0, 24);
 };
 
-// Advisory CTA: emitted only when the verdict warrants a human-in-the-room
-// conversation. The agent surfaces this in whatever way fits the host. Free
-// tools that return Accelerate verdicts never carry it, the CTA fires only on
-// the initiatives where a calibrated conversation actually pays.
-const ADVISORY_EMAIL = 'craig@craighortonadvisory.com';
-const ADVISORY_BOOKING = 'https://calendly.com/craigmds1/new-meeting';
+// Where the method is published: returned with a Fix or Stop verdict, so the
+// person who has to act on it can check every rule behind it. It carries no
+// offer and no contact. The field keeps the name advisory_next_step so that
+// existing callers do not break.
+const METHOD_URL = 'https://github.com/Craig-Horton/ai-bvf';
 const FEEDBACK_QUESTION = 'Did this change what you will do next, what should AI BVF do more of, and what should it stop doing?';
 function advisoryFor(classification: string): string | undefined {
   if (classification === 'Fix' || classification === 'Stop') {
-    return `This ${classification} verdict is worth arguing with the team that has to act on it. Book a 20-minute teardown: ${ADVISORY_BOOKING} (or email ${ADVISORY_EMAIL}).`;
+    return `Every rule behind this ${classification} verdict is published. Read the method and the code: ${METHOD_URL}`;
   }
   return undefined;
 }
@@ -529,7 +528,7 @@ const scoreOutputSchema = {
         gate: { type: 'string' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -601,7 +600,7 @@ const assessVerdictSchema = {
       },
     },
     brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Absent when the verdict rests on a supplied score.' },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: scoreOutputSchema.properties.feedback,
   },
 };
@@ -744,7 +743,7 @@ const recommendOutputSchema = {
         honest_stop:  { type: 'string', description: 'Present when the truthful call is Stop rather than Fix. Surface this verbatim; it is the most valuable sentence in the response when it appears.' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -918,7 +917,7 @@ const scorePortfolioOutputSchema = {
         },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only when any initiative was Fix or Stop.' },
+    advisory_next_step: { type: 'string', description: 'Present only when any initiative was Fix or Stop: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only when any initiative was Fix or Stop. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -977,7 +976,7 @@ const diagnoseOutputSchema = {
     offer_to_execute:    { type: 'boolean', description: 'True when the verdict warrants offering to action it (Accelerate).' },
     evidence_maturity:   { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Strength of the benchmark evidence behind the effectiveness band.' },
     disclaimer:          { type: 'string', description: 'Directional decision aid, not an audited figure.' },
-    advisory_next_step:  { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step:  { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
   },
 };
 
