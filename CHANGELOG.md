@@ -2,6 +2,16 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.19.0 (aibvf-mcp), 22 November 2026
+
+Changed: the field `advisory_next_step` is now `method_note`. It carries the same line as before: where the method and the code are published. A caller that read the old name has to read the new one.
+
+Why: AI BVF is a personal project, built in Craig Horton's own time. Nothing in it offers a service, so nothing in its output should be named as if it did.
+
+Changed: two tool descriptions no longer speak of advisory use. The package READMEs and the repository say "a personal project by Craig Horton, built in his own time".
+
+Scope: one field renamed in the output of five tools. No verdict, score, threshold or rule changes. `@aibvf/core` stays at 0.14.1, and the 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.18.1 (aibvf-mcp), 0.14.1 (@aibvf/core), 22 November 2026
 
 Added: `open_questions` on `assess_ai_initiative` in evidence mode. It lists every guided question still without an answer, each with its choices and where to look. An agent working alone reads all five on its first call and answers them in one call.

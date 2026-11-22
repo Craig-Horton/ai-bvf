@@ -2,7 +2,7 @@
 
 Assess one AI investment proposal and return Stop, Fix or Accelerate with the evidence gaps and next actions. Thirteen tools support assessment, work design checks and portfolio review.
 
-> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · [Try an assessment](https://www.aibvf.com/start) · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton](https://linkedin.com/in/Craig-Horton-ai)
+> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · [Try an assessment](https://www.aibvf.com/start) · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · A personal project by [Craig Horton](https://linkedin.com/in/Craig-Horton-ai), built in his own time
 
 ## No install: use it on claude.ai
 

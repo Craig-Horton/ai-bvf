@@ -51,7 +51,7 @@ Accepted:
 
 The difference: no em-dash, no "not A, it is B", the question asked straight.
 
-## Personal brand visual identity (Craig Horton Advisory artefacts)
+## Personal brand visual identity (Craig Horton's own artefacts)
 
 For artefacts in Craig's own name: Brief PDFs, decks, one-pagers. Distinct from the AI BVF product brand, which lives in the `aibvf-design` skill (copper on deep navy, Playfair Display). Do not mix the two.
 

@@ -69,7 +69,7 @@ Documentation that promises a result should include explicit inputs and a reprod
 
 Code contributions follow the repository source license. Specification changes follow the license of the specification being changed, and a contributor must have the right to submit the material.
 
-Existing references to a proprietary benchmark corpus concern a separate contribution route requiring a written agreement with Craig Horton Advisory. Before submitting material through that route, ask the maintainer to identify the corpus and the terms for the particular material.
+Existing references to a proprietary benchmark corpus concern a separate contribution route requiring a written agreement with Craig Horton. Before submitting material through that route, ask the maintainer to identify the corpus and the terms for the particular material.
 
 Public source corrections, bug reports and discussion of the disclosed constants can use the ordinary repository process. This guide does not add restrictions to rights already granted by LICENSE or NOTICE, and it does not grant rights to separately licensed material or certification marks.
 

@@ -4,7 +4,7 @@ The brand and UI system for **AI BVF (the AI Business Value Framework)** by **Cr
 
 One engine, three surfaces: `@aibvf/core` (TypeScript scoring engine), `aibvf-mcp` (MCP server, twelve tools for agents, hosted connector at mcp.aibvf.com), and `aibvf-check` (CI/CD pre-flight gate — "SonarQube for AI").
 
-This design system unifies the product surfaces onto **one accent (copper) on deep navy**, correcting the multi-colour drift that had crept into the live pages. Serif display, executive/advisory tone.
+This design system unifies the product surfaces onto **one accent (copper) on deep navy**, correcting the multi-colour drift that had crept into the live pages. Serif display, executive tone.
 
 ## Sources
 
@@ -69,7 +69,7 @@ Brand seed (from the logo): deep navy `#0F1E35` + copper `#B87333`, serif displa
 
 ## Iconography
 
-The source product is **near-iconless by design** — an executive/advisory aesthetic that avoids icon clutter. Its visual signals are typographic and geometric rather than pictographic:
+The source product is **near-iconless by design** — an executive aesthetic that avoids icon clutter. Its visual signals are typographic and geometric rather than pictographic:
 
 - **The RAG dot** — a small glowing filled circle in the verdict colour (see `VerdictBadge`). This is the most-used "icon" in the system.
 - **Copper hairline rules** — thin lines and the 3px left-rule stand in for section iconography.
