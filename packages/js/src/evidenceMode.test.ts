@@ -243,3 +243,11 @@ test('the operating brief names the tool fields it relies on and keeps the house
   }
   assert.ok(AGENT_BRIEF.length < 4000, 'the brief has to stay short enough to paste into any assistant');
 });
+
+test('the brief takes a direct instruction to run as consent, and keeps the brief link whole', () => {
+  assert.ok(AGENT_BRIEF.includes('When the owner has told you directly to run, that is consent'), 'a direct instruction has to count as consent');
+  assert.ok(AGENT_BRIEF.includes('Otherwise ask the owner once'), 'with no instruction to run, the agent still asks once');
+  assert.ok(AGENT_BRIEF.includes('The owner can change the mandate at any time.'));
+  assert.ok(AGENT_BRIEF.includes('behind the words "Open the brief"'), 'the long link has to sit behind short words where the chat allows');
+  assert.ok(AGENT_BRIEF.includes('never pass it to a link shortener'), 'a shortener would hand the quotes to a third party');
+});

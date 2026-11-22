@@ -47,7 +47,7 @@ Run in a live OpenClaw on Windows on 21 November 2026, with the connector and th
 1. Add the skill. In the Control UI open Plugins, then Skills, and import [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/raw/main/aibvf-agent.zip). From a terminal, unzip it and run `openclaw skills install ./aibvf-agent`.
 2. Add the connector. In the Control UI open Settings, then MCP, then Add server. Choose Streamable HTTP, name it `aibvf` and paste `https://mcp.aibvf.com/api/mcp`.
    In the Windows app, open Config, then Mcp, and paste this into the box under MCP Servers, then save: `{"aibvf": {"url": "https://mcp.aibvf.com/api/mcp", "transport": "streamable-http"}}`
-3. Message your agent: "Run the AI BVF agent." It states its mandate and asks once. Without the skill, the connector alone is enough: "Get the prompt aibvf_agent from the aibvf server and follow it."
+3. Message your agent: "Run the AI BVF agent." It states its mandate and goes ahead, because you told it to run. Without the skill, the connector alone is enough: "Get the prompt aibvf_agent from the aibvf server and follow it."
 4. Then: "Do this every Monday at 07:00." It schedules itself and reports in that chat.
 
 From a terminal, steps 2 and 4 are the lines below. The Gateway has to be stopped while a connector is added.
@@ -63,7 +63,7 @@ An OpenClaw agent can reach the whole computer it runs on. This skill tells it t
 
 ## The first run
 
-The agent states its mandate and asks once whether to change it:
+The agent states its mandate. When you told it to run, it goes ahead. Otherwise it asks once whether to change it:
 
 - May read: what you have connected or handed to it. Nothing else.
 - May do: draft. Send nothing, spend nothing, change no system.

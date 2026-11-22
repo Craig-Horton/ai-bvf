@@ -58,7 +58,7 @@ const FUNCTION_ALIASES: Record<string, AliasGroup> = {
 
 const INDUSTRY_ALIASES: Record<string, AliasGroup> = {
   retail: {
-    strong: ['retail', 'retailer', 'ecommerce', 'e-commerce', 'consumer goods', 'fmcg', 'grocery', 'fashion retail'],
+    strong: ['retail', 'retailer', 'ecommerce', 'e-commerce', 'online shop', 'online store', 'webshop', 'web shop', 'supermarket', 'department store', 'consumer goods', 'fmcg', 'grocery', 'fashion retail'],
     weak: ['fashion', 'shops'],
   },
   financial: {

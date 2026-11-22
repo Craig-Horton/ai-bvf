@@ -76,6 +76,11 @@ test('every plain-language proposal is read correctly or left open as a question
 
 test('a word never matches inside another word', () => {
   assert.equal(mapToTaxonomy({ industry: 'a company' }).industry?.resolved, null);
+  for (const named of ['an online shop for outdoor clothing', 'a family-run webshop', 'a regional supermarket chain', 'a department store group', 'the largest online store in the country']) {
+    assert.equal(mapToTaxonomy({ industry: named }).industry?.resolved, 'retail', named);
+  }
+  // Selling something online is said of every industry, so it names none.
+  assert.equal(mapToTaxonomy({ industry: 'sells outdoor clothing and equipment online' }).industry?.resolved, null);
   assert.equal(mapToTaxonomy({ function: 'laptops' }).function?.resolved, null);
   assert.equal(mapToTaxonomy({ industry: 'we went bankrupt' }).industry?.resolved, null);
   assert.equal(mapToTaxonomy({ industry: 'a healthy business' }).industry?.resolved, null);

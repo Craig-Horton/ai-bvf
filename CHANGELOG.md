@@ -2,6 +2,20 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.19.1 (aibvf-mcp), 0.14.2 (@aibvf/core), 22 November 2026
+
+Changed: the operating brief is version 3. A direct instruction from the owner to run now counts as consent to the mandate. The agent states the mandate and goes ahead. With no such instruction it still asks once. The owner can change the mandate at any time.
+
+Why: an outside agent reported that the brief made it ask before starting, even after its owner had said "read and run".
+
+Changed: the brief and the deep dive skill tell the agent to show the brief link and the report link behind short words, "Open the brief" and "Open the report", where the chat can do that. They forbid changing the link or passing it to a link shortener.
+
+Why: the links carry every answer and quote after the `#` sign, so they are long, and in a chat they read as noise. Nothing is stored, so there is no short link to give. A link shortener would hand the quotes to a third party.
+
+Added: six more words name retail: online shop, online store, webshop, web shop, supermarket and department store. "Sells online" names no industry, and the tool still asks.
+
+Scope: wording in the brief, the two skills and one output description, and one word list. No verdict, score, threshold or rule changes. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.19.0 (aibvf-mcp), 22 November 2026
 
 Changed: the field `advisory_next_step` is now `method_note`. It carries the same line as before: where the method and the code are published. A caller that read the old name has to read the new one.
