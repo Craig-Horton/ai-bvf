@@ -1,6 +1,6 @@
 ---
 name: aibvf-design
-description: Use this skill to generate well-branded interfaces and assets for AI BVF (the AI Business Value Framework, by Craig Horton Advisory), either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
+description: Use this skill to generate well-branded interfaces and assets for AI BVF (the AI Business Value Framework, by Craig Horton), either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for prototyping.
 user-invocable: true
 ---
 
