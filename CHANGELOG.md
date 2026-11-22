@@ -10,7 +10,7 @@ Why: waiting is the largest drag factor in almost every log of cases. On a ticke
 
 Added: the first line of `assumptions` names the rule that chose the intervention.
 
-Added: `REWORK_FLOOR`, `SHORT_WORK_HOURS` and `REPEAT_VOLUME` are exported from `@aibvf/core`. The three thresholds are Craig Horton's judgement. They are not taken from a benchmark.
+Added: the three thresholds are named constants in `packages/js/src/diagnose.ts`: `REWORK_FLOOR`, `SHORT_WORK_HOURS` and `REPEAT_VOLUME`. They are Craig Horton's judgement. They are not taken from a benchmark. They are not exported from the package root in this version.
 
 Scope: a process that fits neither new rule gets the same intervention and the same figures as before. The savings formula, the effectiveness bands, the confidence and the verdict thresholds are unchanged. The 13-tool catalogue, `assess_ai_initiative`, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
 
