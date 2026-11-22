@@ -16,5 +16,5 @@ Product surfaces (AI BVF) use the `aibvf-design` skill: copper `#B87333` on deep
 
 - Voice rules are enforced by tests: `packages/js/src/boardInstrument.test.ts` and `packages/js/src/changePlan.test.ts` fail on em-dashes and banned vocabulary in engine output.
 - Current package versions live in each `packages/*/package.json`, not in docs; when they move, update the root README table and `CHANGELOG.md` in the same change.
-- The MCP tool count is written into many surfaces: both READMEs, the stdio banner in `packages/mcp/src/index.ts`, `api/mcp.ts` (header and landing page), `index.html` (tools grid and the `og:description` meta), the design-system READMEs, and the protocol ui_kit specimens. When a tool is added, grep for the old number from the repo root, not from a subdirectory.
+- The MCP tool count is written into many surfaces: both READMEs, the stdio banner in `packages/mcp/src/index.ts`, `api/mcp.ts` (header and landing page), `developers.html` (tools grid and the `og:description` meta), the design-system READMEs, and the protocol ui_kit specimens. When a tool is added, grep for the old number from the repo root, not from a subdirectory.
 - `npm run adoption` prints the adoption snapshot (npm, PyPI, GitHub); behind a proxy it needs `NODE_USE_ENV_PROXY=1`.
