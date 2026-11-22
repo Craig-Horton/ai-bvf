@@ -61,8 +61,16 @@ function quoteIsInFiles(quote) {
 function parseReply(text) {
   const blocks = [];
   let current = null;
+  // A quote may run over more than one line. A line that starts no new item belongs to the answer above it.
+  const logical = [];
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/^[\s>*#-]+/, '').replace(/\*\*/g, '').trim();
+    if (!line) continue;
+    const startsItem = /^(INITIATIVE:|Q[1-5]:|LEFT OUT:|LINES ADDRESSED TO AN AI:)/i.test(line);
+    if (!startsItem && logical.length > 0 && /^Q[1-5]:/i.test(logical[logical.length - 1])) logical[logical.length - 1] += ` ${line}`;
+    else logical.push(line);
+  }
+  for (const line of logical) {
     const head = line.match(/^INITIATIVE:\s*(.+)$/i);
     if (head) { current = { name: head[1].trim(), answers: {} }; blocks.push(current); continue; }
     const row = line.match(/^Q([1-5]):\s*(.+)$/i);
