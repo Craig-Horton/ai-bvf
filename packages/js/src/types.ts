@@ -504,6 +504,12 @@ export interface AssessInitiativeInput {
    * the verdict. With previous_brief, the result says what changed since.
    */
   review?: AssessReview;
+  /**
+   * The funding record: what is asked for the next stage, the alternative, and
+   * the results agreed to release more money. It sits beside the verdict and
+   * never changes it. Every figure is the organisation's own.
+   */
+  funding?: AssessFundingInput;
   /** For callers that already hold 0 to 100 pillar scores. A supplied score takes precedence over an answer. */
   scores?: Partial<PillarScores>;
   signal_completeness?: number;
@@ -686,6 +692,83 @@ export interface AssessInitiativeResult {
   conflicts?: AssessConflict[];
   /** Present when a review was passed: the earlier verdict and what happened since. */
   review?: AssessReviewRecord;
+  /** Present when a funding record was passed, or the earlier brief carried one. It never changes the verdict. */
+  funding?: AssessFunding;
+}
+
+/** The stage the money is for. */
+export type FundingStage = 'pilot' | 'rollout';
+/** How a figure is known: counted from records, estimated, or not known. */
+export type FundingKind = 'measured' | 'estimate' | 'unknown';
+/** What the owner decided at a review. Recorded as one of three words, with no amount. */
+export type FundingDecision = 'released' | 'deferred' | 'withdrew';
+
+/** One result the owner agrees would release more money, written down before the work starts. */
+export interface AssessFundingThresholdInput {
+  /** What is measured, for example "Cost per resolved ticket". */
+  measure: string;
+  /** The unit, for example euros or percent. */
+  unit?: string;
+  /** at_most when lower is better, at_least when higher is better. */
+  direction: 'at_most' | 'at_least';
+  target: number;
+  /** Today's figure. */
+  baseline?: number;
+  /** measured when today's figure was counted from records. Otherwise it is an estimate. */
+  baseline_kind?: 'measured' | 'estimate';
+  /** Evidence mode: the words that record the agreement, and where they were found. */
+  evidence?: AssessEvidence;
+}
+
+export interface AssessFundingInput {
+  stage?: FundingStage;
+  /** What is asked for the next stage, in euros. */
+  ask?: { amount_eur?: number; evidence?: AssessEvidence };
+  /** The cheapest credible other route, including fixing the process as it is. */
+  alternative?: { description: string; amount_eur?: number; evidence?: AssessEvidence };
+  /** Up to three results that would release more money. */
+  thresholds?: AssessFundingThresholdInput[];
+  /** At a review: what was measured, by the name of the agreed result. */
+  results?: { measure: string; value: number; kind?: 'measured' | 'estimate'; evidence?: AssessEvidence }[];
+  /** At a review: what the person who holds the budget decided. */
+  decision?: FundingDecision;
+}
+
+export interface AssessFundingThreshold {
+  measure: string;
+  unit?: string;
+  direction: 'at_most' | 'at_least';
+  target: number;
+  baseline?: number;
+  baseline_kind: FundingKind;
+  evidence?: AssessEvidence;
+  /** At a review: what was measured. */
+  result?: number;
+  result_kind?: 'measured' | 'estimate';
+  result_evidence?: AssessEvidence;
+  /** At a review: whether the result is on the agreed side of the target. */
+  met?: boolean;
+  /** The agreed result in one sentence, with today's figure or the result. */
+  line: string;
+}
+
+/** The funding record as the engine keeps it. No figure in it was worked out by the engine. */
+export interface AssessFunding {
+  stage?: FundingStage;
+  ask?: { amount_eur: number; evidence?: AssessEvidence };
+  alternative?: { description: string; amount_eur?: number; evidence?: AssessEvidence };
+  thresholds: AssessFundingThreshold[];
+  /** What the person who holds the budget still does not know, most important first. */
+  gaps: string[];
+  /** Present once a result is in: how many agreed results are met. */
+  review?: { met: number; of: number; statement: string };
+  /** True when results passed today differ from those the earlier brief carried. The earlier ones are used. */
+  agreement_changed?: true;
+  decision?: FundingDecision;
+  /** Say this with the verdict. */
+  statement: string;
+  /** Whose figures these are, and that the decision is not the engine's. */
+  note: string;
 }
 
 /** One answer on which two records disagree. No rule picks a winner: the owner says which record applies today. */

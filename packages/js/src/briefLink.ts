@@ -7,9 +7,10 @@
  * brief cannot say anything the engine would not.
  */
 import type {
-  AssessAnsweredBy, AssessChoiceId, AssessEvidence, AssessInitiativeInput, AssessInitiativeResult, AssessQuestionId, Classification,
-  PillarScores,
+  AssessAnsweredBy, AssessChoiceId, AssessEvidence, AssessFunding, AssessInitiativeInput, AssessInitiativeResult,
+  AssessQuestionId, Classification, PillarScores,
 } from './types.js';
+import { fundingRecord } from './funding.js';
 
 export const BRIEF_BASE = 'https://www.aibvf.com/verdict';
 const QUESTIONS: AssessQuestionId[] = ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
@@ -34,8 +35,59 @@ export interface BriefLinkInput {
   conflicts?: Partial<Record<AssessQuestionId, BriefConflict>>;
   /** At a return visit: the earlier verdict, its date, the answers as they stood then, and the changes that moved the verdict. */
   previous?: BriefPrevious;
+  /** The funding record: the ask, the alternative and the agreed results, so a return visit can set results beside them. */
+  funding?: AssessFunding;
+  /** False to leave the quotes behind the funding figures out of the link, when it would be too long with them. */
+  funding_quotes?: boolean;
   /** The page that opens the brief. Defaults to the public one. */
   base?: string;
+}
+
+const pair = (evidence: AssessEvidence | undefined, keep: boolean): [string, string] | 0 =>
+  (evidence && keep ? [evidence.quote.slice(0, 200), evidence.source.slice(0, 120)] : 0);
+const unpair = (given: unknown): AssessEvidence | undefined =>
+  (Array.isArray(given) && typeof given[0] === 'string' && typeof given[1] === 'string' ? { quote: given[0].slice(0, 400), source: given[1].slice(0, 160) } : undefined);
+
+/** The funding record in its short form for the link. A result is one row: what is measured, the agreement, today's figure and the result. */
+function packFunding(funding: AssessFunding, quotes: boolean): Record<string, unknown> {
+  return {
+    ...(funding.stage ? { s: funding.stage === 'pilot' ? 'p' : 'r' } : {}),
+    ...(funding.ask ? { k: [funding.ask.amount_eur, pair(funding.ask.evidence, quotes)] } : {}),
+    ...(funding.alternative ? { l: [funding.alternative.description.slice(0, 200), funding.alternative.amount_eur ?? null, pair(funding.alternative.evidence, quotes)] } : {}),
+    t: funding.thresholds.slice(0, 3).map((item) => [
+      item.measure.slice(0, 80), item.unit ?? '', item.direction === 'at_most' ? 'm' : 'l', item.target,
+      item.baseline ?? null, item.baseline_kind === 'measured' ? 'm' : 'e', pair(item.evidence, quotes),
+      item.result ?? null, item.result_kind === 'measured' ? 'm' : 'e', pair(item.result_evidence, quotes),
+    ]),
+    ...(funding.decision ? { d: funding.decision } : {}),
+  };
+}
+
+/** Reads the short form back and has the engine rebuild the record, so the brief says only what the engine would. */
+function unpackFunding(given: unknown, agreedOn?: string): AssessFunding | undefined {
+  if (!given || typeof given !== 'object') return undefined;
+  const u = given as Record<string, unknown>;
+  const num = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+  const rows = (Array.isArray(u.t) ? u.t : []).filter((row): row is unknown[] => Array.isArray(row) && typeof row[0] === 'string' && num(row[3]) !== undefined).slice(0, 3);
+  try {
+    const agreed = fundingRecord({
+      ...(u.s === 'p' ? { stage: 'pilot' as const } : u.s === 'r' ? { stage: 'rollout' as const } : {}),
+      ...(Array.isArray(u.k) && num(u.k[0]) !== undefined ? { ask: { amount_eur: num(u.k[0]), evidence: unpair(u.k[1]) } } : {}),
+      ...(Array.isArray(u.l) && typeof u.l[0] === 'string' ? { alternative: { description: u.l[0], amount_eur: num(u.l[1]), evidence: unpair(u.l[2]) } } : {}),
+      thresholds: rows.map((row) => ({
+        measure: row[0] as string, unit: typeof row[1] === 'string' ? row[1] : undefined, direction: row[2] === 'l' ? 'at_least' as const : 'at_most' as const,
+        target: row[3] as number, baseline: num(row[4]), baseline_kind: row[5] === 'm' ? 'measured' as const : 'estimate' as const, evidence: unpair(row[6]),
+      })),
+      results: rows.filter((row) => num(row[7]) !== undefined).map((row) => ({
+        measure: row[0] as string, value: row[7] as number, kind: row[8] === 'm' ? 'measured' as const : 'estimate' as const, evidence: unpair(row[9]),
+      })),
+      ...(u.d === 'released' || u.d === 'deferred' || u.d === 'withdrew' ? { decision: u.d } : {}),
+    // A link whose quotes were left out still carries its figures: they are read as given.
+    }, false, undefined, agreedOn);
+    return agreed;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface BriefConflict {
@@ -96,6 +148,7 @@ export function briefUrl(input: BriefLinkInput): string {
     for (const id of QUESTIONS) if (input.previous.answers[id]) then[id] = input.previous.answers[id];
     payload.r = { v: input.previous.verdict, d: input.previous.date, a: then, m: input.previous.moved.filter((id) => QUESTIONS.includes(id)) };
   }
+  if (input.funding) payload.u = packFunding(input.funding, input.funding_quotes !== false);
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -169,6 +222,8 @@ export function readBriefLink(link: string): BriefLinkInput | undefined {
       moved: (Array.isArray(r.m) ? r.m : []).filter((id): id is AssessQuestionId => QUESTIONS.includes(id as AssessQuestionId)),
     };
   }
+  const funding = unpackFunding(data.u, brief.previous?.date);
+  if (funding) brief.funding = funding;
   return brief;
 }
 
@@ -213,9 +268,9 @@ export function briefUrlFor(
   const scored = Object.keys(verdict.scores_supplied) as (keyof PillarScores)[];
   if (scored.some((pillar) => !verdict.answers_given[pillar])) return undefined;
   if (Object.keys(input.work_architecture ?? {}).length) return undefined;
-  try {
-    return briefUrl({
-      context: { industry: context.industry, function: context.function, ai_tier: context.ai_tier, employees: context.employees },
+  const read = { industry: context.industry, function: context.function, ai_tier: context.ai_tier, employees: context.employees };
+  const build = (fundingQuotes: boolean) => briefUrl({
+      context: read,
       answers: input.answers ?? {},
       date,
       ...(options.include_proposal ? { proposal: result.proposal } : {}),
@@ -238,9 +293,14 @@ export function briefUrlFor(
           moved: result.review.since_last.changes.filter((change) => change.moved_verdict).map((change) => change.id),
         },
       } : {}),
+      ...(result.funding ? { funding: result.funding, funding_quotes: fundingQuotes } : {}),
       ...(options.base ? { base: options.base } : {}),
     });
+  try {
+    return build(true);
   } catch {
+    // Too long with the quotes behind the funding figures. The figures still travel without them.
+    if (result.funding) { try { return build(false); } catch { /* still too long */ } }
     // Too long to travel in a link. The verdict stands without one.
     return undefined;
   }

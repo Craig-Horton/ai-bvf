@@ -89,6 +89,8 @@ Where another record says otherwise than an answer, the agent passes its words i
 
 At a return visit the agent passes `review.previous_brief`, the `brief_url` of the earlier verdict. The earlier answers and quotes travel inside that link, so `review.since_last` can say which answers changed and which change moved the verdict. Nothing is stored.
 
+`funding` takes what is asked for the next stage, the alternative and up to three results agreed to release more money. It comes back beside the verdict with what is still not known. At a return visit `funding.results` takes what was measured, and each agreed result comes back marked met or not met. It never changes the verdict, it holds no figure the organisation did not state, and it never says whether to fund.
+
 The operating brief is served as the MCP prompt `aibvf_agent`. For Claude, Claude Code and OpenClaw it is also packed as a skill: [`skills/aibvf-agent`](https://github.com/Craig-Horton/ai-bvf/tree/main/skills/aibvf-agent).
 
 ## Troubleshooting
@@ -149,6 +151,7 @@ aibvf-mcp can send an anonymous event on each tool call. Events describe observe
 - `user_role` — an optional broad role sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`; it is never inferred
 - `answered_by`: for a guided assessment, `owner` when a person answered or `evidence` when an agent answered from evidence it quoted
 - `review_previous_verdict`, `review_outcome`: at a review, the earlier verdict and which of five fixed outcomes followed it
+- `funding_decision`: at a review, what the owner decided on the next round of money: `released`, `deferred` or `withdrew`. No amount, threshold or result is sent
 
 Classification and decision confidence are included when the calling tool supplies them. No user IDs, proposal text, quoted evidence, revenue figures, pillar scores, portfolio data or stack traces are sent.
 
