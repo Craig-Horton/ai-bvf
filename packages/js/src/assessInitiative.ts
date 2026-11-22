@@ -16,6 +16,12 @@
  * rests on and where they were found. An answer without them is counted as
  * not known, so the agent cannot pick an answer it cannot quote. The verdict
  * says an agent answered from evidence and that no person confirmed it.
+ *
+ * Two more rules hold in that mode. Where two records disagree on an answer,
+ * the answer is counted as not known and both sets of quotes come back for
+ * the owner, because no rule here picks which record applies today. And at a
+ * return visit the earlier brief link is read back, so the result says which
+ * answers changed and which change moved the verdict. Nothing is stored.
  */
 import { mapToTaxonomy } from './aliases.js';
 import { score } from './score.js';
@@ -24,14 +30,16 @@ import { assessWorkArchitecture } from './workArchitecture.js';
 import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import { plainResult } from './plainResult.js';
 import { readProposal } from './proposalReading.js';
+import { assessInputFromBrief, readBriefLink } from './briefLink.js';
 import {
-  CHOICE_SCORES, SMALLER_FIRM_BELOW, UNKNOWN_LABEL,
+  CHOICE_SCORES, QUESTION_SHORT, SMALLER_FIRM_BELOW, UNKNOWN_LABEL,
   WORK_ARCHITECTURE_CHOICES, trackFor, whereToLookFor, whyFor, wordingFor,
 } from './guidedQuestions.js';
 import type {
-  AiTier, AssessAnswer, AssessChoice, AssessContradiction, AssessChoiceId, AssessContext, AssessDecider, AssessEvidence, AssessField, AssessOpenQuestion,
-  AssessInitiativeInput, AssessInitiativeResult, AssessProvenance, AssessQuestion, AssessQuestionId, AssessReviewRecord, AssessTrack,
-  AssessVerdict, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
+  AiTier, AssessAnswer, AssessAnswerAt, AssessAnswerChange, AssessChoice, AssessConflict, AssessContradiction, AssessChoiceId, AssessContext,
+  AssessDecider, AssessEvidence, AssessField, AssessOpenQuestion,
+  AssessInitiativeInput, AssessInitiativeResult, AssessProvenance, AssessQuestion, AssessQuestionId, AssessReviewRecord, AssessSinceLast, AssessTrack,
+  AssessVerdict, Classification, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
 } from './types.js';
 
 export { extractRevenueEur } from './extractRevenue.js';
@@ -242,13 +250,32 @@ function cleanEvidenceList(given: unknown): AssessEvidence[] {
   return items.map(cleanEvidence).filter((item): item is AssessEvidence => item !== undefined).slice(0, QUOTES_PER_ANSWER);
 }
 
-function reviewRecord(input: AssessInitiativeInput, byEvidence: boolean): AssessReviewRecord | undefined {
+/** Shown as the answer where two records disagree. */
+export const CONFLICT_LABEL = 'Two records disagree. Counted as not known.';
+/** Shown as the earlier answer to a question that had not been put. */
+export const UNANSWERED_LABEL = 'Not answered.';
+const ALL_QUESTIONS: AssessQuestionId[] = ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
+
+/** The question to put to the owner when two records disagree on one answer. */
+function conflictAsk(first: AssessEvidence, second: AssessEvidence): string {
+  return `Two records disagree. ${first.source} says "${first.quote}" and ${second.source} says "${second.quote}". Which one applies today?`;
+}
+
+function reviewRecord(input: AssessInitiativeInput, byEvidence: boolean, earlierVerdict?: Classification): AssessReviewRecord | undefined {
   const review = input.review;
   if (review === undefined) return undefined;
-  if (!review || !['Accelerate', 'Fix', 'Stop'].includes(review.previous_verdict) || !REVIEW_OUTCOMES.includes(review.outcome)) {
-    throw new Error(`review needs previous_verdict (Accelerate, Fix or Stop) and outcome (${REVIEW_OUTCOMES.join(', ')}).`);
+  const needs = `review needs previous_brief, the brief link the earlier verdict came with, or previous_verdict (Accelerate, Fix or Stop) with outcome (${REVIEW_OUTCOMES.join(', ')}).`;
+  if (!review || typeof review !== 'object') throw new Error(needs);
+  const previous = earlierVerdict ?? review.previous_verdict;
+  if (!previous || !['Accelerate', 'Fix', 'Stop'].includes(previous)) throw new Error(needs);
+  if (review.outcome === undefined) {
+    if (!earlierVerdict) throw new Error(needs);
+    return { previous_verdict: previous, accepted: true, note: 'The earlier verdict was read from its brief link. It does not change the verdict.' };
   }
-  const record = { previous_verdict: review.previous_verdict, outcome: review.outcome };
+  if (!REVIEW_OUTCOMES.includes(review.outcome)) throw new Error(needs);
+  const record = { previous_verdict: previous, outcome: review.outcome };
   if (!byEvidence) return { ...record, accepted: true, note: 'Kept beside the new verdict. It does not change the verdict.' };
   const evidence = cleanEvidence(review.evidence);
   return evidence
@@ -256,7 +283,102 @@ function reviewRecord(input: AssessInitiativeInput, byEvidence: boolean): Assess
     : { ...record, accepted: false, note: 'No evidence was given for what happened, so the outcome was not kept.' };
 }
 
+/** The earlier verdict, rebuilt from the brief link it came with. */
+function earlierFrom(link: unknown) {
+  const brief = typeof link === 'string' ? readBriefLink(link) : undefined;
+  if (!brief) throw new Error('review.previous_brief must be the brief link the earlier verdict came with. It starts https://www.aibvf.com/verdict# and must be passed unchanged.');
+  const input = assessInputFromBrief(brief);
+  const result = assess(input);
+  if (result.status !== 'verdict' || !result.verdict) throw new Error('review.previous_brief holds no verdict.');
+  return { brief, input, result, verdict: result.verdict.classification };
+}
+
+/** An answer as the engine counted it: not known without a quote in evidence mode, and not known where two records disagree. */
+function answerAt(input: AssessInitiativeInput, id: AssessQuestionId, track: AssessTrack, aiTier?: string): AssessAnswerAt {
+  const choice = input.answers?.[id];
+  if (choice === undefined) return { choice: 'unanswered', label: UNANSWERED_LABEL };
+  if (choice === 'unknown') return { choice, label: UNKNOWN_LABEL };
+  const wording = id === 'work_architecture' ? wordingFor(track, id) : wordingFor(track, id, aiTier);
+  if (input.answered_by !== 'evidence') return { choice, label: wording[choice] };
+  const evidence = cleanEvidenceList(input.evidence?.[id]);
+  if (!evidence.length) return { choice: 'unknown', label: UNKNOWN_LABEL };
+  if (cleanEvidenceList(input.evidence_against?.[id]).length) return { choice: 'unknown', label: CONFLICT_LABEL };
+  return { choice, label: wording[choice], evidence };
+}
+
+const outcomeOf = (result: AssessInitiativeResult): Classification | 'Not enough to judge yet' =>
+  (result.status === 'verdict' && result.verdict ? result.verdict.classification : 'Not enough to judge yet');
+
+/**
+ * What changed between the earlier verdict and this one. A change moved the
+ * verdict when putting that one answer back, with its earlier quotes, gives a
+ * different outcome from today's.
+ */
+function sinceLast(input: AssessInitiativeInput, result: AssessInitiativeResult, then: ReturnType<typeof earlierFrom>): AssessSinceLast {
+  const track = result.resolved_inputs.track!;
+  const aiTier = result.resolved_inputs.ai_tier;
+  const before = then.result.resolved_inputs;
+  const now = outcomeOf(result);
+  const verdictChanged = now !== then.verdict;
+  const { review: _review, ...today } = input;
+
+  const changes: AssessAnswerChange[] = [];
+  for (const id of ALL_QUESTIONS) {
+    const from = answerAt(then.input, id, before.track!, before.ai_tier);
+    const to = answerAt(input, id, track, aiTier);
+    if (from.choice === to.choice && from.label === to.label) continue;
+    let moved = false;
+    if (verdictChanged) {
+      const back: AssessInitiativeInput = {
+        ...today, answers: { ...today.answers }, evidence: { ...today.evidence }, evidence_against: { ...today.evidence_against },
+      };
+      const put = <T>(target: Partial<Record<AssessQuestionId, T>>, value: T | undefined) => {
+        if (value === undefined) delete target[id]; else target[id] = value;
+      };
+      put(back.answers!, then.input.answers?.[id]);
+      put(back.evidence!, then.input.evidence?.[id]);
+      put(back.evidence_against!, then.input.evidence_against?.[id]);
+      moved = outcomeOf(assess(back)) !== now;
+    }
+    const short = QUESTION_SHORT[track][id];
+    changes.push({
+      id, short, question: (id === 'work_architecture' ? wordingFor(track, id) : wordingFor(track, id, aiTier)).question,
+      from, to, moved_verdict: moved, line: `${short}. Before: ${from.label} Now: ${to.label}`,
+    });
+  }
+
+  const contextChanged = CONTEXT_FIELDS.filter((field) => before[field] !== result.resolved_inputs[field]);
+  const [year, month, day] = then.brief.date.split('-').map(Number);
+  const dated = `${day} ${MONTHS[month - 1]} ${year}`;
+  const movers = changes.filter((change) => change.moved_verdict).map((change) => change.short);
+  const head = !verdictChanged ? `The verdict is still ${now}.`
+    : now === 'Not enough to judge yet' ? `The earlier verdict was ${then.verdict}. There is not enough to judge yet.`
+    : `The verdict moved from ${then.verdict} to ${now}.`;
+  const count = `${COUNT_WORDS[changes.length]} answer${changes.length === 1 ? '' : 's'} changed since ${dated}.`;
+  const why = !verdictChanged ? ''
+    : movers.length === 1 ? ` This change moved the verdict: ${movers[0]}.`
+    : movers.length > 1 ? ` The verdict needed each of these changes: ${movers.join(', ')}.`
+    : changes.length ? ' The changes moved the verdict together.'
+    : ' The wording of the proposal or the context changed.';
+
+  return {
+    previous_verdict: then.verdict, previous_date: then.brief.date, now, verdict_changed: verdictChanged,
+    changes, unchanged: ALL_QUESTIONS.length - changes.length,
+    ...(contextChanged.length ? { context_changed: contextChanged } : {}),
+    statement: `${head} ${count}${why}`,
+  };
+}
+
 export function assessInitiative(input: AssessInitiativeInput): AssessInitiativeResult {
+  const link = input.review && typeof input.review === 'object' ? input.review.previous_brief : undefined;
+  if (link === undefined) return assess(input);
+  const then = earlierFrom(link);
+  const result = assess(input, then.verdict);
+  if (!result.review || (result.status !== 'verdict' && result.status !== 'not_enough_to_judge')) return result;
+  return { ...result, review: { ...result.review, since_last: sinceLast(input, result, then) } };
+}
+
+function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): AssessInitiativeResult {
   const proposal = input.proposal?.trim();
   if (!proposal) throw new Error('proposal must be a plain-English description of the AI initiative.');
   if (input.answered_by !== undefined && input.answered_by !== 'owner' && input.answered_by !== 'evidence') {
@@ -266,7 +388,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (byEvidence && (Object.keys(input.scores ?? {}).length || Object.keys(input.work_architecture ?? {}).length)) {
     throw new Error('In evidence mode, answer each question with a to d and quote the evidence for it. Numeric scores and the four work checks are not accepted: answer work_architecture in answers with a to d, and quote it in evidence.');
   }
-  const review = reviewRecord(input, byEvidence);
+  const review = reviewRecord(input, byEvidence, earlierVerdict);
 
   // ── 1. Read the context ────────────────────────────────────────────────
   const resolved: AssessContext = {};
@@ -350,6 +472,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const rules: string[] = [`track:${track}`, ...(byEvidence ? ['answered_by:evidence'] : [])];
   const evidenceMissing: AssessQuestionId[] = [];
   const evidenceGiven: Partial<Record<AssessQuestionId, AssessEvidence[]>> = {};
+  const held: { id: AssessQuestionId; choice: Exclude<AssessChoiceId, 'unknown'>; evidence: AssessEvidence[]; against: AssessEvidence[] }[] = [];
 
   // In evidence mode an answer of a to d counts only with its quote and source.
   // Without them it is counted as not known, so nothing rests on an answer nobody can check.
@@ -362,6 +485,14 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     if (!evidence.length) {
       evidenceMissing.push(id);
       rules.push(`evidence_missing:${id}`);
+      return 'unknown';
+    }
+    // Two records that disagree. No rule here picks which one applies today, so
+    // the answer is counted as not known and both come back for the owner.
+    const against = cleanEvidenceList(input.evidence_against?.[id]);
+    if (against.length) {
+      held.push({ id, choice: choice as Exclude<AssessChoiceId, 'unknown'>, evidence, against });
+      rules.push(`conflict:${id}`);
       return 'unknown';
     }
     evidenceGiven[id] = evidence;
@@ -408,6 +539,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     work_architecture: workInput ?? null,
     // Evidence mode: which answers carried a quote, and which were counted as not known for want of one.
     ...(byEvidence ? { answered_by: 'evidence', evidence_sources: Object.fromEntries(Object.entries(evidenceGiven).map(([id, items]) => [id, items!.map((item) => item.source)])), evidence_missing: evidenceMissing } : {}),
+    ...(held.length ? { evidence_conflicts: held.map((item) => item.id) } : {}),
   };
   const suppliedCount = Object.keys(supplied).length;
   const regulatedAgentic = resolved.ai_tier === 'gen3'
@@ -424,9 +556,16 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     ? order.filter((id) => (id === 'work_architecture' ? !workAnswered : supplied[id] === undefined))
       .map((id) => ({ ...decider(track, id, resolved.ai_tier), choices: guidedChoices(track, id, resolved.ai_tier) }))
     : [];
+  const conflicts: AssessConflict[] = order.flatMap((id) => held.filter((item) => item.id === id)).map((item) => ({
+    id: item.id, short: QUESTION_SHORT[track][item.id],
+    question: (item.id === 'work_architecture' ? wordingFor(track, item.id) : wordingFor(track, item.id, resolved.ai_tier)).question,
+    answer: (item.id === 'work_architecture' ? wordingFor(track, item.id) : wordingFor(track, item.id, resolved.ai_tier))[item.choice],
+    evidence: item.evidence, against: item.against, ask: conflictAsk(item.evidence[0], item.against[0]),
+  }));
   const judged = {
     ...base, missing_fields: [] as AssessField[],
     ...(evidenceMissing.length ? { evidence_missing: evidenceMissing } : {}),
+    ...(conflicts.length ? { conflicts } : {}),
     ...(openQuestions.length ? { open_questions: openQuestions } : {}),
   };
   const provenance: { provenance?: AssessProvenance } = byEvidence
@@ -538,9 +677,12 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   if (!next) {
     // Every question has been put. What remains is for the user to find out.
     const list = toFindOut.map((d, i) => `${i + 1}. ${d.question}`).join(' ');
+    const disagree = conflicts.length
+      ? `Two records disagree on ${conflicts.map((item) => item.short.toLowerCase()).join(' and on ')}. Ask the owner which record applies today. `
+      : '';
     return {
       status: 'not_enough_to_judge', ...judged,
-      next_question: `Not enough to judge yet. Find out and come back: ${list}`,
+      next_question: `Not enough to judge yet. ${disagree}Find out and come back: ${list}`,
       to_find_out: toFindOut, ...warning,
     };
   }

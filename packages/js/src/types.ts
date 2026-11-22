@@ -456,10 +456,16 @@ export type AssessAnsweredBy = 'owner' | 'evidence';
 export type AssessReviewOutcome = 'delivering' | 'falling_short' | 'fixed_then_went_ahead' | 'paused_or_stopped' | 'no_decision';
 
 export interface AssessReview {
-  /** The verdict the initiative received at its last assessment. */
-  previous_verdict: Classification;
-  /** What happened since that verdict. */
-  outcome: AssessReviewOutcome;
+  /**
+   * The brief link the earlier verdict came with. The answers and quotes travel
+   * inside it, so the result can say which answers changed since and which
+   * change moved the verdict. Nothing is stored.
+   */
+  previous_brief?: string;
+  /** The verdict the initiative received at its last assessment. Read from previous_brief when that is passed. */
+  previous_verdict?: Classification;
+  /** What happened since that verdict. Needed unless previous_brief is passed. */
+  outcome?: AssessReviewOutcome;
   /** In evidence mode: the words that show the outcome, and where they were found. */
   evidence?: AssessEvidence;
 }
@@ -486,7 +492,17 @@ export interface AssessInitiativeInput {
    * quotes, each with its own source.
    */
   evidence?: Partial<Record<AssessQuestionId, AssessEvidence | AssessEvidence[]>>;
-  /** At a review: the earlier verdict and what happened since. It is echoed back and never changes the verdict. */
+  /**
+   * Evidence mode: words in another record that say otherwise than the answer,
+   * by question id, each with its own source. Where an answer has any, the two
+   * records disagree: the answer is counted as not known and both sets of quotes
+   * come back in conflicts, for the owner to say which record applies today.
+   */
+  evidence_against?: Partial<Record<AssessQuestionId, AssessEvidence | AssessEvidence[]>>;
+  /**
+   * At a review: the earlier verdict and what happened since. It never changes
+   * the verdict. With previous_brief, the result says what changed since.
+   */
   review?: AssessReview;
   /** For callers that already hold 0 to 100 pillar scores. A supplied score takes precedence over an answer. */
   scores?: Partial<PillarScores>;
@@ -663,14 +679,83 @@ export interface AssessInitiativeResult {
    * nothing waits on them.
    */
   open_questions?: AssessOpenQuestion[];
+  /**
+   * Evidence mode only: answers where two records disagree. Each was counted as
+   * not known. Put ask to the owner, with both sets of quotes beside it.
+   */
+  conflicts?: AssessConflict[];
   /** Present when a review was passed: the earlier verdict and what happened since. */
   review?: AssessReviewRecord;
 }
 
-export interface AssessReviewRecord extends AssessReview {
+/** One answer on which two records disagree. No rule picks a winner: the owner says which record applies today. */
+export interface AssessConflict {
+  id: AssessQuestionId;
+  /** A short name for the question, for lists. */
+  short: string;
+  /** The question as it was asked. */
+  question: string;
+  /** The answer the first record supports. */
+  answer: string;
+  /** The words that support that answer, each with its source. */
+  evidence: AssessEvidence[];
+  /** The words in another record that say otherwise, each with its source. */
+  against: AssessEvidence[];
+  /** The question to put to the owner. */
+  ask: string;
+}
+
+export interface AssessReviewRecord {
+  /** The verdict the initiative received at its last assessment. */
+  previous_verdict: Classification;
+  /** What happened since that verdict, when it was given. */
+  outcome?: AssessReviewOutcome;
+  /** In evidence mode: the words that show the outcome, and where they were found. */
+  evidence?: AssessEvidence;
   /** False when an agent gave an outcome with no evidence. An outcome without evidence is not kept. */
   accepted: boolean;
   note: string;
+  /** Present when previous_brief was passed: which answers changed since the earlier verdict, and which change moved it. */
+  since_last?: AssessSinceLast;
+}
+
+/** An answer as it stood at one assessment. */
+export interface AssessAnswerAt {
+  /** a to d, unknown, or unanswered when the question had not been put. */
+  choice: AssessChoiceId | 'unanswered';
+  label: string;
+  /** Evidence mode: the words the answer rested on. */
+  evidence?: AssessEvidence[];
+}
+
+/** One answer that differs between the earlier verdict and this one. */
+export interface AssessAnswerChange {
+  id: AssessQuestionId;
+  short: string;
+  question: string;
+  from: AssessAnswerAt;
+  to: AssessAnswerAt;
+  /** True when putting this one answer back gives a different outcome from today's. */
+  moved_verdict: boolean;
+  /** The change in one sentence. */
+  line: string;
+}
+
+/** What changed between the earlier verdict and this one. Built from the earlier brief link and today's answers. */
+export interface AssessSinceLast {
+  previous_verdict: Classification;
+  /** The date of the earlier verdict, written YYYY-MM-DD. */
+  previous_date: string;
+  /** Today's outcome. */
+  now: Classification | 'Not enough to judge yet';
+  verdict_changed: boolean;
+  changes: AssessAnswerChange[];
+  /** How many of the five answers are the same as before. */
+  unchanged: number;
+  /** Present when the earlier brief was for another industry, function, AI type or size. */
+  context_changed?: AssessField[];
+  /** Say this with the verdict. */
+  statement: string;
 }
 
 /** Result of mapping free text onto the canonical taxonomy. */

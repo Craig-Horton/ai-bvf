@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.19.2';
+export const VERSION = '0.20.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -319,11 +319,17 @@ const assessInitiativeInputSchema = {
       properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
         .map((id) => [id, evidenceForAnswerSchema])),
     },
+    evidence_against: {
+      type: 'object',
+      description: 'Evidence mode: where another record says otherwise than your answer, the words of that record and where they were found, by question id. Pass the answer one record supports in answers, its quote in evidence, and the words of the other record here. The answer is then counted as not known and both sets of quotes come back in conflicts, because no rule here picks which record applies today. Never leave a record out because it disagrees.',
+      properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
+        .map((id) => [id, evidenceForAnswerSchema])),
+    },
     review: {
       type: 'object',
-      required: ['previous_verdict', 'outcome'],
-      description: 'At a review of an initiative that was assessed before: the verdict it received then and what happened since. It is returned beside the new verdict and never changes it. In evidence mode it needs its own quote and source, or the outcome is not kept.',
+      description: 'At a return visit to an initiative that was assessed before. Pass previous_brief, the brief_url the earlier verdict came with, unchanged: the result then says in since_last which answers changed and which change moved the verdict. Without that link, pass previous_verdict and outcome. A review never changes the verdict. In evidence mode an outcome needs its own quote and source, or it is not kept.',
       properties: {
+        previous_brief: { type: 'string', description: 'The brief_url returned with the earlier verdict, passed unchanged. The earlier answers and quotes travel inside it. Nothing is stored.' },
         previous_verdict: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
         outcome: {
           type: 'string', enum: [...REVIEW_OUTCOMES],
@@ -665,16 +671,62 @@ const assessInitiativeOutputSchema = {
         },
       },
     },
+    conflicts: {
+      type: 'array',
+      description: 'Evidence mode: answers on which two records disagree. Each was counted as not known. Put ask to the owner, with both sets of quotes beside it, and never say which record is right.',
+      items: {
+        type: 'object',
+        required: ['id', 'short', 'question', 'answer', 'evidence', 'against', 'ask'],
+        properties: {
+          id: { type: 'string' },
+          short: { type: 'string', description: 'A short name for the question.' },
+          question: { type: 'string' },
+          answer: { type: 'string', description: 'The answer the first record supports.' },
+          evidence: { type: 'array', items: evidenceSchema, description: 'The words that support that answer.' },
+          against: { type: 'array', items: evidenceSchema, description: 'The words in another record that say otherwise.' },
+          ask: { type: 'string', description: 'The question to put to the owner, in these words.' },
+        },
+      },
+    },
     review: {
       type: 'object',
       description: 'Present when a review was passed: the earlier verdict and what happened since. accepted is false when an agent gave an outcome with no evidence.',
-      required: ['previous_verdict', 'outcome', 'accepted', 'note'],
+      required: ['previous_verdict', 'accepted', 'note'],
       properties: {
         previous_verdict: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
         outcome: { type: 'string', enum: [...REVIEW_OUTCOMES] },
         evidence: evidenceSchema,
         accepted: { type: 'boolean' },
         note: { type: 'string' },
+        since_last: {
+          type: 'object',
+          description: 'Present when previous_brief was passed. Say statement with the verdict, then each line in changes with the earlier and the new quote beside it.',
+          required: ['previous_verdict', 'previous_date', 'now', 'verdict_changed', 'changes', 'unchanged', 'statement'],
+          properties: {
+            previous_verdict: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'] },
+            previous_date: { type: 'string', description: 'The date of the earlier verdict, written YYYY-MM-DD.' },
+            now: { type: 'string', enum: ['Accelerate', 'Fix', 'Stop', 'Not enough to judge yet'] },
+            verdict_changed: { type: 'boolean' },
+            unchanged: { type: 'number', description: 'How many of the five answers are the same as before.' },
+            context_changed: stringArray('Present when the earlier brief was for another industry, function, AI type or size. Tell the owner.'),
+            statement: { type: 'string', description: 'What changed, in plain sentences. Say it as written.' },
+            changes: {
+              type: 'array',
+              description: 'Each answer that differs from the earlier verdict.',
+              items: {
+                type: 'object',
+                required: ['id', 'short', 'question', 'from', 'to', 'moved_verdict', 'line'],
+                properties: {
+                  id: { type: 'string' }, short: { type: 'string' }, question: { type: 'string' },
+                  from: { type: 'object', description: 'The answer as it stood then, with its quotes.' },
+                  to: { type: 'object', description: 'The answer today, with its quotes.' },
+                  moved_verdict: { type: 'boolean', description: 'True when putting this one answer back gives a different outcome from today\'s.' },
+                  line: { type: 'string', description: 'The change in one sentence.' },
+                },
+              },
+            },
+          },
+        },
       },
     },
     verdict: assessVerdictSchema,
@@ -1180,7 +1232,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. Where two records disagree on an answer, pass the words of the other record in evidence_against: the answer is counted as not known and conflicts returns both, with the question to put to the owner. At a return visit, pass review with previous_brief, the brief_url of the earlier verdict: since_last then says which answers changed and which change moved the verdict. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const EXAMPLE_ORGANIZATION = { name: 'Example retailer', industry: 'retail', revenue_eur: 300_000_000 };

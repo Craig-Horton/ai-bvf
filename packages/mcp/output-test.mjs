@@ -327,6 +327,34 @@ test('MCP evidence mode lets an agent answer alone, only from what it can quote'
     const unquoted = await call('assess_ai_initiative', { ...alone, evidence, review: { previous_verdict: 'Fix', outcome: 'delivering' } });
     assert.equal(unquoted.review.accepted, false);
 
+    // Two records that disagree: the answer is held as not known and both come back, with the question for the owner.
+    const minutes = { quote: 'The returns lead approves every refund exception from 1 December and can switch the agent off.', source: 'Board minutes, 26 November 2026' };
+    const policy = { quote: 'The agent pays refund exceptions of any amount when the customer asks twice.', source: 'Service policy v4, 3 September 2026' };
+    const cleared = { ...answers, governance_risk: 'd', work_architecture: 'd' };
+    const designed = { quote: 'The new workflow is drawn end to end. The roles are rewritten. Override rights and team measures are set.', source: 'Process design, 10 November 2026' };
+    const conflicted = await call('assess_ai_initiative', {
+      ...alone, answers: cleared, evidence: { ...evidence, governance_risk: minutes, work_architecture: designed }, evidence_against: { governance_risk: policy },
+    });
+    assert.equal(conflicted.status, 'not_enough_to_judge');
+    assert.equal(conflicted.conflicts[0].id, 'governance_risk');
+    assert.match(conflicted.conflicts[0].ask, /^Two records disagree\. Board minutes, 26 November 2026 says .* Which one applies today\?$/);
+
+    // A return visit: the earlier brief link comes back in, and the result says what changed and what moved the verdict.
+    const returned = await call('assess_ai_initiative', {
+      ...alone, answers: cleared, evidence: { ...evidence, governance_risk: minutes, work_architecture: designed },
+      review: { previous_brief: judged.verdict.brief_url },
+    });
+    assert.equal(returned.verdict.classification, 'Accelerate');
+    assert.equal(returned.review.previous_verdict, 'Fix');
+    assert.equal(returned.review.since_last.verdict_changed, true);
+    assert.deepEqual(returned.review.since_last.changes.map((change) => change.id), ['governance_risk', 'work_architecture']);
+    assert.match(returned.review.since_last.statement, /^The verdict moved from Fix to Accelerate\. Two answers changed since /);
+    const carriedBack = JSON.parse(Buffer.from(returned.verdict.brief_url.split('#')[1], 'base64url').toString('utf8'));
+    assert.equal(carriedBack.r.v, 'Fix', 'the new brief link carries the earlier verdict');
+    const shortened = await client.callTool({ name: 'assess_ai_initiative', arguments: { ...alone, evidence, review: { previous_brief: 'https://bit.ly/3xYz' } } });
+    assert.equal(shortened.isError, true, 'a shortened or changed link is refused');
+    assert.match(shortened.content[0].text, /brief link the earlier verdict came with/);
+
     // A person-answered verdict is unchanged, and still gets its brief link.
     const owner = await call('assess_ai_initiative', { proposal, confirmed: true, answers });
     assert.equal(owner.answered_by, undefined);
