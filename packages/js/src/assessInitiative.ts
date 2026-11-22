@@ -591,8 +591,12 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
     const value = supplied[id];
     return value !== undefined && (id === 'governance_risk' ? value <= 40 : value >= 60);
   };
+  // A phrase about one part of the work redesign counts only against an answer that claims that part.
+  const contradicted = (found: { question: AssessQuestionId; part?: keyof WorkArchitectureInput }): boolean =>
+    (found.part ? workAnswered && workInput?.[found.part] === true : favourable(found.question));
   const findings = readProposal(proposal);
-  const contradictions: AssessContradiction[] = findings.filter((found) => favourable(found.question)).map((found) => ({
+  const contradictions: AssessContradiction[] = findings.filter(contradicted)
+    .filter((found, index, all) => all.findIndex((other) => other.question === found.question) === index).map((found) => ({
     id: found.question, rule: found.rule, proposal_words: found.proposal_words, proposal_says: found.says,
     answer: answersGiven[found.question]?.label
       ?? (found.question === 'work_architecture' ? 'The work is shown as redesigned.' : `A score of ${supplied[found.question as keyof PillarScores]} out of 100.`),
@@ -601,12 +605,11 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
   // that says the opposite of the answer it was given for holds the verdict at Fix.
   const evidenceRules: string[] = [];
   for (const id of Object.keys(evidenceGiven) as AssessQuestionId[]) {
-    const found = evidenceGiven[id]!
-      .map((item) => readProposal(item.quote).find((finding) => finding.question === id))
-      .find((finding) => finding !== undefined);
-    if (!found) continue;
-    evidenceRules.push(`evidence_read:${found.rule}`);
-    if (!favourable(id) || contradictions.some((item) => item.id === id)) continue;
+    const read = evidenceGiven[id]!.flatMap((item) => readProposal(item.quote).filter((finding) => finding.question === id));
+    if (!read.length) continue;
+    for (const rule of new Set(read.map((finding) => finding.rule))) evidenceRules.push(`evidence_read:${rule}`);
+    const found = read.find(contradicted);
+    if (!found || contradictions.some((item) => item.id === id)) continue;
     contradictions.push({
       id, rule: found.rule, proposal_words: found.proposal_words, proposal_says: found.says,
       answer: answersGiven[id]!.label, found_in: 'evidence',
