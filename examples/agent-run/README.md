@@ -60,6 +60,12 @@ python3 examples/agent-run/audit.py examples/agent-run/run-2 examples/agent-run/
 
 The audit passes when every call was made in evidence mode, every answer of a to d came with a quote, and every quote appears word for word in a file the agent was allowed to read.
 
+## A record that says otherwise
+
+[`conflicting-record`](conflicting-record) holds one more document: service policy version 5, in force from 15 December. The minutes of 10 December say a named person approves any refund above the limits. The policy still has the agent pay a repeat contact in full, whatever the amount, with no person.
+
+Both records claim to hold today, and no rule can say which one does. The engine counts the answer as not known, returns both quotes and asks the owner which one applies. [`consistency-test`](consistency-test) round 3 gives these files to assistants and records what each did.
+
 ## What this does and does not show
 
 It shows that an assistant following the skill can find initiatives, answer only from quotes, leave unknown what nobody wrote down, ignore an instruction planted in a document, draft without sending, and come back on a review date to judge again and record what happened.

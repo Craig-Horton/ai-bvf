@@ -66,6 +66,8 @@ The AI BVF agent is the same assessment with nobody at the keyboard. Your assist
 
 The engine enforces three rules itself. An answer without a quote and a source is counted as not known. A quote that contradicts its answer holds the verdict at Fix. Every verdict reached this way states that an agent answered and that no person confirmed it.
 
+Two more rules cover records that change. Where two records disagree on an answer, the engine counts it as not known and returns both quotes with the question for the owner: which one applies today. At a return visit the earlier brief link goes back in, and the result says which answers changed and which change moved the verdict.
+
 - Claude, Claude Code and OpenClaw: install the skill in [`skills/aibvf-agent`](skills/aibvf-agent), packed as [`aibvf-agent.zip`](aibvf-agent.zip).
 - Any other assistant with the connector: give it the operating brief, which the connector serves as the prompt `aibvf_agent`.
 
@@ -111,9 +113,9 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.19.2 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.20.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.14.3 | TypeScript assessment and scoring engine. |
+| [`@aibvf/core`](packages/js) | 0.15.0 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.

@@ -250,6 +250,11 @@ test('the brief takes a direct instruction to run as consent, and keeps the brie
   assert.ok(AGENT_BRIEF.includes('The owner can change the mandate at any time.'));
   assert.ok(AGENT_BRIEF.includes('behind the words "Open the brief"'), 'the long link has to sit behind short words where the chat allows');
   assert.ok(AGENT_BRIEF.includes('never pass it to a link shortener'), 'a shortener would hand the quotes to a third party');
+  assert.ok(AGENT_BRIEF.includes('Then look for a record that says otherwise and has not been replaced by a later one.'), 'the agent has to look for the record that disagrees');
+  assert.ok(AGENT_BRIEF.includes('pass its words and source in evidence_against'), 'the disagreeing record goes where the engine can hold the answer');
+  assert.ok(AGENT_BRIEF.includes('Two records, no winner.'));
+  assert.ok(AGENT_BRIEF.includes('never say which record is right'), 'the owner decides which record applies');
+  assert.ok(AGENT_BRIEF.includes('Pass review with previous_brief'), 'a return visit hands back the earlier brief link');
 });
 
 test('choice b asks for figures on cost and return, and for the organisation on the business result', () => {

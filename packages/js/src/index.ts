@@ -17,7 +17,7 @@ export { assemblePortfolio } from './assemblePortfolio.js';
 export { mapToTaxonomy } from './aliases.js';
 export {
   assessInitiative, extractEmployees, extractRevenueEur, CONTEXT_CHOICES,
-  EVIDENCE_STATEMENT, REVIEW_OUTCOMES, REVIEW_OUTCOME_LABEL,
+  CONFLICT_LABEL, EVIDENCE_STATEMENT, REVIEW_OUTCOMES, REVIEW_OUTCOME_LABEL, UNANSWERED_LABEL,
 } from './assessInitiative.js';
 export {
   CHOICE_SCORES, FIRST_STEP, QUESTION_SHORT, QUESTION_WHY, SMALLER_FIRM_BELOW, UNKNOWN_LABEL, WORDING,
@@ -38,5 +38,5 @@ export {
   firstStepFor, whereToLookFor, whyFor, wordingFor,
 } from './guidedQuestions.js';
 export { AGENT_BRIEF, AGENT_BRIEF_VERSION, AGENT_CONNECTOR_URL } from './agentBrief.js';
-export { BRIEF_BASE, briefUrl, briefUrlFor } from './briefLink.js';
-export type { BriefLinkInput } from './briefLink.js';
+export { BRIEF_BASE, assessInputFromBrief, briefUrl, briefUrlFor, readBriefLink } from './briefLink.js';
+export type { BriefConflict, BriefLinkInput, BriefPrevious } from './briefLink.js';
