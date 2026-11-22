@@ -10,6 +10,7 @@
 //   2. diagnoseProcess()  the published engine in @aibvf/core picks the intervention and sizes the saving.
 //   3. report()   the words. Every figure in it comes from 1 or 2.
 import { readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { diagnoseProcess } from '../../packages/js/dist/index.js';
 
 const here = (name) => new URL(name, import.meta.url);
@@ -134,7 +135,8 @@ export function report(measured, judged, { department, organisation, rate }) {
   return `${lines.join('\n')}\n`;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run as a command, on any system: a Windows path, or a folder name with a space, has to become a file address first.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const measured = measure(await readFile(here('halden-service-desk/tickets.csv'), 'utf8'));
   const about = { department: 'customer service desk', organisation: 'Halden & Co' };
   const rate = flag('--rate') ? Number(flag('--rate')) : undefined;

@@ -11,6 +11,7 @@
 // and for each process the arguments for diagnose_process, to pass on unchanged.
 import { readFile } from 'node:fs/promises';
 import { Buffer } from 'node:buffer';
+import { pathToFileURL } from 'node:url';
 
 /** A small CSV reader: quoted cells, doubled quotes, commas and line breaks inside quotes. */
 export function parseCsv(text) {
@@ -166,7 +167,8 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run as a command, on any system: a Windows path, or a folder name with a space, has to become a file address first.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const flag = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
   const number = (name) => (flag(name) === undefined ? undefined : Number(flag(name)));

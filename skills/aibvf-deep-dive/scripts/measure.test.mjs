@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, cp, rm } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Buffer } from 'node:buffer';
 import { measureLog, parseCsv } from './measure.mjs';
 import { diagnoseProcess } from '../../../packages/js/dist/index.js';
@@ -97,4 +102,24 @@ test('a long log is read, and a link that leaves processes out says how many', (
   assert.equal(carried.p.length, 40);
   assert.equal(carried.x, 5);
   assert.ok(counted.report_url.split('#')[1].length < 12_000);
+});
+
+// Nothing above runs the script the way an agent does: as a command. On Windows,
+// and from any folder with a space in its name, the old check never matched and
+// the script printed nothing.
+test('run as a command it prints the counts, from a folder with a space in its name too', async () => {
+  const run = promisify(execFile);
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const log = fileURLToPath(new URL('../../../examples/process-deep-dive/halden-service-desk/tickets.csv', import.meta.url));
+  const flags = ['--case', 'case_id', '--process', 'category', '--time', 'timestamp', '--actor', 'actor', '--actor-type', 'actor_type', '--system-value', 'system', '--minutes', 'minutes_worked', '--step', 'step', '--reopen-value', 'Reopened', '--function', 'cx'];
+  const plain = await run(process.execPath, [join(here, 'measure.mjs'), log, ...flags]);
+  assert.equal(JSON.parse(plain.stdout).processes.length, 6);
+  const folder = await mkdtemp(join(tmpdir(), 'deep dive '));
+  try {
+    await cp(join(here, 'measure.mjs'), join(folder, 'measure.mjs'));
+    const spaced = await run(process.execPath, [join(folder, 'measure.mjs'), log, ...flags]);
+    assert.equal(JSON.parse(spaced.stdout).processes.length, 6);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });
