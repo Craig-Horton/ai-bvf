@@ -2,6 +2,19 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.19.2 (aibvf-mcp), 0.14.3 (@aibvf/core), 22 November 2026
+
+Changed: two answer choices say more exactly what they mean.
+
+- Cost and return, choice b. It read "The return rests on figures nobody has tested, or it only breaks even." It now reads "The return is written down in figures that nobody has tested, or it only breaks even." For a smaller firm it read "We are estimating, or it only breaks even." It now reads "We have rough numbers that nobody has checked, or it only breaks even."
+- Business result, choice b. It read "A result is named, with no target." It now reads "The organisation has named a result, with no target."
+
+Why: seven replies from four assistants read the same ten files and split on these two choices. Three of seven read "I think it will pay for itself" as an untested figure. Five of seven read a vendor's claim about its other clients as a result the organisation had named. An opinion with no figure, and a vendor's claim, are both "I do not know yet".
+
+Changed: the consistency test keeps each round in its own folder, and its reply form takes up to three quotes for an answer, each with its own file. The first form allowed one, which made an assistant join quotes from different files.
+
+Scope: the wording of three answer choices. No score, threshold or rule changes: each choice carries the score it carried before. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.19.1 (aibvf-mcp), 0.14.2 (@aibvf/core), 22 November 2026
 
 Changed: the operating brief is version 3. A direct instruction from the owner to run now counts as consent to the mandate. The agent states the mandate and goes ahead. With no such instruction it still asks once. The owner can change the mandate at any time.

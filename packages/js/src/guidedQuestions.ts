@@ -120,7 +120,7 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     financial_return: {
       question: 'What does it cost to build and run, and what does it return each year?',
       a: 'It costs more than it returns.',
-      b: 'The return rests on figures nobody has tested, or it only breaks even.',
+      b: 'The return is written down in figures that nobody has tested, or it only breaks even.',
       c: 'The return covers the cost, on figures finance has checked.',
       d: 'The return covers the cost, on results measured in a pilot or in live use.',
     },
@@ -134,7 +134,7 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     strategic_alignment: {
       question: 'Which business result does this move, and by how much?',
       a: 'No business result is named.',
-      b: 'A result is named, with no target.',
+      b: 'The organisation has named a result, with no target.',
       c: 'A result the organisation already tracks, with a target and a named executive owner.',
       d: 'A board-level result, with a target, a named owner and a baseline measured today.',
     },
@@ -157,7 +157,7 @@ export const WORDING: Record<AssessTrack, Record<AssessQuestionId, Wording>> = {
     financial_return: {
       question: 'What does it cost each month, and what does it save or earn?',
       a: 'It costs more than it saves.',
-      b: 'We are estimating, or it only breaks even.',
+      b: 'We have rough numbers that nobody has checked, or it only breaks even.',
       c: 'It pays for itself, on numbers we have checked.',
       d: 'It pays for itself, on results we have measured in a trial or in use.',
     },
