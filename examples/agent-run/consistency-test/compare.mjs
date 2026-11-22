@@ -46,9 +46,9 @@ function walk(dir, out = []) {
 const squash = (text) => text.replace(/\s+/g, ' ').trim();
 const corpus = squash(walk(haldenRoot).map((file) => fs.readFileSync(file, 'utf8')).join('\n'));
 
-/** One answer may rest on several quotes, written as "first" / "second". */
+/** One answer may rest on several quotes, written as "first" / "second" or "first"; "second", with or without a file in brackets after each. */
 function quotesOf(cell) {
-  return cell.split(/["“”]\s*\/\s*["“”]/).map((quote) => quote.replace(/^["“”']+|["“”']+$/g, '').trim()).filter(Boolean);
+  return cell.split(/["“”]\s*(?:\([^)]*\))?\s*[/;]\s*["“”]/).map((quote) => quote.replace(/^["“”']+|["“”']+$/g, '').trim()).filter(Boolean);
 }
 
 /** A quote counts when every part of it, split at an ellipsis, is in the files word for word. */

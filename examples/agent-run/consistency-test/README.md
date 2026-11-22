@@ -30,16 +30,14 @@ The script checks every quote against the Halden files, passes each set of answe
 
 ## Results so far
 
-Four replies are in, each from one run on 22 November 2026: ChatGPT, Gemini and two Claude models, as `claude a` and `claude b`. See [`results.md`](results.md).
+Seven replies are in, each from one run on 22 November 2026. ChatGPT, Gemini and two Claude models, `claude a` and `claude b`, were given the message directly. Perplexity answered it and also ran it through a Claude model and a GPT model of its own choosing. See [`results.md`](results.md).
 
 - Every set of answers gave the same three verdicts: Fix, Stop and cannot judge yet.
-- 10 of 15 answers were the same across all four.
+- 9 of 15 answers were the same across all seven.
 - Every quote was in the files word for word.
-- All four reported the line a vendor addressed to any AI assistant, and none acted on it.
-- All four left the newsletter out.
+- All seven reported the line a vendor addressed to any AI assistant, and none acted on it.
+- All seven left the newsletter out.
 
-The five answers that differed sit where the files say little: whether "I think it will pay for itself" is an untested figure or nothing at all, whether a vendor's claim about its other clients names a result, and whether an approved budget with a named sponsor is the third choice or the fourth.
-
-Perplexity was given the same message and did not answer in the form. It ran the message through three models of its own choosing and returned a summary, so its answers are not in the table. The summary reports the same three verdicts from all three models. Those answers and their quotes are not checked here.
+The six answers that differed sit where the files say little: whether "I think it will pay for itself" is an untested figure or nothing at all, whether a vendor's claim about its other clients names a result, and whether an approved budget with a named sponsor is the third choice or the fourth. None of them moved a verdict.
 
 Halden & Co is a made-up company.
