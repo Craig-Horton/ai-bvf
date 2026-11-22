@@ -150,4 +150,4 @@ Private benchmark material and certification marks are outside the source-code c
 
 Craig Horton is the author of the AI Business Value Framework. AI BVF is a personal project, built in his own time. His work connects AI investment decisions with organisational readiness and the redesign of work.
 
-[The Transformation Brief](https://brief.craighortonadvisory.com) · [Craig Horton on LinkedIn](https://linkedin.com/in/Craig-Horton-ai)
+[The Transformation Brief](https://thetransformationbrief.ai) · [Craig Horton on LinkedIn](https://linkedin.com/in/Craig-Horton-ai)

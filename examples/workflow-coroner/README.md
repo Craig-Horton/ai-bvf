@@ -17,7 +17,7 @@ Most process mining births new automations. This one performs autopsies first. D
 
 ## How to run
 
-This is the developer on-ramp. The senior-leader on-ramp is the AI BVF scorer at https://www.aibvf.com/protocol/scorer plus the agentic workmate layer landing on https://brief.craighortonadvisory.com/workflow-coroner.html next week. If you are not running Python, start there.
+This is the developer on-ramp. The senior-leader on-ramp is the AI BVF scorer at https://www.aibvf.com/protocol/scorer plus the agentic workmate layer landing on https://thetransformationbrief.ai/workflow-coroner.html next week. If you are not running Python, start there.
 
 ### Install, one time
 

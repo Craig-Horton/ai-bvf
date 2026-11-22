@@ -11,12 +11,11 @@ This design system unifies the product surfaces onto **one accent (copper) on de
 Built from the public repo (browse for deeper context — the reader is encouraged to explore these to build higher-fidelity work):
 
 - **GitHub — `Craig-Horton/ai-bvf`**: https://github.com/Craig-Horton/ai-bvf
-  - `index.html` — the product app (scoring workspace, portfolio, board readout). Primary source for the unified design tokens.
-  - `AI-BVF.html` — long-form product/marketing page.
+  - `developers.html` — the page for developers: the MCP server, the CI gate and the protocol. The older copies of the product app were removed on 22 November 2026; the live product is at www.aibvf.com.
   - `ai-readiness-blueprint.html` — the six-driver diagnostic marketing page (earlier, lighter palette — superseded here).
   - `assets/bvf-logo.svg` — the brand mark (imported into `assets/`).
   - `README.md` — product copy, the four pillars, the thirteen MCP tools, scoring rules.
-- Live product: bvf.craighortonadvisory.com · Protocol: www.aibvf.com/protocol · The Transformation Brief: brief.craighortonadvisory.com
+- Live product: www.aibvf.com · Protocol: www.aibvf.com/protocol · The Transformation Brief: thetransformationbrief.ai
 
 Brand seed (from the logo): deep navy `#0F1E35` + copper `#B87333`, serif display, executive tone.
 
