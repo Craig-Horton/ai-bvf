@@ -62,12 +62,26 @@ When the owner asks for the detail of one process in the chat, give it in this f
 
 ```text
 PROCESS
-Today: N a year, N minutes of work each, N people on a case, N hours or days from open to close, N percent come back.
+Today: N a year, N minutes of work each, N people on a case, TIME from open to close, N percent come back.
 Do: the intervention.
-Why: the rule that chose, from the first line of the tool's assumptions, in plain words and without "intervention chosen by".
+Why: the line for the rule that chose, from the list below.
 How: the line for that intervention, from the list below.
-Saves: €LOW–HIGH a year, about N percent of the effort. Confidence N, as the tool returned it.
+Saves: €LOW–HIGH a year, about N percent of the effort. Confidence: WORD (N).
 ```
+
+- `TIME`: under one day, whole hours, as in "about 15 hours". One day or more, days with one decimal at most, as in "9.8 days". Never two decimals.
+- `WORD (N)`: the tool's `decision_confidence` as it came back, with one word before it. 0.75 or more is high, 0.5 or more is medium, below that is low. Write "high (0.91)".
+
+Why, for each rule. The rule is named in the first line of the tool's `assumptions`. Use these words and add none of the tool's own terms:
+
+- short and repeated: it is short and repeated: N minutes of work, N times a year.
+- comes back: N percent of cases come back.
+- rare and heavy: it is rare and heavy: N a year, and each one takes a lot of work.
+- largest drag factor, manual: most of the work is done by hand.
+- largest drag factor, wait: a case spends most of its time waiting.
+- largest drag factor, handoffs: too many people touch each case.
+- largest drag factor, rework: too many cases come back.
+- largest drag factor, cycle: it takes too long from open to close.
 
 How, for each intervention:
 
