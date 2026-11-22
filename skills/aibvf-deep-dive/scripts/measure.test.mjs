@@ -134,6 +134,8 @@ test('the flow of a process is counted: the orders its steps come in, and who do
     ['Received > Applied > Checked > Confirmed', 95],
   ]);
   assert.equal(flow.orders.reduce((sum, order) => sum + order.cases, 0) + flow.cases_in_orders_left_out, flow.cases_in_log);
+  // The shares of the orders add up to the whole. Rounded to two places they came to 101 percent.
+  assert.deepEqual(flow.orders.map((order) => order.share), [0.525, 0.475]);
   // The finding a draft rests on: the address is applied by a system before a person checks it, in every case.
   for (const order of flow.orders) assert.ok(order.steps.indexOf('Applied') < order.steps.indexOf('Checked'));
   const step = (name) => flow.steps.find((item) => item.step === name);

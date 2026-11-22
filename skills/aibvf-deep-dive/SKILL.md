@@ -120,7 +120,7 @@ When the owner says yes, write the full draft under these five headings, in this
 
 Rules for a draft:
 
-- Quote the flow. Every statement about how the work runs today carries a count the script printed. Never read rows to find a pattern.
+- Quote the flow. Every statement about how the work runs today carries a count the script printed. Never read rows to find a pattern. Quote the cases, as in "in 105 of 200 cases", in place of a share.
 - Propose the target. Give one target for each measure, with your reason, and mark it as your suggestion. The owner confirms it or changes it.
 - Name no person. The script counts people and names none. Write the role, as in "an agent on the desk" or "one team lead", and let the owner name who.
 - The log records what happened and never why. Put every reason you give under "What I assumed".

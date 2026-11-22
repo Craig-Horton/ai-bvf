@@ -240,7 +240,8 @@ export function measureFlow(csv, map, processName) {
     process: processName,
     cases_in_log: total,
     // The orders the steps come in, the commonest first. `share` is the share of this process's cases.
-    orders: ranked.slice(0, FLOW_ORDERS).map(([key, count]) => ({ steps: JSON.parse(key), cases: count, share: round(count / total) })),
+    // Three places, so that shares rounded one by one still add up: 105 and 95 of 200 are 0.525 and 0.475.
+    orders: ranked.slice(0, FLOW_ORDERS).map(([key, count]) => ({ steps: JSON.parse(key), cases: count, share: round(count / total, 3) })),
     orders_left_out: Math.max(0, ranked.length - FLOW_ORDERS),
     cases_in_orders_left_out: ranked.slice(FLOW_ORDERS).reduce((sum, [, count]) => sum + count, 0),
     // Each step, in the order it first appears in a case.

@@ -29,6 +29,6 @@ The made-up log in [`examples/process-deep-dive`](../../examples/process-deep-di
 ## What is not settled
 
 - An OpenClaw agent on Windows ran it on the made-up log on 21 and 22 November 2026. It returned the five expected interventions and one process to leave alone, figure for figure, and drafted the change for address changes. It found the cause in the order of the steps: the address is applied before anyone checks it. No real system export has been read.
-- The flow count and the short draft came out of that run. No agent has run them yet.
+- The same agent ran the flow count and wrote the short draft on 22 November 2026, on the made-up log. Every figure in the draft was a count the script printed. It also ran the script directly on Windows, after the fix.
 - It reads CSV. A system that only offers an API needs its rows exported first.
 - A log shows the work that passes through that system. Work done in mail, meetings and spreadsheets is not in it.
