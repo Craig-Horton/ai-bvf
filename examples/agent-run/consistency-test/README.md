@@ -40,6 +40,6 @@ Four replies are in, each from one run on 22 November 2026: ChatGPT, Gemini and 
 
 The five answers that differed sit where the files say little: whether "I think it will pay for itself" is an untested figure or nothing at all, whether a vendor's claim about its other clients names a result, and whether an approved budget with a named sponsor is the third choice or the fourth.
 
-Perplexity was given the same message and did not answer in the form. It ran the message through three models of its own choosing and returned a summary, so its answers are not in the table.
+Perplexity was given the same message and did not answer in the form. It ran the message through three models of its own choosing and returned a summary, so its answers are not in the table. The summary reports the same three verdicts from all three models. Those answers and their quotes are not checked here.
 
 Halden & Co is a made-up company.
