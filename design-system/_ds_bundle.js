@@ -1110,7 +1110,7 @@ function AppHeader({
       fontSize: '12px',
       color: 'rgba(255,255,255,0.78)'
     }
-  }, "Craig Horton Advisory"), /*#__PURE__*/React.createElement("div", {
+  }, "Craig Horton"), /*#__PURE__*/React.createElement("div", {
     style: {
       width: '30px',
       height: '30px',
@@ -2104,7 +2104,7 @@ function Footer() {
       fontSize: '13px',
       color: 'var(--text-dim)'
     }
-  }, "AI BVF \xB7 Craig Horton Advisory \xB7 Amsterdam"));
+  }, "AI BVF \xB7 Craig Horton \xB7 Amsterdam"));
 }
 function ProtocolPage() {
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Nav, null), /*#__PURE__*/React.createElement(Hero, null), /*#__PURE__*/React.createElement(WhatItDoes, null), /*#__PURE__*/React.createElement(Tools, null), /*#__PURE__*/React.createElement(CiGate, null), /*#__PURE__*/React.createElement(Install, null), /*#__PURE__*/React.createElement(Footer, null));

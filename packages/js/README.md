@@ -2,7 +2,7 @@
 
 Deterministic AI investment assessment with disclosed assumptions, evidence gaps and work design checks. The public portfolio format is version 1.0.
 
-> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · [Try an assessment](https://www.aibvf.com/start) · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton Advisory](https://craighortonadvisory.com)
+> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · [Try an assessment](https://www.aibvf.com/start) · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton](https://linkedin.com/in/Craig-Horton-ai)
 
 ```bash
 npm install @aibvf/core

@@ -18,12 +18,12 @@ On first use, state the mandate below and ask the owner once whether to change a
 - May do: count, report and draft. Change no system, send nothing, spend nothing.
 - Report to: the owner, here.
 
-Tell the owner once: the rows of the log stay on this computer. Only the counts for each process go to the AI BVF tool, and it stores none of them.
+Tell the owner once: the rows of the log stay on this computer. Only the counts for each process go to the AI BVF tool, and it stores none of them. It records an anonymous count of each call: which tool ran, the business function and the verdict.
 
 ## Each deep dive
 
 1. Get the log. Ask the owner for an export from the system the department works in: tickets, orders, cases, invoices or claims. It has one row for each step or event, as a CSV file. Start with one department.
-2. Map the columns. Read the header and the first twenty rows. Decide which column holds the case, the process or category, the time, and who did the step. Then look for three more: a column or value that marks a step done by a system, the minutes worked on a step, and the value that marks a case that came back. Show the owner the mapping in one short message. Never use a column that is not there.
+2. Map the columns. Read the header and the first twenty rows, for the mapping and for nothing else. Decide which column holds the case, the process or category, the time, and who did the step. Then look for three more: a column or value that marks a step done by a system, the minutes worked on a step, and the value that marks a case that came back. Show the owner the mapping in one short message. Never use a column that is not there.
 3. Count. Run the script in this skill's folder. Never count rows yourself, and never change a count.
 
    ```bash
@@ -36,7 +36,14 @@ Tell the owner once: the rows of the log stay on this computer. Only the counts 
 4. Ask once, before the report. The hourly cost of the team, with salary and overheads, is never in a log. Ask the owner for it in one short message and wait for the answer. With an answer, run the script again with `--rate`. Only when the owner declines or does not know, go on with no euro figure.
 5. Judge. For each process the script prints `diagnose_process`: the arguments for the tool of that name. Pass them unchanged. When it is `null`, the log lacks a signal the tool needs: say which one, and judge nothing for that process.
 6. Report. Use the form below. Put the largest saving first.
-7. Draft. When the owner says yes, write the change as a draft for a person to carry out: the new steps, who decides, and what to check after a month. Build nothing.
+7. Draft. When the owner names a process, count its flow first:
+
+   ```bash
+   node {baseDir}/scripts/measure.mjs LOG.csv --flow "PROCESS" --case COLUMN --process COLUMN --time COLUMN --actor COLUMN \
+     --actor-type COLUMN --system-value VALUE --minutes COLUMN --step COLUMN
+   ```
+
+   It prints the orders the steps come in and, for each step, who does it and how long after the step before. Write the draft from those counts, in the form under "The draft". With no column that names the step there is no flow: say so, and draft from the counts in the report alone. Build nothing.
 
 ## The report
 
@@ -89,6 +96,35 @@ How, for each intervention:
 - Consolidate & re-sequence: redesign the flow before any AI. Cut the hand-offs: give one role the right to decide, and run the checks side by side.
 - Quality controls: stop the error where it starts. Check the input when it arrives, so that the case does not come back.
 - Eliminate / insource: stop running it as its own process. Fold it into the process next to it, or give it whole to the one team that owns the outcome.
+
+## The draft
+
+Give the short draft first. It fits one screen, about 150 words.
+
+```text
+DRAFT: PROCESS. THE CHANGE IN A FEW WORDS.
+For a person to carry out. Nothing has been built, sent or changed.
+Found: what the flow shows, with its counts, as in "in 105 of 200 cases".
+Change: the new order of steps, in two or three lines.
+Check after one month: MEASURE, today N, target N. The target is my suggestion, because REASON.
+Shall I write the full draft?
+```
+
+When the owner says yes, write the full draft under these five headings, in this order:
+
+- Today, from the log. The steps in their commonest order, who does each one, and the counts.
+- The change. The new steps, numbered. Say which steps stay as they are.
+- Who decides. On each case, and for the change as a whole.
+- What to check after one month. Each measure with today's figure and the target, and what to do when the target is met and when it is missed.
+- What I assumed. Everything in the draft that the log does not show.
+
+Rules for a draft:
+
+- Quote the flow. Every statement about how the work runs today carries a count the script printed. Never read rows to find a pattern. Quote the cases, as in "in 105 of 200 cases", in place of a share.
+- Propose the target. Give one target for each measure, with your reason, and mark it as your suggestion. The owner confirms it or changes it.
+- Name no person. The script counts people and names none. Write the role, as in "an agent on the desk" or "one team lead", and let the owner name who.
+- The log records what happened and never why. Put every reason you give under "What I assumed".
+- The check after one month is the same count: the same script with the same flags, then `diagnose_process` again.
 
 ## Rules that hold in every deep dive
 

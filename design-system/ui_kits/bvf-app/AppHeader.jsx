@@ -37,7 +37,7 @@ function AppHeader({ tab, setTab }) {
         </nav>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.78)' }}>Craig Horton Advisory</span>
+        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.78)' }}>Craig Horton</span>
         <div style={{
           width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(184,115,51,0.16)',
           border: '1px solid rgba(184,115,51,0.34)', display: 'flex', alignItems: 'center',

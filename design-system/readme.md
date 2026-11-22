@@ -1,6 +1,6 @@
 # AI BVF — Design System
 
-The brand and UI system for **AI BVF (the AI Business Value Framework)** by **Craig Horton Advisory** — an open, deterministic toolchain that scores AI initiatives **Accelerate / Fix / Stop** before budget is committed. Board-review discipline for enterprise AI investment.
+The brand and UI system for **AI BVF (the AI Business Value Framework)** by **Craig Horton** — an open, deterministic toolchain that scores AI initiatives **Accelerate / Fix / Stop** before budget is committed. Board-review discipline for enterprise AI investment.
 
 One engine, three surfaces: `@aibvf/core` (TypeScript scoring engine), `aibvf-mcp` (MCP server, thirteen tools for agents, hosted connector at mcp.aibvf.com), and `aibvf-check` (CI/CD pre-flight gate — "SonarQube for AI").
 

@@ -9,6 +9,10 @@
 //
 // One row is one step of one case. Prints JSON: what was counted, what was not in the log,
 // and for each process the arguments for diagnose_process, to pass on unchanged.
+//
+//   node measure.mjs log.csv --flow "Address change" --case ... --process ... --time ... --actor ... --step step
+//
+// With --flow, prints the flow of that one process: the orders its steps come in and who does each step.
 import { readFile } from 'node:fs/promises';
 import { Buffer } from 'node:buffer';
 import { pathToFileURL } from 'node:url';
@@ -167,6 +171,99 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
   };
 }
 
+/** How many step orders, and how many steps, one flow lists. The rest are counted and named as left out. */
+export const FLOW_ORDERS = 5;
+export const FLOW_STEPS = 20;
+
+/**
+ * The flow of one process, counted: the orders its steps come in, and for each step who does it and
+ * how long after the step before. A draft quotes these counts. No person is named: people are counted.
+ */
+export function measureFlow(csv, map, processName) {
+  const [head, ...lines] = parseCsv(csv);
+  for (const need of ['case', 'process', 'time', 'actor', 'step']) {
+    if (!map[need]) throw new Error(need === 'step' ? 'The flow needs the column that names each step. Name it with --step.' : `Name the ${need} column with --${need}.`);
+    if (!head.includes(map[need])) throw new Error(`The log has no column named "${map[need]}". Its columns are: ${head.join(', ')}.`);
+  }
+  for (const optional of ['actorType', 'minutes']) {
+    if (map[optional] && !head.includes(map[optional])) throw new Error(`The log has no column named "${map[optional]}". Its columns are: ${head.join(', ')}.`);
+  }
+  const all = lines.map((cells) => Object.fromEntries(head.map((name, index) => [name, cells[index] ?? ''])));
+  const rows = all.filter((row) => row[map.process] === processName);
+  if (!rows.length) {
+    const names = [...new Set(all.map((row) => row[map.process]))].slice(0, 40);
+    throw new Error(`The log has no process named "${processName}". Its processes are: ${names.join(', ')}.`);
+  }
+  const systemActors = new Set((map.systemActors ?? '').split(',').map((name) => name.trim()).filter(Boolean));
+  const knowsSystems = Boolean(map.actorType && map.systemValue) || systemActors.size > 0;
+  const isSystem = (row) => (map.actorType && map.systemValue ? row[map.actorType] === map.systemValue : false) || systemActors.has(row[map.actor]);
+  const readable = (value) => String(value).trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+
+  const cases = new Map();
+  for (const row of rows) {
+    const at = Date.parse(row[map.time]);
+    if (Number.isNaN(at)) throw new Error(`Some values in "${map.time}" are not dates the script can read. Use a form like 2026-09-01T08:30Z.`);
+    if (!cases.has(row[map.case])) cases.set(row[map.case], []);
+    cases.get(row[map.case]).push({ row, at, position: cases.get(row[map.case]).length });
+  }
+  // Each case in time order. Steps with the same time keep the order they have in the log.
+  for (const steps of cases.values()) steps.sort((a, b) => a.at - b.at || a.position - b.position);
+
+  const orders = new Map();
+  const perStep = new Map();
+  for (const steps of cases.values()) {
+    const key = JSON.stringify(steps.map((step) => step.row[map.step]));
+    orders.set(key, (orders.get(key) ?? 0) + 1);
+    const seen = new Set();
+    steps.forEach((step, index) => {
+      const name = step.row[map.step];
+      if (!perStep.has(name)) perStep.set(name, { first: index, cases: 0, times: 0, bySystem: 0, systems: new Map(), people: new Set(), gaps: [], minutes: [], unreadable: 0 });
+      const entry = perStep.get(name);
+      entry.times += 1;
+      entry.first = Math.min(entry.first, index);
+      if (!seen.has(name)) { entry.cases += 1; seen.add(name); }
+      if (knowsSystems && isSystem(step.row)) {
+        entry.bySystem += 1;
+        entry.systems.set(step.row[map.actor], (entry.systems.get(step.row[map.actor]) ?? 0) + 1);
+      } else {
+        entry.people.add(step.row[map.actor]);
+        if (map.minutes) { if (readable(step.row[map.minutes])) entry.minutes.push(Number(step.row[map.minutes])); else entry.unreadable += 1; }
+      }
+      if (index > 0) entry.gaps.push((step.at - steps[index - 1].at) / 3_600_000);
+    });
+  }
+
+  const total = cases.size;
+  const ranked = [...orders].sort((a, b) => b[1] - a[1]);
+  const steps = [...perStep].sort((a, b) => a[1].first - b[1].first || b[1].cases - a[1].cases);
+  return {
+    process: processName,
+    cases_in_log: total,
+    // The orders the steps come in, the commonest first. `share` is the share of this process's cases.
+    // Three places, so that shares rounded one by one still add up: 105 and 95 of 200 are 0.525 and 0.475.
+    orders: ranked.slice(0, FLOW_ORDERS).map(([key, count]) => ({ steps: JSON.parse(key), cases: count, share: round(count / total, 3) })),
+    orders_left_out: Math.max(0, ranked.length - FLOW_ORDERS),
+    cases_in_orders_left_out: ranked.slice(FLOW_ORDERS).reduce((sum, [, count]) => sum + count, 0),
+    // Each step, in the order it first appears in a case.
+    steps: steps.slice(0, FLOW_STEPS).map(([name, entry]) => ({
+      step: name,
+      in_cases: entry.cases,
+      share_of_cases: round(entry.cases / total),
+      done_by: !knowsSystems ? 'not in the log' : entry.bySystem === entry.times ? 'a system' : entry.bySystem === 0 ? 'a person' : 'a system or a person',
+      ...(knowsSystems && entry.systems.size ? { systems: [...entry.systems].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([actor]) => actor) } : {}),
+      ...(!knowsSystems || entry.bySystem < entry.times ? { people_who_did_it: entry.people.size } : {}),
+      ...(entry.gaps.length ? { median_hours_after_the_step_before: round(median(entry.gaps), 1) } : {}),
+      ...(entry.minutes.length && !entry.unreadable ? { median_minutes_of_work: round(median(entry.minutes), 1) } : {}),
+    })),
+    steps_left_out: Math.max(0, steps.length - FLOW_STEPS),
+    not_in_log: [
+      ...(knowsSystems ? [] : ['which steps a system does']),
+      ...(map.minutes ? [] : ['minutes of work on each step']),
+      'why a case takes one order and not another: the log records what happened, not the reason',
+    ],
+  };
+}
+
 // Run as a command, on any system: a Windows path, or a folder name with a space, has to become a file address first.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
@@ -174,11 +271,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const number = (name) => (flag(name) === undefined ? undefined : Number(flag(name)));
   try {
     if (!args[0] || args[0].startsWith('--')) throw new Error('Give the log file first: node measure.mjs log.csv --case ... --process ... --time ... --actor ...');
-    const result = measureLog(await readFile(args[0], 'utf8'), {
+    const map = {
       case: flag('--case'), process: flag('--process'), time: flag('--time'), actor: flag('--actor'),
       actorType: flag('--actor-type'), systemValue: flag('--system-value'), systemActors: flag('--system-actors'),
       minutes: flag('--minutes'), step: flag('--step'), reopenValue: flag('--reopen-value'),
-    }, { fn: flag('--function'), rate: number('--rate'), spend: number('--spend'), department: flag('--department'), organisation: flag('--organisation') });
+    };
+    const csv = await readFile(args[0], 'utf8');
+    // With --flow and the name of one process, print that process's flow in place of the counts.
+    const result = flag('--flow') !== undefined
+      ? measureFlow(csv, map, flag('--flow'))
+      : measureLog(csv, map, { fn: flag('--function'), rate: number('--rate'), spend: number('--spend'), department: flag('--department'), organisation: flag('--organisation') });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);

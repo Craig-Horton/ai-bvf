@@ -201,7 +201,7 @@ function Footer() {
   return (
     <footer style={{ borderTop: '1px solid var(--line)', padding: '30px 44px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px', color: 'var(--copper-300)' }}>What you don't gate, you don't govern.</span>
-      <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>AI BVF · Craig Horton Advisory · Amsterdam</span>
+      <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>AI BVF · Craig Horton · Amsterdam</span>
     </footer>
   );
 }
