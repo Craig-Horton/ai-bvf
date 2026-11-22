@@ -44,6 +44,15 @@ The six answers that differed sat where the files say little. Two of them came f
 
 ## Round 2
 
-The message carries the reworded choices, and the reply form takes up to three quotes for an answer. See [`round-2/results.md`](round-2/results.md) once replies are in.
+The message carries the reworded choices, and the reply form takes up to three quotes for an answer. See [`round-2/results.md`](round-2/results.md).
+
+The two Claude models have answered it. Between them, round 1 had three answers that differed and round 2 has one.
+
+- Win-back, cost and return: both now answer unknown. In round 1 one of them read "I think it will pay for itself" as an untested figure.
+- LedgerLight, business result: both now answer unknown. In round 1 one of them read the vendor's claim as a result Halden had named.
+- LedgerLight, cost and return: they still differ. One counts the vendor's untested figures as written down, and the other answers unknown.
+- Refund agent, ownership of the change: both now answer d. In round 1 one answered c.
+
+The three verdicts are the same in both rounds. Replies from other assistants are added as they are run.
 
 Halden & Co is a made-up company. One run each shows where assistants differ and does not measure how often.
