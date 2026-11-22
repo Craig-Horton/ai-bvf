@@ -46,6 +46,13 @@ function evidenceOf(given: unknown): AssessEvidence | undefined {
   return quote.length >= 8 && source.length >= 3 ? { quote, source } : undefined;
 }
 
+/** The text without its closing full stop, question mark or exclamation mark. A plain loop: no pattern to run slowly on a long input. */
+export function withoutClosingStop(given: string): string {
+  let end = given.length;
+  while (end > 0 && '.!?'.includes(given[end - 1])) end -= 1;
+  return given.slice(0, end);
+}
+
 /** A number as it is written in a sentence: thousands separated, at most two decimals. */
 export function plainNumber(value: number): string {
   const [whole, fraction = ''] = (Math.round(value * 100) / 100).toString().split('.');
@@ -175,7 +182,7 @@ export function fundingRecord(
   if (stage || ask) {
     sentences.push(`${stage ? `The next stage is a ${stage}.` : 'The next stage is not named.'} ${ask ? `The ask is ${euros(ask.amount_eur)}.` : 'The amount asked is not known.'}`);
   }
-  if (alternative) sentences.push(`The alternative: ${alternative.description.replace(/[.!?]+$/, '')}${alternative.amount_eur !== undefined ? `, at ${euros(alternative.amount_eur)}` : ''}.`);
+  if (alternative) sentences.push(`The alternative: ${withoutClosingStop(alternative.description)}${alternative.amount_eur !== undefined ? `, at ${euros(alternative.amount_eur)}` : ''}.`);
   let review: AssessFunding['review'];
   if (reviewed.length) {
     const met = reviewed.filter((item) => item.met).length;

@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assessInitiative } from './assessInitiative.js';
 import { briefUrlFor, readBriefLink } from './briefLink.js';
-import { FUNDING_DECISIONS, FUNDING_DECISION_LABEL, FUNDING_NOTE, fundingRecord, plainNumber, withUnit } from './funding.js';
+import { FUNDING_DECISIONS, FUNDING_DECISION_LABEL, FUNDING_NOTE, fundingRecord, plainNumber, withUnit, withoutClosingStop } from './funding.js';
 import type { AssessFundingInput, AssessInitiativeInput } from './types.js';
 
 // A made-up service desk. The four answers give Fix, and the funding record changes none of it.
@@ -153,4 +153,9 @@ test('numbers are written the way a person writes them', () => {
   assert.equal(withUnit(9.5, 'EUR'), '€9.50');
   assert.equal(withUnit(6, 'percent'), '6 percent');
   assert.equal(withUnit(30), '30');
+  assert.equal(withoutClosingStop('Rewrite the form...'), 'Rewrite the form');
+  assert.equal(withoutClosingStop('Really?!'), 'Really');
+  // A long run of marks that does not end the text is left alone, and takes no time.
+  const marks = `${'!'.repeat(200000)} and then`;
+  assert.equal(withoutClosingStop(marks), marks);
 });

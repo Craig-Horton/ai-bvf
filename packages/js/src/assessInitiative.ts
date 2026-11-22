@@ -31,7 +31,7 @@ import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import { plainResult } from './plainResult.js';
 import { readProposal } from './proposalReading.js';
 import { assessInputFromBrief, readBriefLink } from './briefLink.js';
-import { fundingRecord } from './funding.js';
+import { fundingRecord, withoutClosingStop } from './funding.js';
 import {
   CHOICE_SCORES, QUESTION_SHORT, SMALLER_FIRM_BELOW, UNKNOWN_LABEL,
   WORK_ARCHITECTURE_CHOICES, trackFor, whereToLookFor, whyFor, wordingFor,
@@ -262,7 +262,7 @@ const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
 /** What one side says, grouped by where it was found. A closing full stop is left off, so the sentence reads cleanly. */
 function sideSays(items: AssessEvidence[]): string {
   const bySource = new Map<string, string[]>();
-  for (const item of items) bySource.set(item.source, [...(bySource.get(item.source) ?? []), `"${item.quote.replace(/[.!?]+$/, '')}"`]);
+  for (const item of items) bySource.set(item.source, [...(bySource.get(item.source) ?? []), `"${withoutClosingStop(item.quote)}"`]);
   return [...bySource].map(([source, quotes]) => `${source} says ${quotes.join(' and ')}.`).join(' ');
 }
 
