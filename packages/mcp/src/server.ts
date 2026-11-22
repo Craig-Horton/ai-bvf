@@ -16,14 +16,14 @@ import type { ErrorObject, ValidateFunction } from 'ajv';
 import {
   score, validate, recommendImprovements, calculatePaceLayerDrag, diagnoseProcess, inferReadiness,
   sequencePortfolio, mapToTaxonomy, assemblePortfolio, assessInitiative, briefUrlFor,
-  AGENT_BRIEF, AGENT_BRIEF_VERSION, REVIEW_OUTCOMES,
+  AGENT_BRIEF, AGENT_BRIEF_VERSION, FUNDING_DECISIONS, REVIEW_OUTCOMES,
   BASE_RATES, BENCHMARK_EVIDENCE_REGISTER, IND_MULT,
   INDUSTRIES, FUNCTIONS, AI_TIERS, READINESS, BVF_VERSION,
 } from '@aibvf/core';
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.20.0';
+export const VERSION = '0.21.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -184,6 +184,8 @@ export function logCall(tool_name: string, meta: Record<string, unknown> = {}) {
     answered_by: ['owner', 'evidence'].includes(String(meta.answered_by)) ? meta.answered_by : null,
     review_previous_verdict: ['Accelerate', 'Fix', 'Stop'].includes(String(meta.review_previous_verdict)) ? meta.review_previous_verdict : null,
     review_outcome: (REVIEW_OUTCOMES as readonly string[]).includes(String(meta.review_outcome)) ? meta.review_outcome : null,
+    // At a review: what the owner decided on the next round of money. One of three words. No amount is ever sent.
+    funding_decision: (FUNDING_DECISIONS as readonly string[]).includes(String(meta.funding_decision)) ? meta.funding_decision : null,
   };
   // Local callers do not wait for telemetry. Serverless callers can flush the
   // pending request briefly after the scoring response has been written.
@@ -336,6 +338,53 @@ const assessInitiativeInputSchema = {
           description: 'delivering: it went ahead and is delivering what was expected. falling_short: it went ahead and is falling short. fixed_then_went_ahead: it was fixed first, then went ahead. paused_or_stopped: it was paused or stopped. no_decision: no decision has been made.',
         },
         evidence: evidenceSchema,
+      },
+    },
+    funding: {
+      type: 'object',
+      description: 'OPTIONAL. The funding record, for the person who holds the budget: what is asked for the next stage, the alternative, and up to three results agreed to release more money. It sits beside the verdict and never changes it. Pass only figures the organisation has stated, never one you worked out. In evidence mode each figure needs its quote and source, or it is not kept. At a return visit pass review.previous_brief and put what was measured in results: the agreed results come back from the earlier link. This tool never says whether to fund.',
+      properties: {
+        stage: { type: 'string', enum: ['pilot', 'rollout'], description: 'What the money is for: a limited pilot, or a rollout.' },
+        ask: {
+          type: 'object', description: 'What is asked for the next stage.',
+          properties: { amount_eur: { type: 'number', minimum: 0, description: 'The amount asked, in euros, as the organisation states it.' }, evidence: evidenceSchema },
+        },
+        alternative: {
+          type: 'object', description: 'The cheapest credible other route, including fixing the process as it is.',
+          properties: { description: { type: 'string', maxLength: 500 }, amount_eur: { type: 'number', minimum: 0 }, evidence: evidenceSchema },
+        },
+        thresholds: {
+          type: 'array', maxItems: 3,
+          description: 'Up to three results the owner agreed would release more money, written down before the work starts.',
+          items: {
+            type: 'object', required: ['measure', 'direction', 'target'],
+            properties: {
+              measure: { type: 'string', maxLength: 200, description: 'What is measured, for example Cost per resolved ticket.' },
+              unit: { type: 'string', maxLength: 40, description: 'For example euros or percent.' },
+              direction: { type: 'string', enum: ['at_most', 'at_least'], description: 'at_most when lower is better, at_least when higher is better.' },
+              target: { type: 'number', description: 'The agreed figure.' },
+              baseline: { type: 'number', minimum: 0, description: 'Today\'s figure.' },
+              baseline_kind: { type: 'string', enum: ['measured', 'estimate'], description: 'measured when today\'s figure was counted from records. Otherwise it is an estimate.' },
+              evidence: evidenceSchema,
+            },
+          },
+        },
+        results: {
+          type: 'array', maxItems: 3,
+          description: 'At a review: what was measured, by the name of the agreed result.',
+          items: {
+            type: 'object', required: ['measure', 'value'],
+            properties: {
+              measure: { type: 'string', maxLength: 200 }, value: { type: 'number' },
+              kind: { type: 'string', enum: ['measured', 'estimate'], description: 'measured when it was counted from records. Otherwise it is an estimate.' },
+              evidence: evidenceSchema,
+            },
+          },
+        },
+        decision: {
+          type: 'string', enum: [...FUNDING_DECISIONS],
+          description: 'At a review, only when the owner has said it: released, the next round of money was released. deferred, the decision was put off. withdrew, the request was withdrawn. Never choose it for the owner.',
+        },
       },
     },
     brief_includes_proposal: { type: 'boolean', description: 'Set true only when the owner says the wording of the proposal may travel in brief_url. Without it the link carries the context, the answers and, in evidence mode, the quotes.' },
@@ -669,6 +718,38 @@ const assessInitiativeOutputSchema = {
           ...assessDeciderSchema.properties,
           choices: { type: 'array', items: { type: 'object', required: ['id', 'label'], properties: { id: { type: 'string' }, label: { type: 'string' } } } },
         },
+      },
+    },
+    funding: {
+      type: 'object',
+      description: 'Present when a funding record was passed, or the earlier brief carried one. Say statement with the verdict, then each line in thresholds and each entry in gaps. Every figure is the organisation\'s own. Never add a figure, and never say whether to fund: say note.',
+      required: ['thresholds', 'gaps', 'statement', 'note'],
+      properties: {
+        stage: { type: 'string', enum: ['pilot', 'rollout'] },
+        ask: { type: 'object', properties: { amount_eur: { type: 'number' }, evidence: evidenceSchema } },
+        alternative: { type: 'object', properties: { description: { type: 'string' }, amount_eur: { type: 'number' }, evidence: evidenceSchema } },
+        thresholds: {
+          type: 'array',
+          items: {
+            type: 'object', required: ['measure', 'direction', 'target', 'baseline_kind', 'line'],
+            properties: {
+              measure: { type: 'string' }, unit: { type: 'string' }, direction: { type: 'string', enum: ['at_most', 'at_least'] }, target: { type: 'number' },
+              baseline: { type: 'number' }, baseline_kind: { type: 'string', enum: ['measured', 'estimate', 'unknown'] }, evidence: evidenceSchema,
+              result: { type: 'number' }, result_kind: { type: 'string', enum: ['measured', 'estimate'] }, result_evidence: evidenceSchema,
+              met: { type: 'boolean', description: 'At a review: whether the result is on the agreed side of the target.' },
+              line: { type: 'string', description: 'The agreed result in one sentence. Say it as written.' },
+            },
+          },
+        },
+        gaps: stringArray('What the person who holds the budget still does not know, most important first.'),
+        review: {
+          type: 'object', description: 'Present once a result is in.', required: ['met', 'of', 'statement'],
+          properties: { met: { type: 'number' }, of: { type: 'number' }, statement: { type: 'string' } },
+        },
+        agreement_changed: { type: 'boolean', description: 'True when results passed today differ from those the earlier brief carried. The earlier ones are used. Tell the owner.' },
+        decision: { type: 'string', enum: [...FUNDING_DECISIONS] },
+        statement: { type: 'string', description: 'The record in plain sentences. Say it as written.' },
+        note: { type: 'string', description: 'Whose figures these are, and whose decision it is. Say it.' },
       },
     },
     conflicts: {
@@ -1232,7 +1313,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. Where two records disagree on an answer, pass the words of the other record in evidence_against: the answer is counted as not known and conflicts returns both, with the question to put to the owner. At a return visit, pass review with previous_brief, the brief_url of the earlier verdict: since_last then says which answers changed and which change moved the verdict. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. Where two records disagree on an answer, pass the words of the other record in evidence_against: the answer is counted as not known and conflicts returns both, with the question to put to the owner. At a return visit, pass review with previous_brief, the brief_url of the earlier verdict: since_last then says which answers changed and which change moved the verdict. For the person who holds the budget, pass funding with what is asked for the next stage, the alternative and up to three results agreed to release more money: funding comes back beside the verdict with what is still not known, and at a return visit with each agreed result marked met or not met. It never changes the verdict and never says whether to fund. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const EXAMPLE_ORGANIZATION = { name: 'Example retailer', industry: 'retail', revenue_eur: 300_000_000 };
@@ -1463,6 +1544,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
           industry: r.resolved_inputs.industry, function: r.resolved_inputs.function,
           ai_tier: r.resolved_inputs.ai_tier,
           answered_by: answeredBy,
+          ...(r.funding?.decision ? { funding_decision: r.funding.decision } : {}),
         });
         const payload = { bvf_version: BVF_VERSION, ...r, assessment_id: assessmentId };
         return {
@@ -1483,6 +1565,8 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         answered_by: answeredBy,
         // An outcome is recorded only once it is accepted: an agent has to quote what happened.
         ...(r.review?.accepted ? { review_previous_verdict: r.review.previous_verdict, review_outcome: r.review.outcome } : {}),
+        // What the owner decided on the next round of money, as one of three words. No amount is recorded.
+        ...(r.funding?.decision ? { funding_decision: r.funding.decision } : {}),
       });
       // The brief is rebuilt from the answers by the page that opens it. The link is made here and stored nowhere.
       const briefUrl = briefUrlFor(a, r, new Date().toISOString().slice(0, 10), { include_proposal: a?.brief_includes_proposal === true });

@@ -124,6 +124,17 @@ assert.equal(payloads.at(-1).answered_by, 'owner');
 await logCall('score_initiative', { entry_route: 'remote', answered_by: 'someone', review_outcome: 'went well' });
 assert.equal(payloads.at(-1).answered_by, null);
 assert.equal(payloads.at(-1).review_outcome, null);
+// What the owner decided on the next round of money is recorded as one word. No amount or threshold is sent.
+await client.callTool({ name: 'assess_ai_initiative', arguments: {
+  proposal: agentCall.proposal, confirmed: true, answers: { governance_risk: 'a' },
+  funding: { stage: 'pilot', ask: { amount_eur: 48750 }, thresholds: [{ measure: 'Cost per resolved ticket', unit: 'euros', direction: 'at_most', target: 10 }], decision: 'deferred' },
+} });
+assert.equal(payloads.at(-1).funding_decision, 'deferred');
+for (const secret of ['48750', 'Cost per resolved ticket', 'pilot']) {
+  assert.equal(JSON.stringify(payloads.at(-1)).includes(secret), false, `telemetry carried "${secret}"`);
+}
+await logCall('score_initiative', { entry_route: 'remote', funding_decision: 'approved' });
+assert.equal(payloads.at(-1).funding_decision, null);
 await client.close();
 await server.close();
 

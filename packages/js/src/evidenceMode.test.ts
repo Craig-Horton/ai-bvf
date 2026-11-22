@@ -241,7 +241,7 @@ test('the operating brief names the tool fields it relies on and keeps the house
   for (const banned of ['boardroom', 'leverage', 'crucial', 'pivotal', 'seamless', 'utilize', 'unlock', 'harness', 'robust', 'delve', 'perhaps', 'maybe']) {
     assert.ok(!AGENT_BRIEF.toLowerCase().includes(banned), `banned word: ${banned}`);
   }
-  assert.ok(AGENT_BRIEF.length < 4000, 'the brief has to stay short enough to paste into any assistant');
+  assert.ok(AGENT_BRIEF.length < 4500, 'the brief has to stay short enough to paste into any assistant');
 });
 
 test('the brief takes a direct instruction to run as consent, and keeps the brief link whole', () => {
@@ -255,6 +255,9 @@ test('the brief takes a direct instruction to run as consent, and keeps the brie
   assert.ok(AGENT_BRIEF.includes('Two records, no winner.'));
   assert.ok(AGENT_BRIEF.includes('never say which record is right'), 'the owner decides which record applies');
   assert.ok(AGENT_BRIEF.includes('Pass review with previous_brief'), 'a return visit hands back the earlier brief link');
+  assert.ok(AGENT_BRIEF.includes('pass them in funding, each figure with its quote'), 'a funding figure is the organisation\'s own, quoted');
+  assert.ok(AGENT_BRIEF.includes('funding.results'), 'a return visit sets the measured results beside the agreement');
+  assert.ok(AGENT_BRIEF.includes('The budget holder decides. Never say whether to fund.'));
 });
 
 test('choice b asks for figures on cost and return, and for the organisation on the business result', () => {

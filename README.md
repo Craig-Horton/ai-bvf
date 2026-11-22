@@ -68,6 +68,8 @@ The engine enforces three rules itself. An answer without a quote and a source i
 
 Two more rules cover records that change. Where two records disagree on an answer, the engine counts it as not known and returns both quotes with the question for the owner: which one applies today. At a return visit the earlier brief link goes back in, and the result says which answers changed and which change moved the verdict.
 
+For the person who holds the budget there is a funding record: what is asked for the next stage, the alternative, and up to three results agreed to release more money. Every figure is the organisation's own. At the return visit each agreed result comes back marked met or not met, and the engine never says whether to fund. See [`examples/funding-review`](examples/funding-review).
+
 - Claude, Claude Code and OpenClaw: install the skill in [`skills/aibvf-agent`](skills/aibvf-agent), packed as [`aibvf-agent.zip`](aibvf-agent.zip).
 - Any other assistant with the connector: give it the operating brief, which the connector serves as the prompt `aibvf_agent`.
 
@@ -113,9 +115,9 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.20.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.21.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.15.0 | TypeScript assessment and scoring engine. |
+| [`@aibvf/core`](packages/js) | 0.16.0 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.
@@ -128,7 +130,7 @@ The MCP server can report tool calls and a `server_connect` event. Events includ
 
 Local stdio calls also include a stable one-way `install_hash` for repeat-use measurement, derived from a random local seed. Hosted calls have no return identity by default; clients can opt in by supplying a random UUID in `x-aibvf-client-id`, of which only a hash is stored. A broad `user_role` is sent only when a local user explicitly sets `AIBVF_USAGE_ROLE`.
 
-The guided tool returns an opaque `assessment_id` to copy into continuation calls, and telemetry stores its hash, the stage, question name, outcome and traffic cohort. It also stores who answered, a person or an agent working from evidence, and at a review the earlier verdict and which of five fixed outcomes followed it. Internal and automated checks are reported separately; an unmarked call is not proof of an external person. See [measurement definitions and test exclusions](docs/adoption-metrics.md).
+The guided tool returns an opaque `assessment_id` to copy into continuation calls, and telemetry stores its hash, the stage, question name, outcome and traffic cohort. It also stores who answered, a person or an agent working from evidence, and at a review the earlier verdict, which of five fixed outcomes followed it, and what the owner decided on the next round of money as one of three words. Internal and automated checks are reported separately; an unmarked call is not proof of an external person. See [measurement definitions and test exclusions](docs/adoption-metrics.md).
 
 No proposal, quoted evidence, portfolio content, revenue figure, numeric pillar score or personal identifier is included. Set `AIBVF_TELEMETRY_DISABLE=1` to prevent events and creation of the local install-id file. Point at your own backend with `AIBVF_TELEMETRY_URL` and `AIBVF_TELEMETRY_KEY`.
 

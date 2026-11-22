@@ -31,6 +31,7 @@ import { REGULATED_FUNCTIONS, REGULATED_INDUSTRIES } from './taxonomy.js';
 import { plainResult } from './plainResult.js';
 import { readProposal } from './proposalReading.js';
 import { assessInputFromBrief, readBriefLink } from './briefLink.js';
+import { fundingRecord } from './funding.js';
 import {
   CHOICE_SCORES, QUESTION_SHORT, SMALLER_FIRM_BELOW, UNKNOWN_LABEL,
   WORK_ARCHITECTURE_CHOICES, trackFor, whereToLookFor, whyFor, wordingFor,
@@ -378,11 +379,13 @@ function sinceLast(input: AssessInitiativeInput, result: AssessInitiativeResult,
 
 export function assessInitiative(input: AssessInitiativeInput): AssessInitiativeResult {
   const link = input.review && typeof input.review === 'object' ? input.review.previous_brief : undefined;
-  if (link === undefined) return assess(input);
-  const then = earlierFrom(link);
-  const result = assess(input, then.verdict);
-  if (!result.review || (result.status !== 'verdict' && result.status !== 'not_enough_to_judge')) return result;
-  return { ...result, review: { ...result.review, since_last: sinceLast(input, result, then) } };
+  const then = link === undefined ? undefined : earlierFrom(link);
+  // The funding record sits beside the verdict. At a return visit the results agreed earlier come back from the brief link.
+  const funding = fundingRecord(input?.funding, input?.answered_by === 'evidence', then?.brief.funding, then?.brief.date);
+  let result = assess(input, then?.verdict);
+  if (result.status !== 'verdict' && result.status !== 'not_enough_to_judge') return result;
+  if (then && result.review) result = { ...result, review: { ...result.review, since_last: sinceLast(input, result, then) } };
+  return funding ? { ...result, funding } : result;
 }
 
 function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): AssessInitiativeResult {

@@ -40,3 +40,4 @@ export {
 export { AGENT_BRIEF, AGENT_BRIEF_VERSION, AGENT_CONNECTOR_URL } from './agentBrief.js';
 export { BRIEF_BASE, assessInputFromBrief, briefUrl, briefUrlFor, readBriefLink } from './briefLink.js';
 export type { BriefConflict, BriefLinkInput, BriefPrevious } from './briefLink.js';
+export { FUNDING_DECISIONS, FUNDING_DECISION_LABEL, FUNDING_NOTE, FUNDING_STAGES, FUNDING_THRESHOLDS_MAX, fundingRecord, plainNumber, withUnit } from './funding.js';

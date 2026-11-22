@@ -351,6 +351,26 @@ test('MCP evidence mode lets an agent answer alone, only from what it can quote'
     assert.match(returned.review.since_last.statement, /^The verdict moved from Fix to Accelerate\. Two answers changed since /);
     const carriedBack = JSON.parse(Buffer.from(returned.verdict.brief_url.split('#')[1], 'base64url').toString('utf8'));
     assert.equal(carriedBack.r.v, 'Fix', 'the new brief link carries the earlier verdict');
+    // The funding record sits beside the verdict, and the agreed results come back from the earlier link at the return visit.
+    const agreed = { quote: 'Release rollout funds if cost per contact falls to 2 euros or less.', source: 'Sponsor note, 20 November 2026' };
+    const asked = { quote: 'We ask for 40,000 euros for the pilot from 1 December.', source: 'Project plan, 6 November 2026' };
+    const funded = await call('assess_ai_initiative', { ...alone, evidence, funding: {
+      stage: 'pilot', ask: { amount_eur: 40000, evidence: asked },
+      thresholds: [{ measure: 'Cost per contact', unit: 'euros', direction: 'at_most', target: 2, baseline: 3.1, baseline_kind: 'measured', evidence: agreed }],
+    } });
+    assert.equal(funded.verdict.classification, 'Fix', 'the funding record does not move the verdict');
+    assert.equal(funded.funding.ask.amount_eur, 40000);
+    assert.equal(funded.funding.thresholds[0].line, 'Cost per contact. Today: €3.10, measured. Agreed: at most €2.');
+    assert.deepEqual(funded.funding.gaps, ['No alternative is named, such as fixing the process as it is.']);
+    assert.match(funded.funding.note, /does not say whether to fund/);
+    const measured = await call('assess_ai_initiative', { ...alone, evidence, review: { previous_brief: funded.verdict.brief_url }, funding: {
+      results: [{ measure: 'Cost per contact', value: 2.4, kind: 'measured', evidence: { quote: 'Cost per contact in December: 2.40 euros.', source: 'Pilot results, 31 December 2026' } }],
+    } });
+    assert.equal(measured.funding.review.met, 0);
+    assert.match(measured.funding.review.statement, /^One result was agreed on \d+ \w+ \d{4}\. It is not met\. Not met: Cost per contact, at most €2 agreed, €2\.40 measured\.$/);
+    const unquotedFigure = await call('assess_ai_initiative', { ...alone, evidence, funding: { ask: { amount_eur: 40000 } } });
+    assert.equal(unquotedFigure.funding.ask, undefined, 'an agent keeps a figure only where it can quote it');
+
     const shortened = await client.callTool({ name: 'assess_ai_initiative', arguments: { ...alone, evidence, review: { previous_brief: 'https://bit.ly/3xYz' } } });
     assert.equal(shortened.isError, true, 'a shortened or changed link is refused');
     assert.match(shortened.content[0].text, /brief link the earlier verdict came with/);

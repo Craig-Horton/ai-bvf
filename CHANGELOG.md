@@ -2,6 +2,28 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.21.0 (aibvf-mcp), 0.16.0 (@aibvf/core), 22 November 2026
+
+Added: a funding record beside the verdict. `assess_ai_initiative` takes `funding`: the stage, a pilot or a rollout, what is asked for it, the alternative, and up to three results agreed to release more money. `funding` comes back with each agreed result in one sentence, what is still not known, and a note on whose figures these are.
+
+Why: a reader pointed out what the person who holds the budget still needs once the verdict is read. What are we asked to spend, what is the alternative, and what result would justify releasing more? The verdict says whether an initiative is ready to go ahead. It could not tell approval for a limited pilot from approval for a rollout.
+
+Added: the return visit checks results against the agreement. The ask and the agreed results travel in the brief link. With `review.previous_brief` and `funding.results`, each agreed result comes back marked met or not met. Results passed at the return visit never replace the earlier agreement without that being said: where they differ, the earlier ones are used and `agreement_changed` is set.
+
+Added: `funding.decision` records what the owner decided at a review: `released`, `deferred` or `withdrew`. Telemetry counts that one word as `funding_decision`. No amount, threshold or result is sent.
+
+Changed: the operating brief is version 5. The agent passes the funding figures the documents state, each with its quote, reports which agreed results are met, and never says whether to fund. The brief may now run to 4,500 characters, up from 4,000.
+
+Three limits, on purpose:
+
+- The engine works out no figure. Every figure in the record is the organisation's own, repeated as stated and marked measured, estimate or not known. In evidence mode a figure without a quote is not kept.
+- The engine never says fund or do not fund. It says which agreed results are met. The decision stays with the person who holds the budget.
+- The funding record never changes the verdict.
+
+Tested: 10 new engine tests, and funding checks in the connector and telemetry tests. [`examples/funding-review`](examples/funding-review) runs both visits on a made-up service desk.
+
+Scope: one optional input and one output on one tool, one telemetry column, and the brief. No score, threshold or verdict rule changes. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged. The site at aibvf.com does not show the funding record yet.
+
 ## 0.20.0 (aibvf-mcp), 0.15.0 (@aibvf/core), 22 November 2026
 
 Added: two records that disagree hold the answer. In evidence mode `assess_ai_initiative` takes `evidence_against`: the words of another record that says otherwise than an answer, with its source. The answer is then counted as not known. `conflicts` returns both sets of quotes and `ask`, the question to put to the owner: which one applies today.
