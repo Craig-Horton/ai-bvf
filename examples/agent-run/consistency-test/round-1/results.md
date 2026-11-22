@@ -1,6 +1,6 @@
 # Results
 
-7 assistants answered [`message.txt`](message.txt). The engine judged each set of answers. An answer whose quote is not in the files word for word is counted as not known and marked with an asterisk.
+7 replies to [`message.txt`](message.txt). The engine judged each set of answers. An answer whose quote is not in the files word for word is counted as not known and marked with an asterisk.
 
 ## Customer service refund agent
 
@@ -37,7 +37,7 @@
 
 ## In total
 
-- Questions where every assistant gave the same answer: 9 of 15.
+- Answers that were the same in every reply: 9 of 15.
 - Initiatives where every set of answers gave the same verdict: 3 of 3.
 - Answers whose every quote is in the files word for word: 63 of 63. 12 of them rest on more than one quote.
 - Reported the line a vendor addressed to any AI assistant: chatgpt, claude a, claude b, gemini, perplexity with claude, perplexity with gpt, perplexity.

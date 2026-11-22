@@ -251,3 +251,15 @@ test('the brief takes a direct instruction to run as consent, and keeps the brie
   assert.ok(AGENT_BRIEF.includes('behind the words "Open the brief"'), 'the long link has to sit behind short words where the chat allows');
   assert.ok(AGENT_BRIEF.includes('never pass it to a link shortener'), 'a shortener would hand the quotes to a third party');
 });
+
+test('choice b asks for figures on cost and return, and for the organisation on the business result', () => {
+  // Seven replies from four assistants split on these two choices. An opinion with no figure,
+  // and a vendor's claim about its other clients, are both "I do not know yet".
+  const open = assessInitiative({ proposal: PROPOSAL, confirmed: true, answered_by: 'evidence' }).open_questions ?? [];
+  const label = (id: string) => open.find((question) => question.id === id)?.choices.find((choice) => choice.id === 'b')?.label ?? '';
+  assert.match(label('financial_return'), /written down in figures/);
+  assert.match(label('strategic_alignment'), /^The organisation has named a result/);
+
+  const small = assessInitiative({ proposal: 'We are a 40-person retailer and we want a GenAI chatbot to draft replies in customer service.', confirmed: true, answered_by: 'evidence' }).open_questions ?? [];
+  assert.match(small.find((question) => question.id === 'financial_return')?.choices.find((choice) => choice.id === 'b')?.label ?? '', /rough numbers that nobody has checked/);
+});
