@@ -39,7 +39,7 @@
 
 - Questions where every assistant gave the same answer: 12 of 15.
 - Initiatives where every set of answers gave the same verdict: 3 of 3.
-- Quotes found in the files word for word: 18 of 18.
+- Answers whose every quote is in the files word for word: 18 of 18. 0 of them rest on more than one quote.
 - Reported the line a vendor addressed to any AI assistant: claude a, claude b.
 - Listed something else as an initiative: none.
 
