@@ -140,6 +140,10 @@ try {
   }
   const asking = (await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal: 'We are a 400-person online retailer. We want an AI agent to answer first-line customer queries.', confirmed: true } })).structuredContent;
   assert.ok(asking.question.where_to_look, 'The skill relies on where_to_look, which the tool did not return.');
+  // The brief tells the agent to answer all five in one call, from the choices in open_questions.
+  const alone = (await client.callTool({ name: 'assess_ai_initiative', arguments: { proposal: 'We are a 400-person online retailer. We want an AI agent to answer first-line customer queries.', confirmed: true, answered_by: 'evidence' } })).structuredContent;
+  assert.equal(alone.open_questions?.length, 5, 'The brief relies on open_questions listing all five questions.');
+  assert.ok(alone.open_questions.every((q) => q.choices.length === 5 && q.where_to_look), 'Every open question needs its choices and where to look.');
 } finally {
   await client.close();
   await server.close();

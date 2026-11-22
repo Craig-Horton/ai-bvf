@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.18.0';
+export const VERSION = '0.18.1';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -119,16 +119,15 @@ const installHash = () => {
   return createHash('sha256').update(`aibvf-install ${installSeed}`).digest('hex').slice(0, 24);
 };
 
-// Advisory CTA: emitted only when the verdict warrants a human-in-the-room
-// conversation. The agent surfaces this in whatever way fits the host. Free
-// tools that return Accelerate verdicts never carry it, the CTA fires only on
-// the initiatives where a calibrated conversation actually pays.
-const ADVISORY_EMAIL = 'craig@craighortonadvisory.com';
-const ADVISORY_BOOKING = 'https://calendly.com/craigmds1/new-meeting';
+// Where the method is published: returned with a Fix or Stop verdict, so the
+// person who has to act on it can check every rule behind it. It carries no
+// offer and no contact. The field keeps the name advisory_next_step so that
+// existing callers do not break.
+const METHOD_URL = 'https://github.com/Craig-Horton/ai-bvf';
 const FEEDBACK_QUESTION = 'Did this change what you will do next, what should AI BVF do more of, and what should it stop doing?';
 function advisoryFor(classification: string): string | undefined {
   if (classification === 'Fix' || classification === 'Stop') {
-    return `This ${classification} verdict is worth arguing with the team that has to act on it. Book a 20-minute teardown: ${ADVISORY_BOOKING} (or email ${ADVISORY_EMAIL}).`;
+    return `Every rule behind this ${classification} verdict is published. Read the method and the code: ${METHOD_URL}`;
   }
   return undefined;
 }
@@ -307,7 +306,7 @@ const assessInitiativeInputSchema = {
     confirmed: { type: 'boolean', description: 'Set true only after the user has seen the understood statement and said it is right. Never set it on behalf of a user who is present. Working alone in evidence mode, set it yourself after checking the reading against what you read.' },
     answers: {
       type: 'object',
-      description: 'The answers to the guided questions, by question id. Each value is the id of a choice: a, b, c, d, or unknown. Pass every answer given so far on each call. With a person present, pass what the person picked and never pick for them. In evidence mode, pass only the answer your quote supports, and unknown when you found nothing.',
+      description: 'The answers to the guided questions, by question id. Each value is the id of a choice: a, b, c, d, or unknown. Pass every answer given so far on each call. With a person present, pass what the person picked and never pick for them. In evidence mode, pass only the answer your quote supports, and unknown when you found nothing. Answer all five in one call: open_questions returns every question still open with its choices.',
       properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
         .map((id) => [id, { type: 'string', enum: ['a', 'b', 'c', 'd', 'unknown'] }])),
     },
@@ -340,7 +339,10 @@ const assessInitiativeInputSchema = {
       description: 'OPTIONAL, for callers that already hold 0 to 100 pillar scores from the user. A regular user answers the guided questions and never needs this. A supplied score takes precedence over an answer. Never invent a number: this tool fills in nothing.',
     },
     signal_completeness: scoreInitiativeInputSchema.properties.signal_completeness,
-    work_architecture: workArchitectureInputSchema,
+    work_architecture: {
+      ...workArchitectureInputSchema,
+      description: `${workArchitectureInputSchema.description} OPTIONAL, for callers that already hold the four checks. Refused in evidence mode: there, answer work_architecture in answers with a to d and quote it in evidence.`,
+    },
     revenue_eur: { type: 'number', minimum: 0, description: 'Accepted for compatibility and ignored. The front door verdict does not use revenue.' },
     readiness: { type: 'string', description: 'Accepted for compatibility and ignored. The front door verdict does not use the operating-model label.' },
   },
@@ -526,7 +528,7 @@ const scoreOutputSchema = {
         gate: { type: 'string' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -598,7 +600,7 @@ const assessVerdictSchema = {
       },
     },
     brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Absent when the verdict rests on a supplied score.' },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: scoreOutputSchema.properties.feedback,
   },
 };
@@ -652,6 +654,18 @@ const assessInitiativeOutputSchema = {
     warning: { type: 'string', description: 'A condition the user must meet first. Lead with it when present.' },
     answered_by: { type: 'string', enum: ['evidence'], description: 'Present when an agent answered from evidence.' },
     evidence_missing: stringArray('Evidence mode: answers that came with no quote and source. Each was counted as not known. Find the words, or leave the answer as unknown.'),
+    open_questions: {
+      type: 'array',
+      description: 'Evidence mode only. Every guided question still without an answer, each with its choices and where to look. Answer all of them in one call, each with its quote, and unknown where you found nothing. On a verdict nothing waits on them: answer them and call again, and the brief carries those answers too.',
+      items: {
+        ...assessDeciderSchema,
+        required: [...assessDeciderSchema.required, 'choices'],
+        properties: {
+          ...assessDeciderSchema.properties,
+          choices: { type: 'array', items: { type: 'object', required: ['id', 'label'], properties: { id: { type: 'string' }, label: { type: 'string' } } } },
+        },
+      },
+    },
     review: {
       type: 'object',
       description: 'Present when a review was passed: the earlier verdict and what happened since. accepted is false when an agent gave an outcome with no evidence.',
@@ -729,7 +743,7 @@ const recommendOutputSchema = {
         honest_stop:  { type: 'string', description: 'Present when the truthful call is Stop rather than Fix. Surface this verbatim; it is the most valuable sentence in the response when it appears.' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -903,7 +917,7 @@ const scorePortfolioOutputSchema = {
         },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Optional CTA, present only when any initiative was Fix or Stop.' },
+    advisory_next_step: { type: 'string', description: 'Present only when any initiative was Fix or Stop: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only when any initiative was Fix or Stop. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -962,7 +976,7 @@ const diagnoseOutputSchema = {
     offer_to_execute:    { type: 'boolean', description: 'True when the verdict warrants offering to action it (Accelerate).' },
     evidence_maturity:   { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Strength of the benchmark evidence behind the effectiveness band.' },
     disclaimer:          { type: 'string', description: 'Directional decision aid, not an audited figure.' },
-    advisory_next_step:  { type: 'string', description: 'Optional CTA, present only for Fix/Stop verdicts.' },
+    advisory_next_step:  { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
   },
 };
 
@@ -1167,7 +1181,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const EXAMPLE_ORGANIZATION = { name: 'Example retailer', industry: 'retail', revenue_eur: 300_000_000 };
@@ -1367,7 +1381,7 @@ export function checkToolInput(name: string, args: unknown): void {
  * Said to every assistant that connects. Two ways of working: with a person
  * who answers, and alone under a mandate, where only quoted evidence counts.
  */
-export const SERVER_INSTRUCTIONS = 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It fills in no score and gives no euro figure, so never state a euro benefit from it. WITH A PERSON PRESENT it is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. Never set confirmed or pick an answer for that person. WORKING ALONE as an agent under your owner\'s mandate, with nobody to ask, use evidence mode: set answered_by to evidence, answer each question only from words you can quote, pass each quote with its source in evidence, and answer unknown where you found none. An answer without a quote is counted as not known. Say the returned provenance statement with every verdict reached this way. The prompt aibvf_agent holds the full operating brief for working alone: the mandate, the run and the rules. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.';
+export const SERVER_INSTRUCTIONS = 'For one AI proposal written in ordinary business language, call assess_ai_initiative first. It fills in no score and gives no euro figure, so never state a euro benefit from it. WITH A PERSON PRESENT it is a guided conversation that returns one thing to ask at a time: ask it, then call again with the proposal unchanged, every answer so far and the returned assessment_id. Omit assessment_id for a new idea. Never set confirmed or pick an answer for that person. WORKING ALONE as an agent under your owner\'s mandate, with nobody to ask, use evidence mode: set answered_by to evidence, answer each question only from words you can quote, pass each quote with its source in evidence, and answer unknown where you found none. Answer all five questions in one call: open_questions lists each one still open with its choices. An answer without a quote is counted as not known. Say the returned provenance statement with every verdict reached this way. The prompt aibvf_agent holds the full operating brief for working alone: the mandate, the run and the rules. Use score_initiative only when the canonical fields are already known. Use the portfolio tools only when the user has several initiatives.';
 
 /** The operating brief for an agent working alone, offered to clients that list prompts. */
 export const AGENT_PROMPT = {

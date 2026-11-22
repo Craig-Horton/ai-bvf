@@ -29,7 +29,7 @@ import {
   WORK_ARCHITECTURE_CHOICES, trackFor, whereToLookFor, whyFor, wordingFor,
 } from './guidedQuestions.js';
 import type {
-  AiTier, AssessAnswer, AssessChoice, AssessContradiction, AssessChoiceId, AssessContext, AssessDecider, AssessEvidence, AssessField,
+  AiTier, AssessAnswer, AssessChoice, AssessContradiction, AssessChoiceId, AssessContext, AssessDecider, AssessEvidence, AssessField, AssessOpenQuestion,
   AssessInitiativeInput, AssessInitiativeResult, AssessProvenance, AssessQuestion, AssessQuestionId, AssessReviewRecord, AssessTrack,
   AssessVerdict, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
 } from './types.js';
@@ -264,7 +264,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   }
   const byEvidence = input.answered_by === 'evidence';
   if (byEvidence && (Object.keys(input.scores ?? {}).length || Object.keys(input.work_architecture ?? {}).length)) {
-    throw new Error('In evidence mode, answer each question with a to d and quote the evidence for it. Numeric scores and the four work checks are not accepted.');
+    throw new Error('In evidence mode, answer each question with a to d and quote the evidence for it. Numeric scores and the four work checks are not accepted: answer work_architecture in answers with a to d, and quote it in evidence.');
   }
   const review = reviewRecord(input, byEvidence);
 
@@ -412,9 +412,22 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const suppliedCount = Object.keys(supplied).length;
   const regulatedAgentic = resolved.ai_tier === 'gen3'
     && (REGULATED_INDUSTRIES.has(resolved.industry!) || REGULATED_FUNCTIONS.has(resolved.function!));
+  // The two questions that can stop the initiative first, then the two
+  // Accelerate needs, then the work redesign.
+  const order: AssessQuestionId[] = regulatedAgentic
+    ? ['governance_risk', 'financial_return', 'strategic_alignment', 'change_enablement', 'work_architecture']
+    : ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
+  // An agent working alone answers every question in one call, so it is shown
+  // every question still without an answer, each with its choices. A person is
+  // asked one question at a time and never sees this list.
+  const openQuestions: AssessOpenQuestion[] = byEvidence
+    ? order.filter((id) => (id === 'work_architecture' ? !workAnswered : supplied[id] === undefined))
+      .map((id) => ({ ...decider(track, id, resolved.ai_tier), choices: guidedChoices(track, id, resolved.ai_tier) }))
+    : [];
   const judged = {
     ...base, missing_fields: [] as AssessField[],
     ...(evidenceMissing.length ? { evidence_missing: evidenceMissing } : {}),
+    ...(openQuestions.length ? { open_questions: openQuestions } : {}),
   };
   const provenance: { provenance?: AssessProvenance } = byEvidence
     ? { provenance: { answered_by: 'evidence', statement: EVIDENCE_STATEMENT, answers_with_evidence: Object.keys(evidenceGiven).length } }
@@ -513,11 +526,7 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
     return { status: 'verdict', ...judged, verdict };
   }
 
-  // Not enough to judge yet. Ask the next question: the two that can stop the
-  // initiative first, then the two Accelerate needs, then the work redesign.
-  const order: AssessQuestionId[] = regulatedAgentic
-    ? ['governance_risk', 'financial_return', 'strategic_alignment', 'change_enablement', 'work_architecture']
-    : ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
+  // Not enough to judge yet. Ask the next question, in the order set above.
   const open = order.filter((id) => !unknown.includes(id) && (id === 'work_architecture'
     ? !workAnswered
     : supplied[id] === undefined));

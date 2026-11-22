@@ -2,6 +2,24 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.18.1 (aibvf-mcp), 0.14.1 (@aibvf/core), 22 November 2026
+
+Added: `open_questions` on `assess_ai_initiative` in evidence mode. It lists every guided question still without an answer, each with its choices and where to look. An agent working alone reads all five on its first call and answers them in one call.
+
+Why: the first agent to run AI BVF from outside, in OpenClaw on 21 November, could not answer the question on how the work changes. The tool showed the choices for one question at a time, and it asks that question only when the other four clear. The agent had the evidence and never saw the choices to answer from, so its brief carried four answers and the site's own agent carried five.
+
+Changed: on a verdict reached without that answer, `open_questions` names what is still open. Nothing waits on it. An agent that answers it with its quote and calls again gets the answer in the brief.
+
+Changed: the refusal of the four work checks in evidence mode says what to do: answer `work_architecture` in `answers` with a to d, and quote it in `evidence`.
+
+Changed: the operating brief is version 2. It tells the agent to answer all five questions in one call. The tool description, the server instructions and the skill in `skills/aibvf-agent` say the same, and `aibvf-agent.zip` is rebuilt.
+
+Changed: a Fix or Stop verdict no longer offers a call. `advisory_next_step` read "Book a 20-minute teardown", with a booking address and an email address. It now reads "Every rule behind this Fix verdict is published. Read the method and the code", with the address of this repository. The field keeps its name so that existing callers do not break.
+
+Why: AI BVF is free and its author earns nothing from it. A tool that judges an initiative and then offers a call reads as a sales route.
+
+Scope: a person is still asked one question at a time and never sees `open_questions`. The score each answer carries, the thresholds, the stop rules, the order of the questions and the 13-tool catalogue are unchanged. The same answers give the same verdict as before. `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged.
+
 ## 0.18.0 (aibvf-mcp), 0.14.0 (@aibvf/core), 21 November 2026
 
 Changed: `diagnose_process` chooses the intervention by the first rule that fits. Rare and heavy still comes first: under 250 instances a year with heaviness of 50 or more is Eliminate / insource. Two rules are new. A process where 30 percent of cases or more are reworked is Quality controls. A process with 15 minutes of work or less on each case, one person at most and 1,000 instances a year or more is Automate. Otherwise the largest drag factor decides, as before.

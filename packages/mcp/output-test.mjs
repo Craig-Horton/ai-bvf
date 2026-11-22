@@ -32,6 +32,9 @@ test('MCP scoring and improvement responses retain engine evidence', { timeout: 
     assert.ok(text.audit.rules_fired.length > 0);
     assert.equal(text.classification, 'Fix');
     assert.equal(text.work_architecture.status, 'gap');
+    // A Fix or Stop verdict points to the published method. It offers nothing and names no contact.
+    assert.match(text.advisory_next_step, /https:\/\/github\.com\/Craig-Horton\/ai-bvf$/);
+    assert.doesNotMatch(scored.content[0].text, /calendly|book a|teardown|@craighortonadvisory/i);
 
     const improved = await client.callTool({ name: 'recommend_improvements', arguments: input });
     assert.notEqual(improved.isError, true);
