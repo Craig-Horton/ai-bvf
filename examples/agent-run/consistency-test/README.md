@@ -59,3 +59,26 @@ ChatGPT, Gemini and the two Claude models have answered it, one run each.
 The new wording moved two assistants and left one where it was. Clearer wording narrows the differences. It does not remove a model's judgement.
 
 Halden & Co is a made-up company. One run each shows where assistants differ and does not measure how often.
+
+## Round 3, the return visit
+
+Round 3 tests two rules that came from a reader's question. What happens when the board minutes say one thing and the service policy says another, and can the tool explain why a verdict changed?
+
+The message is the return visit on 4 January. It carries 14 files: the ten from November, the three in [`arrives-later`](../arrives-later), and one new record in [`conflicting-record`](../conflicting-record). The minutes of 10 December name a person who approves refunds above the limits. Service policy version 5, in force from 15 December, still has the agent pay a repeat contact in full with no person.
+
+The reply form has one new line. Where another file says otherwise than an answer, the assistant quotes it under that answer as `Q2 AGAINST`. It is told to pick no winner, and that a later file which reports a change replaces the earlier one.
+
+The script passes those words to the engine as `evidence_against`. The same assistant's round 2 answers stand for its first visit on 23 November: their brief link goes back in as `review.previous_brief`, and the engine says what changed.
+
+[`round-3/expected.md`](round-3/expected.md) was written before any reply came in. See [`round-3/results.md`](round-3/results.md).
+
+Two Claude models have answered it, one run each.
+
+- Both quoted the service policy against the refund agent's answer on risk and control. Neither marked the November minutes as a disagreement.
+- The engine held that answer in both and gave no verdict on the refund agent. It returned both sets of quotes and asked which one applies today.
+- Once the owner confirms the answer given, one reply reaches Accelerate and the other Fix. They differ on one answer: whether the team's measures, changed after go-live, count as redesigned.
+- For the reply that reaches Accelerate the engine says: "The verdict moved from Fix to Accelerate. Three answers changed since 23 November 2026. The verdict needed each of these changes: Risk and control, Redesign of the work."
+- The win-back agent is Stop on both visits, with no answer changed.
+
+This is one made-up conflict, placed where an assistant would look, and two replies from one vendor's models. It shows the rule works when the assistant finds both records. It does not show how often an assistant misses the second record in a real organisation's files.
+

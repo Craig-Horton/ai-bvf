@@ -7,6 +7,8 @@ It finds the AI initiatives in what you let it read. It decides Accelerate, Fix 
 ## What keeps it honest
 
 - **Evidence or unknown.** The agent may answer a question only with words it can quote and the place it found them. The engine enforces this: an answer with no quote is counted as not known.
+- **Two records, no winner.** Where two records disagree on an answer, the agent quotes both. The engine counts the answer as not known, and you are asked which record applies today.
+- **A return visit says what changed.** The agent hands back the brief link of the earlier verdict. The engine says which answers changed and which change moved the verdict.
 - **Fixed rules judge.** The verdict comes from `assess_ai_initiative`, a deterministic tool. The same answers give the same verdict every time.
 - **Every verdict says who answered.** A verdict reached this way states that an agent answered from evidence and that no person confirmed it. The brief shows each quote beside its answer.
 - **It drafts and never sends.** No message leaves, no money is spent and no system changes unless you change the mandate.

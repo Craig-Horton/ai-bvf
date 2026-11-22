@@ -37,7 +37,7 @@ test('two records that disagree hold the answer as not known and both come back'
   assert.equal(conflict.id, 'governance_risk');
   assert.deepEqual(conflict.evidence, [MINUTES]);
   assert.deepEqual(conflict.against, [POLICY]);
-  assert.equal(conflict.ask, `Two records disagree. ${MINUTES.source} says "${MINUTES.quote}" and ${POLICY.source} says "${POLICY.quote}". Which one applies today?`);
+  assert.equal(conflict.ask, 'Two records disagree. Board minutes, 26 November 2026 says "The returns lead approves every refund exception from 1 December and can switch the agent off". Service policy v4, 3 September 2026 says "The agent pays refund exceptions of any amount when the customer asks twice". Which one applies today?');
   assert.match(result.next_question!, /^Not enough to judge yet\. Two records disagree on risk and control\. Ask the owner which record applies today\. /);
   assert.deepEqual(result.to_find_out?.map((item) => item.id), ['governance_risk']);
 });

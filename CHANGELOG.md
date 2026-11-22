@@ -2,6 +2,24 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.20.0 (aibvf-mcp), 0.15.0 (@aibvf/core), 22 November 2026
+
+Added: two records that disagree hold the answer. In evidence mode `assess_ai_initiative` takes `evidence_against`: the words of another record that says otherwise than an answer, with its source. The answer is then counted as not known. `conflicts` returns both sets of quotes and `ask`, the question to put to the owner: which one applies today.
+
+Why: a reader asked what happens when board minutes say a person approves refund exceptions and the service policy still lets the agent pay them. Both quotes can be accurate. No rule in the engine can say which record applies today, so it picks no winner and asks.
+
+Added: a return visit says what changed. `review` takes `previous_brief`, the `brief_url` of the earlier verdict. The engine reads the earlier answers and quotes out of that link and returns `review.since_last`: each answer that changed, with its earlier and its new quote, and whether that change moved the verdict. A change moved the verdict when putting that one answer back gives a different outcome from today's. Nothing is stored.
+
+Why: the same reader named the return visit as the reason to keep using the tool. A service owner gets a Fix, changes who can approve a refund, and comes back. Until now the engine kept the earlier verdict beside the new one and could not say why it moved.
+
+Changed: the operating brief is version 4. The agent looks for a record that says otherwise and has not been replaced by a later one, and passes it in `evidence_against`. It keeps each brief link in its register and passes it back at a review.
+
+Changed: `review.outcome` and `review.previous_verdict` are no longer needed when `previous_brief` is passed. The brief link carries conflicts and the earlier verdict, and `readBriefLink` and `assessInputFromBrief` in `@aibvf/core` read a link back.
+
+Tested: 13 new engine tests and one connector test. Round 3 of the consistency test gave 14 Halden files to two Claude models. Both quoted the policy against the minutes, and the engine held the answer in both. The expected result was written down before either replied.
+
+Scope: two inputs and two outputs on one tool, and the brief. No score, threshold or verdict rule changes: an answer that is held counts exactly as "I do not know yet" always has. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.2 are unchanged. The site at aibvf.com does not use either rule yet.
+
 ## 0.19.2 (aibvf-mcp), 0.14.3 (@aibvf/core), 22 November 2026
 
 Changed: two answer choices say more exactly what they mean.

@@ -85,6 +85,10 @@ An assistant can run the same assessment alone, under a mandate its owner sets o
 
 The server holds the rules. In evidence mode, `answered_by: "evidence"`, an answer of a to d counts only with a quote and its source in `evidence`. Without them the answer is counted as not known. A quote that contradicts its answer holds the verdict at Fix. The verdict carries `provenance`, which states that an agent answered and that no person confirmed it, and `brief_url`, the link to the one-page brief.
 
+Where another record says otherwise than an answer, the agent passes its words in `evidence_against`. The answer is then counted as not known, and `conflicts` returns both sets of quotes with the question to put to the owner. No rule picks which record applies today.
+
+At a return visit the agent passes `review.previous_brief`, the `brief_url` of the earlier verdict. The earlier answers and quotes travel inside that link, so `review.since_last` can say which answers changed and which change moved the verdict. Nothing is stored.
+
 The operating brief is served as the MCP prompt `aibvf_agent`. For Claude, Claude Code and OpenClaw it is also packed as a skill: [`skills/aibvf-agent`](https://github.com/Craig-Horton/ai-bvf/tree/main/skills/aibvf-agent).
 
 ## Troubleshooting

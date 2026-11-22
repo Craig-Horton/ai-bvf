@@ -321,7 +321,7 @@ const assessInitiativeInputSchema = {
     },
     evidence_against: {
       type: 'object',
-      description: 'Evidence mode: where another record says otherwise than your answer, the words of that record and where they were found, by question id. Pass the answer one record supports in answers, its quote in evidence, and the words of the other record here. The answer is then counted as not known and both sets of quotes come back in conflicts, because no rule here picks which record applies today. Never leave a record out because it disagrees.',
+      description: 'Evidence mode: where another record says otherwise than your answer, the words of that record and where they were found, by question id. Pass the answer one record supports in answers, its quote in evidence, and the words of the other record here. The answer is then counted as not known and both sets of quotes come back in conflicts, because no rule here picks which record applies today. A later record that reports a change replaces the earlier one, and that is no disagreement. Never leave a record out because it disagrees.',
       properties: Object.fromEntries(['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture']
         .map((id) => [id, evidenceForAnswerSchema])),
     },

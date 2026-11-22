@@ -258,9 +258,16 @@ const ALL_QUESTIONS: AssessQuestionId[] = ['financial_return', 'governance_risk'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
 
+/** What one side says, grouped by where it was found. A closing full stop is left off, so the sentence reads cleanly. */
+function sideSays(items: AssessEvidence[]): string {
+  const bySource = new Map<string, string[]>();
+  for (const item of items) bySource.set(item.source, [...(bySource.get(item.source) ?? []), `"${item.quote.replace(/[.!?]+$/, '')}"`]);
+  return [...bySource].map(([source, quotes]) => `${source} says ${quotes.join(' and ')}.`).join(' ');
+}
+
 /** The question to put to the owner when two records disagree on one answer. */
-function conflictAsk(first: AssessEvidence, second: AssessEvidence): string {
-  return `Two records disagree. ${first.source} says "${first.quote}" and ${second.source} says "${second.quote}". Which one applies today?`;
+function conflictAsk(evidence: AssessEvidence[], against: AssessEvidence[]): string {
+  return `Two records disagree. ${sideSays(evidence)} ${sideSays(against)} Which one applies today?`;
 }
 
 function reviewRecord(input: AssessInitiativeInput, byEvidence: boolean, earlierVerdict?: Classification): AssessReviewRecord | undefined {
@@ -560,7 +567,7 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
     id: item.id, short: QUESTION_SHORT[track][item.id],
     question: (item.id === 'work_architecture' ? wordingFor(track, item.id) : wordingFor(track, item.id, resolved.ai_tier)).question,
     answer: (item.id === 'work_architecture' ? wordingFor(track, item.id) : wordingFor(track, item.id, resolved.ai_tier))[item.choice],
-    evidence: item.evidence, against: item.against, ask: conflictAsk(item.evidence[0], item.against[0]),
+    evidence: item.evidence, against: item.against, ask: conflictAsk(item.evidence, item.against),
   }));
   const judged = {
     ...base, missing_fields: [] as AssessField[],
