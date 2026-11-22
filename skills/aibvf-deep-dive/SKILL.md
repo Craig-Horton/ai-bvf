@@ -12,7 +12,7 @@ Three parts stay apart. Code counts the log. The AI BVF tool `diagnose_process` 
 
 ## Mandate
 
-On first use, state the mandate below and ask the owner once whether to change anything.
+On first use, state the mandate below. When the owner has told you directly to run, that is consent: go ahead under it. Otherwise ask the owner once whether to change anything.
 
 - May read: the log files the owner names. Nothing else.
 - May do: count, report and draft. Change no system, send nothing, spend nothing.
@@ -54,12 +54,12 @@ AI BVF deep dive: DEPARTMENT. N processes found. Fixed published rules chose eac
 1. PROCESS: the intervention the tool returned. Saves €LOW–HIGH a year.
 2. PROCESS: the intervention. Saves €LOW–HIGH a year.
 3. PROCESS: leave it.
-The full report, to read or forward: REPORT_URL
+The full report, to read or forward: REPORT_LINK
 Which one shall I draft?
 ```
 
 - Put the largest saving first. Write "leave it" when the tool's verdict is Stop. Print the tool's verdict word nowhere else.
-- `REPORT_URL` is `report_url` from the script, unchanged. Pass `--department` and `--organisation` so that the page carries their names. The link holds the counts for each process and no row of the log.
+- `REPORT_LINK` is `report_url` from the script, unchanged. Show it as a link behind the words "Open the report" where the chat can do that, and on a line of its own where it cannot. Never change the link and never pass it to a link shortener: the counts travel inside it. Pass `--department` and `--organisation` so that the page carries their names. The link holds the counts for each process and no row of the log.
 - With no hourly cost, leave the euro figures out and end with the question: "What does an hour of this team cost, with salary and overheads?"
 - Add no total. The page adds it.
 - When `report_leaves_out` is above zero, say so in one line: the link shows the largest processes by volume and leaves that many out.

@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.19.0';
+export const VERSION = '0.19.1';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -598,7 +598,7 @@ const assessVerdictSchema = {
         answers_with_evidence: { type: 'number' },
       },
     },
-    brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Absent when the verdict rests on a supplied score.' },
+    brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Show it behind link text where the chat can do that. Never change it and never pass it to a link shortener. Absent when the verdict rests on a supplied score.' },
     method_note: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: scoreOutputSchema.properties.feedback,
   },
