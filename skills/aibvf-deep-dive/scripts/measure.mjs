@@ -39,6 +39,8 @@ export function parseCsv(text) {
 const median = (list) => { const sorted = [...list].sort((a, b) => a - b); const mid = sorted.length >> 1; return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2; };
 const mean = (list) => list.reduce((sum, value) => sum + value, 0) / list.length;
 const round = (value, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
+/** How many processes one report link carries. The page reads up to this many. */
+export const LINK_PROCESSES = 40;
 
 /**
  * `map` names the columns: case, process, time and actor are needed. The rest are optional,
@@ -57,12 +59,24 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
   const systemActors = new Set((map.systemActors ?? '').split(',').map((name) => name.trim()).filter(Boolean));
   const knowsSystems = Boolean(map.actorType && map.systemValue) || systemActors.size > 0;
   const isSystem = (row) => (map.actorType && map.systemValue ? row[map.actorType] === map.systemValue : false) || systemActors.has(row[map.actor]);
-  const knowsMinutes = Boolean(map.minutes);
+  // A blank or unreadable value in the minutes column is not zero work. With any such value on a step a person did,
+  // the work time is left uncounted, so no saving is sized from a guess.
+  const readable = (value) => String(value).trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+  const unreadableMinutes = map.minutes ? rows.filter((row) => !isSystem(row) && !readable(row[map.minutes])).length : 0;
+  const knowsMinutes = Boolean(map.minutes) && unreadableMinutes === 0;
   const knowsReopen = Boolean(map.step && map.reopenValue);
 
-  const times = rows.map((row) => Date.parse(row[map.time]));
-  if (times.some(Number.isNaN)) throw new Error(`Some values in "${map.time}" are not dates the script can read. Use a form like 2026-09-01T08:30Z.`);
-  const periodDays = Math.max(1, Math.ceil((Math.max(...times) - Math.min(...times)) / 86_400_000));
+  // A loop, so that a log of any length is read. Spreading a long log into Math.max stops the script.
+  let earliest = Infinity;
+  let latest = -Infinity;
+  for (const row of rows) {
+    const at = Date.parse(row[map.time]);
+    if (Number.isNaN(at)) throw new Error(`Some values in "${map.time}" are not dates the script can read. Use a form like 2026-09-01T08:30Z.`);
+    if (at < earliest) earliest = at;
+    if (at > latest) latest = at;
+  }
+  if (!rows.length) throw new Error('The log has no rows.');
+  const periodDays = Math.max(1, Math.ceil((latest - earliest) / 86_400_000));
 
   const byProcess = new Map();
   for (const row of rows) {
@@ -74,7 +88,8 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
   }
 
   const notInLog = [];
-  if (!knowsMinutes) notInLog.push('minutes of work on each step, so the work time for each case and the share of time spent working are not counted');
+  if (unreadableMinutes) notInLog.push(`minutes of work: ${unreadableMinutes} of ${rows.length} steps have no readable value in "${map.minutes}", so the work time for each case and the share of time spent working are not counted`);
+  else if (!knowsMinutes) notInLog.push('minutes of work on each step, so the work time for each case and the share of time spent working are not counted');
   if (!knowsSystems) notInLog.push('which steps a system does, so the share of automated steps is not counted');
   if (!knowsReopen) notInLog.push('what marks a case that comes back, so the share of reworked cases is not counted');
   if (rate === undefined) notInLog.push('the hourly cost of the team, with salary and overheads');
@@ -87,7 +102,7 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
   const processes = [...byProcess].map(([name, cases]) => {
     const perCase = [...cases.values()].map((steps) => {
       const at = steps.map((step) => Date.parse(step[map.time]));
-      const elapsed = (Math.max(...at) - Math.min(...at)) / 60_000;
+      const elapsed = (Math.max(...at) - Math.min(...at)) / 60_000; // one case's steps, never the whole log
       const worked = knowsMinutes ? steps.reduce((sum, step) => sum + (Number(step[map.minutes]) || 0), 0) : 0;
       // A case that runs past one working day is counted at eight working hours a day.
       const working = Math.max(worked, elapsed > 480 ? elapsed / 3 : elapsed);
@@ -114,7 +129,8 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
       cases_in_log: perCase.length,
       counted: signals,
       // Ready for diagnose_process only when every signal the engine needs was counted. Pass it on unchanged.
-      diagnose_process: complete ? {
+      ...(complete && !(signals.fte_hours_per_instance > 0) ? { not_judged: 'no work time is recorded for this process, so there is no baseline to size a saving against' } : {}),
+      diagnose_process: complete && signals.fte_hours_per_instance > 0 ? {
         process_id: name, ...(fn ? { function: fn } : {}), ...signals,
         loaded_hourly_rate_eur: rate ?? 1, direct_spend_eur: spend ?? 0,
         signal_completeness: round(counted / 9),
@@ -124,18 +140,24 @@ export function measureLog(csv, map, { fn, rate, spend, department, organisation
 
   // The full report as one link to read or forward. It carries the counts for each process and no row of the log.
   // The page at that address runs the published engine on the counts, in the reader's browser. Nothing is stored.
-  const first = new Date(Math.min(...times)).toISOString().slice(0, 10);
-  const last = new Date(Math.max(...times)).toISOString().slice(0, 10);
-  const linked = complete && fn ? {
+  const first = new Date(earliest).toISOString().slice(0, 10);
+  const last = new Date(latest).toISOString().slice(0, 10);
+  // The link holds the largest processes by volume, up to a set number, and says how many it leaves out.
+  const judged = processes.filter((item) => item.diagnose_process).sort((a, b) => b.cases_in_log - a.cases_in_log);
+  const inLink = judged.slice(0, LINK_PROCESSES);
+  const omitted = processes.length - inLink.length;
+  const linked = complete && fn && inLink.length ? {
     v: 1, k: 'dd', n: String(department ?? '').slice(0, 80), o: String(organisation ?? '').slice(0, 80), f: first, l: last,
     c: new Set(rows.map((row) => row[map.case])).size, t: rows.length, fn, r: rate ?? null,
-    p: processes.slice(0, 40).map((item) => [item.name.slice(0, 120), item.counted.instances_per_year, item.counted.fte_hours_per_instance, item.counted.cycle_time_days,
+    ...(omitted ? { x: omitted } : {}),
+    p: inLink.map((item) => [item.name.slice(0, 120), item.counted.instances_per_year, item.counted.fte_hours_per_instance, item.counted.cycle_time_days,
       item.counted.touch_ratio, item.counted.handoffs, item.counted.rework_rate, item.counted.automation_level, round(counted / 9)]),
   } : null;
 
   return {
     report_url: linked ? `https://www.aibvf.com/deep-dive#${Buffer.from(JSON.stringify(linked)).toString('base64url')}` : null,
-    period: { first: new Date(Math.min(...times)).toISOString().slice(0, 10), last: new Date(Math.max(...times)).toISOString().slice(0, 10), days: periodDays },
+    report_leaves_out: linked ? omitted : 0,
+    period: { first, last, days: periodDays },
     cases: new Set(rows.map((row) => row[map.case])).size,
     steps: rows.length,
     euro_figures: rate !== undefined && complete,

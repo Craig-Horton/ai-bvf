@@ -55,6 +55,8 @@ Which one shall I draft?
 - `REPORT_URL` is `report_url` from the script, unchanged. Pass `--department` and `--organisation` so that the page carries their names. The link holds the counts for each process and no row of the log.
 - With no hourly cost, leave the euro figures out and end with the question: "What does an hour of this team cost, with salary and overheads?"
 - Add no total. The page adds it.
+- When `report_leaves_out` is above zero, say so in one line: the link shows the largest processes by volume and leaves that many out.
+- When a process carries `not_judged`, list it with that reason and no recommendation.
 
 When the owner asks for the detail of one process in the chat, give it in this form:
 
