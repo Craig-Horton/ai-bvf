@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Buffer } from 'node:buffer';
-import { measureLog, parseCsv } from './measure.mjs';
+import { measureLog, measureFlow, parseCsv, FLOW_ORDERS } from './measure.mjs';
 import { diagnoseProcess } from '../../../packages/js/dist/index.js';
 
 const log = await readFile(new URL('../../../examples/process-deep-dive/halden-service-desk/tickets.csv', import.meta.url), 'utf8');
@@ -122,4 +122,61 @@ test('run as a command it prints the counts, from a folder with a space in its n
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+// The flow of one process: what a draft is written from. The script counts it, so that no draft
+// rests on a few cases read by eye.
+test('the flow of a process is counted: the orders its steps come in, and who does each step', () => {
+  const flow = measureFlow(log, MAP, 'Address change');
+  assert.equal(flow.cases_in_log, 200);
+  assert.deepEqual(flow.orders.map((order) => [order.steps.join(' > '), order.cases]), [
+    ['Received > Applied > Checked > Confirmed > Reopened > Fixed', 105],
+    ['Received > Applied > Checked > Confirmed', 95],
+  ]);
+  assert.equal(flow.orders.reduce((sum, order) => sum + order.cases, 0) + flow.cases_in_orders_left_out, flow.cases_in_log);
+  // The finding a draft rests on: the address is applied by a system before a person checks it, in every case.
+  for (const order of flow.orders) assert.ok(order.steps.indexOf('Applied') < order.steps.indexOf('Checked'));
+  const step = (name) => flow.steps.find((item) => item.step === name);
+  assert.deepEqual([step('Applied').done_by, step('Applied').systems, step('Applied').in_cases], ['a system', ['Order system'], 200]);
+  assert.deepEqual([step('Checked').done_by, step('Checked').people_who_did_it], ['a person', 6]);
+  assert.equal(step('Reopened').in_cases, 105);
+  assert.equal(step('Reopened').median_hours_after_the_step_before, 19.4);
+  assert.equal(step('Received').median_hours_after_the_step_before, undefined, 'the first step has no step before it');
+});
+
+test('the flow counts people and names none', () => {
+  const printed = JSON.stringify(measureFlow(log, MAP, 'Address change'));
+  for (const person of ['Femi', 'Chloe', 'Bram', 'Ana', 'Eli', 'Deniz']) assert.ok(!printed.includes(person), `${person} is named in the flow`);
+  assert.ok(printed.includes('Order system'), 'a system is named');
+});
+
+test('the flow says what it cannot give: an unknown process, a log with no step names, a log that marks no system', () => {
+  assert.throws(() => measureFlow(log, MAP, 'Adress change'), /no process named "Adress change"\. Its processes are: .*Address change/);
+  const { step: _step, ...noStep } = MAP;
+  assert.throws(() => measureFlow(log, noStep, 'Address change'), /Name it with --step/);
+  const { actorType: _type, systemValue: _value, ...noSystems } = MAP;
+  const flow = measureFlow(log, noSystems, 'Address change');
+  assert.equal(flow.steps[0].done_by, 'not in the log');
+  assert.ok(flow.not_in_log.includes('which steps a system does'));
+});
+
+test('steps are put in time order, the log order decides a tie, and rare orders are counted as left out', () => {
+  const head = 'case_id,category,step,timestamp,actor';
+  const tied = [head, 'A,P,Second,2026-09-01T09:00Z,x', 'A,P,First,2026-09-01T08:00Z,x', 'A,P,Third,2026-09-01T09:00Z,x'].join('\n');
+  assert.deepEqual(measureFlow(tied, { case: 'case_id', process: 'category', time: 'timestamp', actor: 'actor', step: 'step' }, 'P').orders[0].steps, ['First', 'Second', 'Third']);
+  const many = [head];
+  for (let index = 0; index < FLOW_ORDERS + 2; index += 1) many.push(`C${index},P,Only${index},2026-09-01T08:00Z,x`);
+  const flow = measureFlow(many.join('\n'), { case: 'case_id', process: 'category', time: 'timestamp', actor: 'actor', step: 'step' }, 'P');
+  assert.equal(flow.orders.length, FLOW_ORDERS);
+  assert.deepEqual([flow.orders_left_out, flow.cases_in_orders_left_out], [2, 2]);
+});
+
+test('run as a command with --flow it prints the flow of that one process', async () => {
+  const run = promisify(execFile);
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const file = fileURLToPath(new URL('../../../examples/process-deep-dive/halden-service-desk/tickets.csv', import.meta.url));
+  const out = await run(process.execPath, [join(here, 'measure.mjs'), file, '--flow', 'Address change', '--case', 'case_id', '--process', 'category', '--time', 'timestamp', '--actor', 'actor', '--actor-type', 'actor_type', '--system-value', 'system', '--step', 'step']);
+  const flow = JSON.parse(out.stdout);
+  assert.equal(flow.process, 'Address change');
+  assert.equal(flow.orders[0].cases, 105);
 });
