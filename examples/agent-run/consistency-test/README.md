@@ -46,14 +46,16 @@ The six answers that differed sat where the files say little. Two of them came f
 
 The message carries the reworded choices, and the reply form takes up to three quotes for an answer. See [`round-2/results.md`](round-2/results.md).
 
-ChatGPT and the two Claude models have answered it, one run each.
+ChatGPT, Gemini and the two Claude models have answered it, one run each.
 
-- 14 of 15 answers are the same across the three. In round 1 the same three assistants agreed on 11 of 15.
-- Win-back, cost and return: all three now answer unknown. In round 1 one of them read "I think it will pay for itself" as an untested figure.
-- LedgerLight, business result: all three now answer unknown. In round 1 two of them read the vendor's claim as a result Halden had named.
-- LedgerLight, cost and return: they still differ. Two count the vendor's untested figures as written down, and one answers unknown.
+- 11 of 15 answers are the same across the four. In round 1 the same four agreed on 10 of 15.
+- ChatGPT and the two Claude models now agree on 14 of 15. In round 1 they agreed on 11 of 15.
+- Gemini gave the same answers in both rounds. It still reads "I think it will pay for itself" as an untested figure, and the vendor's claim as a result Halden named.
+- Win-back, cost and return: three now answer unknown, and Gemini answers b.
+- LedgerLight, business result: three now answer unknown, and Gemini answers b.
+- LedgerLight, cost and return: three count the vendor's untested figures as written down, and one answers unknown.
 - The three verdicts are the same in both rounds, and every quote is in the files word for word.
 
-Replies from other assistants are added as they are run.
+The new wording moved two assistants and left one where it was. Clearer wording narrows the differences. It does not remove a model's judgement.
 
 Halden & Co is a made-up company. One run each shows where assistants differ and does not measure how often.
