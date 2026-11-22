@@ -65,3 +65,36 @@ test('the report link carries the counts and no row of the log', () => {
   // Without every signal the engine needs, there is no link.
   assert.equal(measureLog(log, { case: 'case_id', process: 'category', time: 'timestamp', actor: 'actor' }, { fn: 'cx' }).report_url, null);
 });
+
+test('a blank or unreadable minutes value is not counted as zero work', () => {
+  const lines = log.trim().split('\n');
+  const blanked = [lines[0], ...lines.slice(1).map((line, index) => (index % 50 === 1 ? line.replace(/,person,\d+,/, ',person,,') : line))].join('\n');
+  const counted = measureLog(blanked, MAP, { fn: 'cx', rate: 38 });
+  assert.equal(counted.processes[0].counted.fte_hours_per_instance, undefined);
+  assert.equal(counted.processes[0].diagnose_process, null);
+  assert.equal(counted.report_url, null);
+  assert.ok(counted.not_in_log.some((line) => /^minutes of work: \d+ of 3733 steps have no readable value/.test(line)));
+});
+
+test('a process with no work time recorded is named and not sent to the engine', () => {
+  const csv = 'case,kind,when,who,type,mins,step\n' + ['a', 'b', 'c'].map((id) => `${id},Auto reply,2026-09-01T08:00Z,Bot,system,0,Sent\n${id},Auto reply,2026-09-02T08:00Z,Bot,system,0,Closed`).join('\n');
+  const counted = measureLog(csv, { case: 'case', process: 'kind', time: 'when', actor: 'who', actorType: 'type', systemValue: 'system', minutes: 'mins', step: 'step', reopenValue: 'Reopened' }, { fn: 'cx', rate: 38 });
+  assert.equal(counted.processes[0].diagnose_process, null);
+  assert.match(counted.processes[0].not_judged, /no work time is recorded/);
+});
+
+test('a long log is read, and a link that leaves processes out says how many', () => {
+  const rows = ['case,kind,when,who,type,mins,step'];
+  for (let index = 0; index < 160_000; index += 1) {
+    const kind = `Process ${index % 45}`;
+    rows.push(`c${index >> 1},${kind},2026-09-${String(1 + (index % 28)).padStart(2, '0')}T08:${String(index % 60).padStart(2, '0')}Z,${index % 2 ? 'Ana' : 'Bot'},${index % 2 ? 'person' : 'system'},${index % 2 ? 5 : 0},Step`);
+  }
+  const counted = measureLog(rows.join('\n'), { case: 'case', process: 'kind', time: 'when', actor: 'who', actorType: 'type', systemValue: 'system', minutes: 'mins', step: 'step', reopenValue: 'Reopened' }, { fn: 'cx', rate: 38 });
+  assert.equal(counted.steps, 160_000);
+  assert.equal(counted.processes.length, 45);
+  assert.equal(counted.report_leaves_out, 5);
+  const carried = JSON.parse(Buffer.from(counted.report_url.split('#')[1], 'base64url').toString('utf8'));
+  assert.equal(carried.p.length, 40);
+  assert.equal(carried.x, 5);
+  assert.ok(counted.report_url.split('#')[1].length < 12_000);
+});
