@@ -111,7 +111,7 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.18.1 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.19.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
 | [`@aibvf/core`](packages/js) | 0.14.1 | TypeScript assessment and scoring engine. |
 | [`aibvf`](packages/py) | 0.2.2 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
@@ -148,6 +148,6 @@ Private benchmark material and certification marks are outside the source-code c
 
 ## About the author
 
-Craig Horton is an independent transformation lead based in Amsterdam and the author of the AI Business Value Framework. His work connects AI investment decisions with organisational readiness and the redesign of work.
+Craig Horton is the author of the AI Business Value Framework. AI BVF is a personal project, built in his own time. His work connects AI investment decisions with organisational readiness and the redesign of work.
 
 [The Transformation Brief](https://brief.craighortonadvisory.com) · [Craig Horton on LinkedIn](https://linkedin.com/in/Craig-Horton-ai)

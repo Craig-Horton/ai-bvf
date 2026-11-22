@@ -2,7 +2,7 @@
 
 AI BVF v1.0 — open protocol for scoring AI investments. Python implementation.
 
-> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · ⭐ star if this helped · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · Built by [Craig Horton](https://linkedin.com/in/Craig-Horton-ai)
+> **Source:** [github.com/Craig-Horton/ai-bvf](https://github.com/Craig-Horton/ai-bvf) · ⭐ star if this helped · [Issues](https://github.com/Craig-Horton/ai-bvf/issues) · A personal project by [Craig Horton](https://linkedin.com/in/Craig-Horton-ai), built in his own time
 
 ```bash
 pip install aibvf

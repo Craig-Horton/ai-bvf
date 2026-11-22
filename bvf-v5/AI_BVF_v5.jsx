@@ -438,7 +438,7 @@ function AlignmentTab({profile,initiatives,rates}){
       <div style={{marginBottom:"18px"}}><FL>AI Alignment Map — Board Summary</FL><div style={{fontSize:"13px",color:C.slate,fontFamily:"'Trebuchet MS',sans-serif"}}>One-page board-ready view. Complete the Company Profile and build your Portfolio to activate all sections.</div></div>
       {/* Header identity */}
       <div style={{padding:"18px 24px",background:`linear-gradient(135deg,rgba(13,31,60,0.8),rgba(22,45,78,0.8))`,border:`1px solid rgba(184,115,51,0.3)`,borderRadius:"4px",marginBottom:"16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
-        <div><div style={{fontSize:"9px",letterSpacing:"3px",color:C.copper,fontFamily:"'Trebuchet MS',sans-serif",marginBottom:"6px"}}>AI ALIGNMENT MAP · CRAIG HORTON ADVISORY · {new Date().getFullYear()}</div><div style={{fontSize:"22px",fontWeight:700,color:C.white,fontFamily:"'Georgia',serif"}}>{profile.company||"[Company Name]"}</div><div style={{fontSize:"12px",color:C.muted,fontFamily:"'Trebuchet MS',sans-serif",marginTop:"2px"}}>{INDUSTRIES.find(i=>i.id===(profile.industry||"universal"))?.label}{complete?` · Rev ${fmt(rev)} · Cost ${fmt(cost)} · EBITDA ${fmt(ebt)}`:""}</div></div>
+        <div><div style={{fontSize:"9px",letterSpacing:"3px",color:C.copper,fontFamily:"'Trebuchet MS',sans-serif",marginBottom:"6px"}}>AI ALIGNMENT MAP · CRAIG HORTON · {new Date().getFullYear()}</div><div style={{fontSize:"22px",fontWeight:700,color:C.white,fontFamily:"'Georgia',serif"}}>{profile.company||"[Company Name]"}</div><div style={{fontSize:"12px",color:C.muted,fontFamily:"'Trebuchet MS',sans-serif",marginTop:"2px"}}>{INDUSTRIES.find(i=>i.id===(profile.industry||"universal"))?.label}{complete?` · Rev ${fmt(rev)} · Cost ${fmt(cost)} · EBITDA ${fmt(ebt)}`:""}</div></div>
         <div style={{fontSize:"11px",color:C.muted,fontFamily:"'Trebuchet MS',sans-serif",textAlign:"right"}}>{new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})}</div>
       </div>
       {/* Three-column summary */}
@@ -518,7 +518,7 @@ export default function App(){
   return(
     <div style={{fontFamily:"'Georgia','Palatino Linotype',serif",background:`linear-gradient(160deg,${C.navy} 0%,#0A1628 100%)`,minHeight:"100vh",color:C.white}}>
       <div style={{padding:"24px 48px 16px",borderBottom:`1px solid rgba(184,115,51,0.15)`,background:`radial-gradient(ellipse at 80% 0%,rgba(184,115,51,0.1) 0%,transparent 60%)`}}>
-        <div style={{fontSize:"9px",letterSpacing:"4px",color:C.copper,fontFamily:"'Trebuchet MS',sans-serif",fontWeight:600,marginBottom:"6px"}}>CRAIG HORTON · AI TRANSFORMATION ADVISORY · 2026</div>
+        <div style={{fontSize:"9px",letterSpacing:"4px",color:C.copper,fontFamily:"'Trebuchet MS',sans-serif",fontWeight:600,marginBottom:"6px"}}>CRAIG HORTON · AI BUSINESS VALUE FRAMEWORK · 2026</div>
         <h1 style={{fontSize:"24px",fontWeight:700,margin:"0 0 3px",letterSpacing:"-0.5px"}}>AI Business Value Framework</h1>
         <p style={{margin:0,fontSize:"12px",color:C.slate,fontFamily:"'Trebuchet MS',sans-serif",fontStyle:"italic"}}>North to South · East to West — Every AI investment mapped to the metrics that matter</p>
       </div>

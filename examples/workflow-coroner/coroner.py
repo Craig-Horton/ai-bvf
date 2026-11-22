@@ -123,7 +123,7 @@ def _eur(n: float) -> str:
 
 def banner(today: str) -> None:
     title = c("the workflow coroner", AMBER_SOFT, BOLD)
-    sub = c(f"craig horton advisory  ·  bvf v1.0  ·  {today}", WHITE, DIM)
+    sub = c(f"craig horton  ·  bvf v1.0  ·  {today}", WHITE, DIM)
     print(_top())
     print(_line(f"  {title}"))
     print(_line(f"  {sub}"))

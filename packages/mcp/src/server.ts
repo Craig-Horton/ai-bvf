@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.18.1';
+export const VERSION = '0.19.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -121,11 +121,10 @@ const installHash = () => {
 
 // Where the method is published: returned with a Fix or Stop verdict, so the
 // person who has to act on it can check every rule behind it. It carries no
-// offer and no contact. The field keeps the name advisory_next_step so that
-// existing callers do not break.
+// offer and no contact.
 const METHOD_URL = 'https://github.com/Craig-Horton/ai-bvf';
 const FEEDBACK_QUESTION = 'Did this change what you will do next, what should AI BVF do more of, and what should it stop doing?';
-function advisoryFor(classification: string): string | undefined {
+function methodNoteFor(classification: string): string | undefined {
   if (classification === 'Fix' || classification === 'Stop') {
     return `Every rule behind this ${classification} verdict is published. Read the method and the code: ${METHOD_URL}`;
   }
@@ -528,7 +527,7 @@ const scoreOutputSchema = {
         gate: { type: 'string' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
+    method_note: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -580,7 +579,7 @@ const assessVerdictSchema = {
       },
     },
     first_step: { type: 'string', description: 'The one thing to do first. Give it after the summary.' },
-    reason: { type: 'string', description: 'The rule that produced the classification, in framework terms. For audit and advisory use; prefer summary when speaking to the user.' },
+    reason: { type: 'string', description: 'The rule that produced the classification, in framework terms. For audit use; prefer summary when speaking to the user.' },
     scores_supplied: { type: 'object', description: 'The pillar scores the verdict rests on, from answers or supplied scores. Nothing here was estimated.' },
     answers_given: { type: 'object', description: 'The guided answers behind those scores: the choice, its wording and the published score it carries.' },
     decision_confidence: { type: 'number', description: 'Heuristic decision score, 0 to 100, with no probability calibration. Present only when all four pillars were supplied.' },
@@ -600,7 +599,7 @@ const assessVerdictSchema = {
       },
     },
     brief_url: { type: 'string', format: 'uri', description: 'A link to the one-page brief for this verdict, to forward to the person who has to sign it off. The context, the answers and any quoted evidence travel inside the link after the # sign and are stored nowhere. Absent when the verdict rests on a supplied score.' },
-    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
+    method_note: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: scoreOutputSchema.properties.feedback,
   },
 };
@@ -743,7 +742,7 @@ const recommendOutputSchema = {
         honest_stop:  { type: 'string', description: 'Present when the truthful call is Stop rather than Fix. Surface this verbatim; it is the most valuable sentence in the response when it appears.' },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
+    method_note: { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only for Fix/Stop verdicts. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -917,7 +916,7 @@ const scorePortfolioOutputSchema = {
         },
       },
     },
-    advisory_next_step: { type: 'string', description: 'Present only when any initiative was Fix or Stop: where the method and the code are published. It carries no offer.' },
+    method_note: { type: 'string', description: 'Present only when any initiative was Fix or Stop: where the method and the code are published. It carries no offer.' },
     feedback: {
       type: 'object',
       description: 'Optional three-question feedback route, present only when any initiative was Fix or Stop. The page records the response anonymously only when the user chooses an answer; no assessment data is attached.',
@@ -976,7 +975,7 @@ const diagnoseOutputSchema = {
     offer_to_execute:    { type: 'boolean', description: 'True when the verdict warrants offering to action it (Accelerate).' },
     evidence_maturity:   { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Strength of the benchmark evidence behind the effectiveness band.' },
     disclaimer:          { type: 'string', description: 'Directional decision aid, not an audited figure.' },
-    advisory_next_step:  { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
+    method_note:  { type: 'string', description: 'Present only for Fix/Stop verdicts: where the method and the code are published. It carries no offer.' },
   },
 };
 
@@ -1181,7 +1180,7 @@ const assemblePortfolioOutputSchema = {
 };
 
 const SCORE_INITIATIVE_DESCRIPTION = 'Canonical-field scorer for one AI initiative. CALL THIS when industry, revenue_eur, function, ai_tier and readiness are already known, or when re-scoring with measured pillar evidence. For a proposal written in ordinary business language, call assess_ai_initiative first; it resolves these fields and asks for anything missing. Pillar scores remain optional: missing pillars are estimated deterministically, reported through pillar_basis, and reduce decision score, while a fully estimated pass can never return Accelerate. Returns Accelerate, Fix or Stop, modelled gross and readiness-adjusted EUR benefit ranges, decision score, sensitivity, assumptions and an audit trail. Use score_portfolio for several initiatives and diagnose_process for measured waste in an existing process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
-const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted for advisory work, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
+const ASSESS_INITIATIVE_DESCRIPTION = "The front door for one AI investment decision. CALL THIS FIRST when the user describes an AI idea in ordinary language or asks whether it should proceed. It works as a short guided conversation and returns one thing to ask at a time. Pass the proposal unchanged on every call, plus everything the user has answered so far. needs_input: a piece of context (industry, business function, AI type or headcount) could not be read; ask question and pass the answer in its named field. needs_confirmation: show the understood statement, ask the user whether it is right, then call again with confirmed true or with the corrected item. not_enough_to_judge: ask question, the next of at most five plain questions, showing every choice label; pass the id of the choice the user picks in answers. When question is absent, tell the user what is listed in to_find_out and stop. verdict: Accelerate, Fix or Stop, from the user's answers read against the proposal. Where the words of the proposal contradict a favourable answer, the verdict is held at Fix and contradictions quotes those words; show them beside the answer and ask the user which is true. Give the user summary first, then each item in holding_back with what they said and what it needs to become, then first_step; these are written in everyday words, so do not replace them with framework terms. Lead with warning whenever it is present. This tool fills in no score and returns no euro figure, so never state a euro benefit from this result. With a person present, never set confirmed and never pick an answer for them; when they are unsure, pass unknown. WORKING ALONE under your owner's mandate, with nobody to ask, use evidence mode: set answered_by to evidence, pass for each question the answer your evidence supports, and put the exact quote and its source in evidence, as a list of up to three when the answer rests on more than one document. An answer with no quote is counted as not known, so pass unknown when you found nothing; where_to_look says where each answer is usually written down. Answer all five questions in one call: open_questions lists every question still open with its choices, including how the work changes, which the sequence for a person asks only when the other four clear. In evidence mode you check the understood statement against what you read and set confirmed yourself. The verdict then carries provenance: say its statement with the verdict. At a review, pass review with the earlier verdict and what happened since. Give the user brief_url, the link to the one-page brief. Organisations under 250 people get questions worded for a smaller firm, with the same rules for every size. Use score_initiative when canonical fields and 0 to 100 scores are already known and a planning range is wanted, score_portfolio for several initiatives, and diagnose_process for measured waste in a running process. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.";
 const RECOMMEND_IMPROVEMENTS_DESCRIPTION = 'Turn a Fix or Stop verdict into the change plan that could earn a re-score, with pillar targets, named plays, owners, stop conditions, cost of waiting and a deadline. CALL THIS after score_initiative returns Fix or Stop, using the same five context fields and any scores or work-architecture evidence from that call. Do not use it to produce the initial verdict, sequence several initiatives or diagnose measured process waste; use score_initiative, sequence_portfolio or diagnose_process for those jobs. Do not call it for Accelerate unless a specific delivery risk needs testing before commitment. resistance_type selects the will or skill route, risk_type selects the regulatory, reputational or operational route, and omitted diagnostics remain provisional with the next question returned. Lead with binding_constraint, surface honest_stop when present, and use rescore_gate to decide whether this remains Fix or becomes Stop. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.';
 
 const EXAMPLE_ORGANIZATION = { name: 'Example retailer', industry: 'retail', revenue_eur: 300_000_000 };
@@ -1422,7 +1421,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
 
       const s = r.verdict!;
       const feedback = feedbackFor(s.classification, r.resolved_inputs.industry);
-      const advisory = advisoryFor(s.classification);
+      const methodNote = methodNoteFor(s.classification);
       await recordCall('assess_ai_initiative', {
         assessment_stage: 'verdict',
         work_architecture_status: s.work_architecture?.status,
@@ -1452,7 +1451,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         value_note: s.value_note,
         ...(s.provenance ? { provenance: s.provenance } : {}),
         ...(briefUrl ? { brief_url: briefUrl } : {}),
-        ...(advisory ? { advisory_next_step: advisory } : {}),
+        ...(methodNote ? { method_note: methodNote } : {}),
         ...(feedback ? { feedback } : {}),
       };
       const payload = { bvf_version: BVF_VERSION, ...r, verdict, assessment_id: assessmentId };
@@ -1491,7 +1490,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         audit: r.audit,
         interpretation: SCORE_INTERPRETATION,
         ...(r.caveat ? { caveat: r.caveat } : {}),
-        advisory_next_step: advisoryFor(r.classification),
+        method_note: methodNoteFor(r.classification),
         ...(feedback ? { feedback } : {}),
       };
       return {
@@ -1636,7 +1635,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         };
       }
       if (summary.stop > 0 || summary.fix > 0) {
-        payload.advisory_next_step = advisoryFor('Fix');
+        payload.method_note = methodNoteFor('Fix');
         payload.feedback = feedbackFor('Fix');
       }
       return {
@@ -1668,7 +1667,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         notes: rec.notes,
         audit: rec.audit,
         ...(rec.change_plan ? { change_plan: rec.change_plan } : {}),
-        advisory_next_step: advisoryFor(rec.current_classification),
+        method_note: methodNoteFor(rec.current_classification),
         ...(feedback ? { feedback } : {}),
       };
       return {
@@ -1771,7 +1770,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         offer_to_execute: v.offer_to_execute,
         evidence_maturity: v.evidence_maturity,
         disclaimer: v.disclaimer,
-        advisory_next_step: advisoryFor(v.verdict),
+        method_note: methodNoteFor(v.verdict),
       };
       return {
         content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],

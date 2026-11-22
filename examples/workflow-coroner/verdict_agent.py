@@ -18,7 +18,7 @@ from _aibvf_loader import score, calculate_pace_layer_drag
 
 MODEL = "claude-sonnet-4-5-20250929"
 
-SYSTEM_PROMPT = """You are Verdict, a sub-agent inside Craig Horton Advisory's Workflow Coroner.
+SYSTEM_PROMPT = """You are Verdict, a sub-agent inside Craig Horton's Workflow Coroner.
 
 The Coroner is a Stop-first BVF adjudicator. It reads process-mined workflows from Pulse, scores them against the AI Business Value Framework v1.0, and routes the result to Architect (target-state design) and Wire (MuleSoft Anypoint actuation).
 

@@ -12,7 +12,7 @@ If the user invokes this skill without any other guidance, ask them what they wa
 - **One accent (copper `#B87333`) on deep navy (`#0F1E35`).** No other decorative colour. RAG (green/amber/red) is functional signal only — Accelerate / Fix / Stop.
 - **Type:** Playfair Display (serif — headings, KPI values, quotes; upright, no italics), DM Sans (body/UI), IBM Plex Mono (EUR figures, scores).
 - **Themes:** dark navy by default; add `data-theme="light"` to `<html>` for the warm-ivory light theme. Same copper accent both ways.
-- **Tone:** executive/advisory, measured, "holds up the mirror." No emoji, no hype. See README → Content Fundamentals.
+- **Tone:** executive, measured, "holds up the mirror." No emoji, no hype. See README → Content Fundamentals.
 - Link `styles.css` for all tokens. Components live under `window.AIBVFDesignSystem_ab2d84` via `_ds_bundle.js`.
 
 ## Key files
