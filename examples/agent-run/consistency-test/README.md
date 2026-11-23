@@ -72,18 +72,19 @@ The script passes those words to the engine as `evidence_against`. The same assi
 
 [`round-3/expected.md`](round-3/expected.md) was written before any reply came in. See [`round-3/results.md`](round-3/results.md).
 
-ChatGPT, Gemini and two Claude models have answered it, one run each.
+ChatGPT, Gemini, Grok and two Claude models have answered it, one run each.
 
-- All four quoted the service policy against the refund agent's answer on risk and control. None marked the November minutes as a disagreement.
-- The engine held that answer in all four and gave no verdict on the refund agent. It returned both sets of quotes and asked which one applies today.
-- Once the owner confirms the answer given, two replies reach Accelerate and two Fix. They differ on one answer: whether the team's measures, changed after go-live, count as redesigned.
+- All five quoted the service policy against the refund agent's answer on risk and control. None marked the November minutes as a disagreement.
+- The engine held that answer in all five and gave no verdict on the refund agent. It returned both sets of quotes and asked which one applies today.
+- Once the owner confirms the answer given, two replies reach Accelerate and three Fix. They differ on one answer: whether the team's measures, changed after go-live, count as redesigned.
 - For a reply that reaches Accelerate the engine says: "The verdict moved from Fix to Accelerate. Three answers changed since 23 November 2026. The verdict needed each of these changes: Risk and control, Redesign of the work."
-- The win-back agent is Stop in all four, and LedgerLight cannot be judged yet in all four.
+- The win-back agent is Stop in all five, and LedgerLight cannot be judged yet in all five.
 - Gemini answered "a" five times with no quote, where the files say nothing. The message forbids that. The engine counted all five as not known, and none moved an outcome.
 - Gemini also answered "Nobody owns it" for the win-back agent and quoted "No budget has been requested yet." The quote is in the files and does not say what the answer says. Nothing in the engine catches that.
 - ChatGPT answered that Halden had named a business result for LedgerLight, and quoted the vendor's claim about its other clients. Round 2 reworded that choice to rule this out. It moved no outcome.
 - ChatGPT curled one apostrophe it had copied straight. The script now treats the shape of an apostrophe or a dash as the site does: they are not words.
-- 6 of 15 answers are the same across the four replies. Every outcome is the same.
+- Grok gave the same answer as one of the Claude models on all 15, with every quote in the files. Grok has no round 2 reply, so nothing is compared with an earlier visit for it.
+- 6 of 15 answers are the same across the five replies. Every outcome is the same.
 
-This is one made-up conflict, placed where an assistant would look, and four replies from three vendors' models. It shows the rule works when the assistant finds both records. It does not show how often an assistant misses the second record in a real organisation's files.
+This is one made-up conflict, placed where an assistant would look, and five replies from four vendors' models. It shows the rule works when the assistant finds both records. It does not show how often an assistant misses the second record in a real organisation's files.
 
