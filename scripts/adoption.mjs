@@ -55,6 +55,21 @@ async function githubStats(repo) {
   };
 }
 
+// The agent skill is downloaded from GitHub releases. Each release holds its own count, so they are added up.
+async function skillDownloads(repo) {
+  const releases = await json(`https://api.github.com/repos/${repo}/releases?per_page=100`);
+  if (!Array.isArray(releases)) return null;
+  let total = 0;
+  let latest = null;
+  for (const release of releases) {
+    const asset = (release.assets ?? []).find((item) => item.name === 'aibvf-agent.zip');
+    if (!asset) continue;
+    total += asset.download_count;
+    if (latest === null) latest = { tag: release.tag_name, downloads: asset.download_count };
+  }
+  return { total, latest };
+}
+
 async function pypiStats(pkg) {
   // pypistats.org (public, no auth). Returns 404 until the package is published.
   const d = await json(`https://pypistats.org/api/packages/${pkg}/recent`);
@@ -64,7 +79,7 @@ async function pypiStats(pkg) {
 function pad(n, w = 7) { return n == null ? ('n/a'.padStart(w, ' ')) : String(n).padStart(w, ' '); }
 const downloads = (point) => point?.downloads ?? null;
 
-const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh] = await Promise.all([
+const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh, skill] = await Promise.all([
   npmDownloads(JS_PKG, 'last-day'),
   npmDownloads(JS_PKG, 'last-week'),
   npmDownloads(JS_PKG, 'last-month'),
@@ -76,6 +91,7 @@ const [jsD, jsW, jsM, mcpD, mcpW, mcpM, ckD, ckW, ckM, py, gh] = await Promise.a
   npmDownloads(CHECK_PKG, 'last-month'),
   pypiStats(PY_PKG),
   githubStats(GH_REPO),
+  skillDownloads(GH_REPO),
 ]);
 
 // Raw package-download sums can count dependencies from the same install twice.
@@ -119,6 +135,15 @@ if (gh) {
   console.log(`  updated: ${gh.updatedAt}`);
 } else {
   console.log('GitHub: rate limited or unreachable.');
+}
+console.log(line);
+if (skill) {
+  console.log('Agent skill (aibvf-agent.zip from GitHub releases)');
+  console.log(`  all releases: ${skill.total}`);
+  console.log(`  latest:       ${skill.latest ? `${skill.latest.downloads} (${skill.latest.tag})` : 'not attached yet'}`);
+  console.log('  Raw downloads from the repository itself are not counted.');
+} else {
+  console.log('Agent skill downloads: unavailable.');
 }
 if (unavailable.size) {
   console.log();

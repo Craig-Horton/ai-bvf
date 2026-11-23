@@ -29,7 +29,7 @@ Any other assistant that can add the connector can run the same agent without th
 ### Claude, on the web and desktop
 
 1. Open Settings, then Connectors. Choose Add custom connector. Name it AI BVF and paste `https://mcp.aibvf.com/api/mcp`.
-2. Download [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/raw/main/aibvf-agent.zip).
+2. Download [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/releases/latest/download/aibvf-agent.zip).
 3. Open Customize, then Skills. Choose "+", then "+ Create skill", then "Upload a skill", and pick the zip. Code execution has to be switched on for skills to load.
 4. Say: "Run the AI BVF agent."
 
@@ -47,7 +47,7 @@ claude mcp add --transport http aibvf https://mcp.aibvf.com/api/mcp
 
 Run in a live OpenClaw on Windows on 21 November 2026, with the connector and the brief it serves: the Halden example gave Fix, Stop and one that cannot be judged, and the agent scheduled its own weekly check. The skill import in step 1 is taken from the OpenClaw 2026.11.6 documentation and has not been run.
 
-1. Add the skill. In the Control UI open Plugins, then Skills, and import [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/raw/main/aibvf-agent.zip). From a terminal, unzip it and run `openclaw skills install ./aibvf-agent`.
+1. Add the skill. In the Control UI open Plugins, then Skills, and import [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/releases/latest/download/aibvf-agent.zip). From a terminal, unzip it and run `openclaw skills install ./aibvf-agent`.
 2. Add the connector. In the Control UI open Settings, then MCP, then Add server. Choose Streamable HTTP, name it `aibvf` and paste `https://mcp.aibvf.com/api/mcp`.
    In the Windows app, open Config, then Mcp, and paste this into the box under MCP Servers, then save: `{"aibvf": {"url": "https://mcp.aibvf.com/api/mcp", "transport": "streamable-http"}}`
 3. Message your agent: "Run the AI BVF agent." It states its mandate and goes ahead, because you told it to run. Without the skill, the connector alone is enough: "Get the prompt aibvf_agent from the aibvf server and follow it."
