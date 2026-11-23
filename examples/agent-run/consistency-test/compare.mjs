@@ -48,7 +48,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-const squash = (text) => text.replace(/\s+/g, ' ').trim();
+// Spacing and the shape of an apostrophe or a dash are not words, as on the site: a chat app may curl an apostrophe it copied straight.
+const squash = (text) => text.replace(/[\u2018\u2019\u201A\u2032]/g, "'").replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
 const roundNumber = (name) => Number(String(name).replace(/\D/g, '')) || 0;
 /** The files a round's message carried: ten on 23 November, and from round 3 the later ones too. */
 function corpusFor(round) {
