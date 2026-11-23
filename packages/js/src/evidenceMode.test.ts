@@ -19,7 +19,11 @@ const QUOTES: Record<AssessQuestionId, { quote: string; source: string }> = {
   change_enablement: { quote: 'Project lead named, with 40,000 euros set aside for training.', source: 'Project plan, 6 November 2026' },
   work_architecture: { quote: 'New workflow, team roles and override rights are designed. Team measures stay as they are.', source: 'Process design, 10 November 2026' },
 };
-const base: AssessInitiativeInput = { proposal: PROPOSAL, confirmed: true, answered_by: 'evidence' };
+// In evidence mode the industry and the number of people count only with a quote.
+const COMPANY = { quote: 'We are a 400-person online retailer.', source: 'Business case v3, 4 November 2026' };
+const base: AssessInitiativeInput = {
+  proposal: PROPOSAL, confirmed: true, answered_by: 'evidence', context_evidence: { industry: COMPANY, employees: COMPANY },
+};
 const ANSWERS = { financial_return: 'c', governance_risk: 'b', strategic_alignment: 'c', change_enablement: 'c', work_architecture: 'c' } as const;
 
 test('an agent that quotes its evidence gets a verdict that says who answered', () => {
@@ -245,7 +249,7 @@ test('the brief link carries the answers and the evidence, and nothing is stored
 });
 
 test('the operating brief names the tool fields it relies on and keeps the house voice', () => {
-  for (const field of ['assess_ai_initiative', 'answered_by', 'evidence', 'confirmed', 'where_to_look', 'open_questions', 'brief_url', 'review', 'unknown']) {
+  for (const field of ['assess_ai_initiative', 'answered_by', 'evidence', 'confirmed', 'where_to_look', 'open_questions', 'brief_url', 'review', 'unknown', 'context_evidence', 'pending_approvals', 'context_defaults']) {
     assert.ok(AGENT_BRIEF.includes(field), `the brief does not mention ${field}`);
   }
   assert.ok(AGENT_BRIEF.includes(AGENT_CONNECTOR_URL));
@@ -281,6 +285,7 @@ test('choice b asks for figures on cost and return, and for the organisation on 
   assert.match(label('financial_return'), /written down in figures/);
   assert.match(label('strategic_alignment'), /^The organisation has named a result/);
 
-  const small = assessInitiative({ proposal: 'We are a 40-person retailer and we want a GenAI chatbot to draft replies in customer service.', confirmed: true, answered_by: 'evidence' }).open_questions ?? [];
+  const said = { quote: 'We are a 40-person retailer.', source: 'About us' };
+  const small = assessInitiative({ proposal: 'We are a 40-person retailer and we want a GenAI chatbot to draft replies in customer service.', confirmed: true, answered_by: 'evidence', context_evidence: { industry: said, employees: said } }).open_questions ?? [];
   assert.match(small.find((question) => question.id === 'financial_return')?.choices.find((choice) => choice.id === 'b')?.label ?? '', /rough numbers that nobody has checked/);
 });

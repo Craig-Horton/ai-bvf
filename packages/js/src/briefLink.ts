@@ -8,7 +8,7 @@
  */
 import type {
   AssessAnsweredBy, AssessChoiceId, AssessEvidence, AssessFunding, AssessInitiativeInput, AssessInitiativeResult,
-  AssessQuestionId, Classification, PillarScores,
+  AssessPendingApproval, AssessQuestionId, Classification, PillarScores,
 } from './types.js';
 import { fundingRecord } from './funding.js';
 
@@ -17,7 +17,8 @@ const QUESTIONS: AssessQuestionId[] = ['financial_return', 'governance_risk', 's
 const MAX_LINK = 12000;
 
 export interface BriefLinkInput {
-  context: { industry: string; function: string; ai_tier: string; employees: number };
+  /** employees is absent when the records did not state it. */
+  context: { industry: string; function: string; ai_tier: string; employees?: number };
   answers: Partial<Record<AssessQuestionId, AssessChoiceId>>;
   /** The date of the assessment, written YYYY-MM-DD. */
   date: string;
@@ -39,6 +40,8 @@ export interface BriefLinkInput {
   funding?: AssessFunding;
   /** False to leave the quotes behind the funding figures out of the link, when it would be too long with them. */
   funding_quotes?: boolean;
+  /** Approvals still to come before go-live, each with its quote, so the person who signs sees them. */
+  pending_approvals?: AssessPendingApproval[];
   /** The page that opens the brief. Defaults to the public one. */
   base?: string;
 }
@@ -116,7 +119,10 @@ export function briefUrl(input: BriefLinkInput): string {
   for (const id of QUESTIONS) if (input.answers[id]) answers[id] = input.answers[id];
   const payload: Record<string, unknown> = {
     v: 1,
-    c: { i: input.context.industry, f: input.context.function, t: input.context.ai_tier, e: Math.round(input.context.employees) },
+    c: {
+      i: input.context.industry, f: input.context.function, t: input.context.ai_tier,
+      ...(input.context.employees !== undefined ? { e: Math.round(input.context.employees) } : {}),
+    },
     a: answers,
     d: input.date,
   };
@@ -149,6 +155,9 @@ export function briefUrl(input: BriefLinkInput): string {
     payload.r = { v: input.previous.verdict, d: input.previous.date, a: then, m: input.previous.moved.filter((id) => QUESTIONS.includes(id)) };
   }
   if (input.funding) payload.u = packFunding(input.funding, input.funding_quotes !== false);
+  if (input.pending_approvals?.length) {
+    payload.o = input.pending_approvals.slice(0, 3).map((item) => [item.what.slice(0, 200), item.by ?? '', pairs(item.evidence ?? [], 1)]);
+  }
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -174,7 +183,8 @@ export function readBriefLink(link: string): BriefLinkInput | undefined {
   }
   const c = data?.c as Record<string, unknown> | undefined;
   if (!data || data.v !== 1 || !c || typeof data.a !== 'object' || data.a === null) return undefined;
-  if (typeof c.i !== 'string' || typeof c.f !== 'string' || typeof c.t !== 'string' || typeof c.e !== 'number' || !(c.e >= 1)) return undefined;
+  if (typeof c.i !== 'string' || typeof c.f !== 'string' || typeof c.t !== 'string') return undefined;
+  if (c.e !== undefined && (typeof c.e !== 'number' || !(c.e >= 1))) return undefined;
   if (typeof data.d !== 'string' || !DATE.test(data.d)) return undefined;
 
   const answers: Partial<Record<AssessQuestionId, AssessChoiceId>> = {};
@@ -187,7 +197,7 @@ export function readBriefLink(link: string): BriefLinkInput | undefined {
     .slice(0, 3).map(([quote, source]) => ({ quote: quote.slice(0, 400), source: source.slice(0, 160) }));
 
   const brief: BriefLinkInput = {
-    context: { industry: c.i, function: c.f, ai_tier: c.t, employees: Math.round(c.e) },
+    context: { industry: c.i, function: c.f, ai_tier: c.t, ...(typeof c.e === 'number' ? { employees: Math.round(c.e) } : {}) },
     answers, date: data.d,
   };
   if (typeof data.p === 'string' && data.p.trim()) brief.proposal = data.p.slice(0, 2000);
@@ -224,6 +234,16 @@ export function readBriefLink(link: string): BriefLinkInput | undefined {
   }
   const funding = unpackFunding(data.u, brief.previous?.date);
   if (funding) brief.funding = funding;
+  if (Array.isArray(data.o)) {
+    const approvals = data.o.flatMap((row): AssessPendingApproval[] => {
+      if (!Array.isArray(row) || typeof row[0] !== 'string' || !row[0].trim()) return [];
+      const what = row[0].slice(0, 200);
+      const by = typeof row[1] === 'string' && row[1].trim() ? row[1].slice(0, 80) : undefined;
+      const evidence = quoted(row[2]);
+      return [{ what, ...(by ? { by } : {}), ...(evidence.length ? { evidence } : {}), line: `${what}.${by ? ` Sign-off: ${by}.` : ''}` }];
+    }).slice(0, 3);
+    if (approvals.length) brief.pending_approvals = approvals;
+  }
   return brief;
 }
 
@@ -233,7 +253,12 @@ export function assessInputFromBrief(brief: BriefLinkInput): AssessInitiativeInp
   const input: AssessInitiativeInput = {
     proposal: brief.proposal || ['Idea text not shared.', ...(brief.contradiction_words ?? [])].join(' '),
     industry: brief.context.industry, function: brief.context.function, ai_tier: brief.context.ai_tier,
-    employees: brief.context.employees, confirmed: true, answers,
+    employees: brief.context.employees ?? 'unknown', confirmed: true, answers,
+    // The link carries the company facts as the first run read them.
+    context_stated_by: 'owner',
+    ...(brief.pending_approvals?.length ? {
+      pending_approvals: brief.pending_approvals.map((item) => ({ what: item.what, ...(item.by ? { by: item.by } : {}), ...(item.evidence ? { evidence: item.evidence } : {}) })),
+    } : {}),
   };
   if (brief.answered_by === 'evidence') {
     input.answered_by = 'evidence';
@@ -264,11 +289,14 @@ export function briefUrlFor(
   const verdict = result.verdict;
   const context = result.resolved_inputs;
   if (result.status !== 'verdict' || !verdict) return undefined;
-  if (!context.industry || !context.function || !context.ai_tier || !context.employees) return undefined;
+  if (!context.industry || !context.function || !context.ai_tier) return undefined;
   const scored = Object.keys(verdict.scores_supplied) as (keyof PillarScores)[];
   if (scored.some((pillar) => !verdict.answers_given[pillar])) return undefined;
   if (Object.keys(input.work_architecture ?? {}).length) return undefined;
-  const read = { industry: context.industry, function: context.function, ai_tier: context.ai_tier, employees: context.employees };
+  const read = {
+    industry: context.industry, function: context.function, ai_tier: context.ai_tier,
+    ...(context.employees !== undefined ? { employees: context.employees } : {}),
+  };
   const build = (fundingQuotes: boolean) => briefUrl({
       context: read,
       answers: input.answers ?? {},
@@ -294,6 +322,7 @@ export function briefUrlFor(
         },
       } : {}),
       ...(result.funding ? { funding: result.funding, funding_quotes: fundingQuotes } : {}),
+      ...(result.pending_approvals?.length ? { pending_approvals: result.pending_approvals } : {}),
       ...(options.base ? { base: options.base } : {}),
     });
   // A link that is too long cannot travel. The verdict then stands without one.

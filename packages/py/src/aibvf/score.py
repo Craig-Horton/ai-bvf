@@ -146,7 +146,7 @@ def _classify(sa: float, fr: float, ce: float, gr: float) -> dict:
     if gr >= 70 or fr <= 20:
         return {"label": "Stop", "reason": "Governance risk above the safe threshold." if gr >= 70 else "Financial return too thin to justify scope."}
     if sa >= 60 and fr >= 60 and ce >= 60 and gr <= 40:
-        return {"label": "Accelerate", "reason": "All four pillars clear, governance contained. Fund it."}
+        return {"label": "Accelerate", "reason": "All four pillars clear, governance contained."}
     gaps = []
     if sa < 60: gaps.append("strategic alignment is weak")
     if fr < 60: gaps.append("financial return is thin")

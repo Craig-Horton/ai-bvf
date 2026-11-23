@@ -2,6 +2,24 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.22.0 (aibvf-mcp), 0.17.0 (@aibvf/core), 0.2.3 (aibvf), 23 November 2026
+
+Added: approvals still to come. `assess_ai_initiative` takes `pending_approvals`: up to three sentences, such as "France activation is pending separate controls sign-off", each with its quote in evidence mode. They never change the verdict. On an Accelerate the first step says what is pending and to go ahead once it is given, and the summary says how many approvals are still to come. A named approver is kept only when the quote names them. The approvals travel in the brief link.
+
+Why: in the Norhaven test, ClearPay returned Accelerate and "Go ahead" while its expansion to France still waited on a separate controls sign-off. An Accelerate now carries the condition. Where the controls themselves are disputed or unproven, that is no pending approval: the risk answer holds the verdict, as before.
+
+Changed: company facts the records do not state stay unknown. `industry` and `employees` take `unknown`. Unknown industry is read as cross-industry, and unknown headcount keeps the questions worded for a larger organisation. `context_defaults` says each default used. In evidence mode an industry or a headcount counts only with its quote in `context_evidence`, or when the owner stated it (`context_stated_by: owner`). A headcount counts only when the quote shows that number. Without either, it counts as not stated and the engine goes on with the default, instead of asking.
+
+Why: in the Norhaven test the agent applied financial services and 20,000 people to an industrial distributor whose records give no headcount.
+
+Changed: the Accelerate reason from `score_initiative` no longer ends "Fund it." The funding decision stays with the budget holder. Same change in the Python package.
+
+Changed: the operating brief is version 6. It asks for the industry and headcount quoted or unknown, for pending approvals quoted, and for both lines to be said with the verdict.
+
+Scope: one rule on the first step of an Accelerate, and company facts. No score, threshold or verdict rule changes: company facts never move a verdict. The three rounds of the consistency test give the same results. In the recorded Halden runs every verdict stands, and the first call of run 1 now goes to the reading instead of asking for the headcount. The 13-tool catalogue and `aibvf-check` 0.1.1 are unchanged.
+
+Correction to 0.21.1: it said the recorded Halden runs give the same results. One did not. Call 8 of run 2 was recorded as Accelerate and gives Fix since 0.21.1, because its work quote says the measures stay as they are. The record in `examples/agent-run/run-2` shows the verdict as it was given on 21 November.
+
 ## 0.21.1 (aibvf-mcp), 0.16.1 (@aibvf/core), 22 November 2026
 
 Changed: a quote that says the measures stay as they are no longer supports an answer that says they were redesigned. The engine has one more published phrase, `measures_unchanged`. It reads "the measures stay as they are", "targets remain unchanged", "the KPIs will stay the same" and "incentives are left as they are". Where such a quote is given for the answer that claims all four parts of the work redesign, the verdict is held at Fix and the words are quoted back.
