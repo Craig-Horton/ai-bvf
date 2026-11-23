@@ -2,6 +2,16 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.23.0 (aibvf-mcp), 0.18.0 (@aibvf/core), 23 November 2026
+
+Changed: the funding record reads the ask as the organisation writes it. The stage can be discovery, as well as a pilot or a rollout. The ask and the alternative take `amount` with `currency` (EUR, GBP or USD), and the statement shows the sign of that currency: "The next stage is discovery. The ask is £60,000." No figure is converted. An amount with no stated currency is shown as written, with "currency not stated". `amount_eur` still works and means euros. The brief link carries the currency, and a link made before it reads as euros.
+
+Added: in evidence mode, a quote that gives a figure about other organisations no longer counts for this organisation's return or result. The engine publishes the phrases it reads: "at comparable warehouses" and the like, "clients of your size", "customers like you", and an industry or sector average. Such a quote is listed in `evidence_set_aside` with its line, and where nothing else supports the answer, the answer counts as not known.
+
+Why: a live test on ShiftSense, from the Norhaven case, called a £60,000 discovery a pilot with the amount not known, and took a supplier's claim of 15 percent fewer agency hours at comparable warehouses as Norhaven's return. The record now says discovery, £60,000 requested, and the return not known.
+
+Scope: no score, threshold or verdict rule changes. The three rounds of the consistency test reproduce their results unchanged, and the recorded Halden runs show no new difference. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.3 are unchanged.
+
 ## 0.22.0 (aibvf-mcp), 0.17.0 (@aibvf/core), 0.2.3 (aibvf), 23 November 2026
 
 Added: approvals still to come. `assess_ai_initiative` takes `pending_approvals`: up to three sentences, such as "France activation is pending separate controls sign-off", each with its quote in evidence mode. They never change the verdict. On an Accelerate the first step says what is pending and to go ahead once it is given, and the summary says how many approvals are still to come. A named approver is kept only when the quote names them. The approvals travel in the brief link.

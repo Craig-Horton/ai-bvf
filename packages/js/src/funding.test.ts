@@ -48,7 +48,7 @@ test('it never says whether to fund, and gives no figure of its own', () => {
 test('what is missing is listed, most important first', () => {
   const bare = assessInitiative({ ...base, funding: {} }).funding!;
   assert.deepEqual(bare.gaps, [
-    'The stage is not known: a pilot or a rollout.',
+    'The stage is not known: discovery, a pilot or a rollout.',
     'The amount asked for the next stage is not known.',
     'No alternative is named, such as fixing the process as it is.',
     'No result is agreed that would release more money.',
@@ -122,7 +122,7 @@ test('an agent keeps a figure only where it can quote it', () => {
     ],
     results: [{ measure: 'Cost per resolved ticket', value: 9.5, kind: 'measured' }],
   }, true)!;
-  assert.deepEqual(funding.ask, { amount_eur: 5000, evidence: quoted });
+  assert.deepEqual(funding.ask, { amount: 5000, currency: 'EUR', amount_eur: 5000, evidence: quoted });
   assert.equal(funding.alternative, undefined, 'an alternative with no quote is not kept');
   assert.equal(funding.thresholds.length, 1, 'an agreed result with no quote is not kept');
   assert.equal(funding.thresholds[0].result, undefined, 'a result with no quote is not counted');
@@ -139,7 +139,7 @@ test('the quotes behind the figures travel in the link, and are left out before 
 });
 
 test('malformed input is refused in plain words', () => {
-  assert.throws(() => assessInitiative({ ...base, funding: { stage: 'trial' as any } }), /funding\.stage must be pilot or rollout/);
+  assert.throws(() => assessInitiative({ ...base, funding: { stage: 'trial' as any } }), /funding\.stage must be discovery, pilot or rollout/);
   assert.throws(() => assessInitiative({ ...base, funding: { ask: { amount_eur: -1 } } }), /funding\.ask\.amount_eur must be a number, 0 or more/);
   assert.throws(() => assessInitiative({ ...base, funding: { thresholds: [{ measure: 'Cost', direction: 'lower' as any, target: 1 }] } }), /direction must be at_most or at_least/);
   assert.throws(() => assessInitiative({ ...base, funding: { thresholds: Array(4).fill({ measure: 'Cost', direction: 'at_most', target: 1 }) } }), /takes 3 at most/);

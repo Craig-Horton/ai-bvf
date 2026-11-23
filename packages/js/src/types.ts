@@ -718,6 +718,19 @@ export interface AssessInitiativeResult {
   pending_approvals?: AssessPendingApproval[];
   /** Company facts the records did not state, and the default the engine used in their place. */
   context_defaults?: AssessContextDefault[];
+  /**
+   * Evidence mode: quotes set aside because they give a figure about other organisations,
+   * such as a supplier's claim about comparable sites. They do not count for this
+   * organisation's return or result.
+   */
+  evidence_set_aside?: AssessSetAside[];
+}
+
+export interface AssessSetAside {
+  id: AssessQuestionId;
+  quote: string;
+  source: string;
+  line: string;
 }
 
 export interface AssessPendingApprovalInput {
@@ -743,7 +756,9 @@ export interface AssessContextDefault {
 }
 
 /** The stage the money is for. */
-export type FundingStage = 'pilot' | 'rollout';
+export type FundingStage = 'discovery' | 'pilot' | 'rollout';
+/** The currency a figure is written in. Figures are never converted. */
+export type FundingCurrency = 'EUR' | 'GBP' | 'USD';
 /** How a figure is known: counted from records, estimated, or not known. */
 export type FundingKind = 'measured' | 'estimate' | 'unknown';
 /** What the owner decided at a review. Recorded as one of three words, with no amount. */
@@ -768,10 +783,13 @@ export interface AssessFundingThresholdInput {
 
 export interface AssessFundingInput {
   stage?: FundingStage;
-  /** What is asked for the next stage, in euros. */
-  ask?: { amount_eur?: number; evidence?: AssessEvidence };
+  /**
+   * What is asked for the next stage, in the currency the record states. Pass amount
+   * with currency, or amount_eur for euros. A figure is never converted.
+   */
+  ask?: { amount?: number; currency?: FundingCurrency; amount_eur?: number; evidence?: AssessEvidence };
   /** The cheapest credible other route, including fixing the process as it is. */
-  alternative?: { description: string; amount_eur?: number; evidence?: AssessEvidence };
+  alternative?: { description: string; amount?: number; currency?: FundingCurrency; amount_eur?: number; evidence?: AssessEvidence };
   /** Up to three results that would release more money. */
   thresholds?: AssessFundingThresholdInput[];
   /** At a review: what was measured, by the name of the agreed result. */
@@ -801,8 +819,9 @@ export interface AssessFundingThreshold {
 /** The funding record as the engine keeps it. No figure in it was worked out by the engine. */
 export interface AssessFunding {
   stage?: FundingStage;
-  ask?: { amount_eur: number; evidence?: AssessEvidence };
-  alternative?: { description: string; amount_eur?: number; evidence?: AssessEvidence };
+  /** amount_eur is set only when the record states euros. */
+  ask?: { amount: number; currency?: FundingCurrency; amount_eur?: number; evidence?: AssessEvidence };
+  alternative?: { description: string; amount?: number; currency?: FundingCurrency; amount_eur?: number; evidence?: AssessEvidence };
   thresholds: AssessFundingThreshold[];
   /** What the person who holds the budget still does not know, most important first. */
   gaps: string[];
