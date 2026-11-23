@@ -38,7 +38,7 @@ import {
 } from './guidedQuestions.js';
 import type {
   AiTier, AssessAnswer, AssessAnswerAt, AssessAnswerChange, AssessChoice, AssessConflict, AssessContradiction, AssessChoiceId, AssessContext,
-  AssessDecider, AssessEvidence, AssessField, AssessOpenQuestion,
+  AssessContextDefault, AssessDecider, AssessPendingApproval, AssessEvidence, AssessField, AssessOpenQuestion,
   AssessInitiativeInput, AssessInitiativeResult, AssessProvenance, AssessQuestion, AssessQuestionId, AssessReviewRecord, AssessSinceLast, AssessTrack,
   AssessVerdict, Classification, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
 } from './types.js';
@@ -172,6 +172,8 @@ function understoodStatement(resolved: AssessContext, missing: AssessField[]): s
   if (resolved.employees !== undefined) {
     const wording = resolved.track === 'smaller_firm' ? 'a smaller firm' : 'a larger organisation';
     read.push(`${resolved.employees.toLocaleString('en-GB')} people, so the questions are worded for ${wording}`);
+  } else if (resolved.track) {
+    read.push('headcount not stated, so the questions are worded for a larger organisation');
   }
   const open = missing.map((field) => FIELD_NAME[field]);
   const readPart = read.length ? `Read as: ${read.join('; ')}.` : 'Nothing in the proposal could be read with confidence.';
@@ -249,6 +251,19 @@ function cleanEvidence(given: unknown): AssessEvidence | undefined {
 function cleanEvidenceList(given: unknown): AssessEvidence[] {
   const items = Array.isArray(given) ? given : [given];
   return items.map(cleanEvidence).filter((item): item is AssessEvidence => item !== undefined).slice(0, QUOTES_PER_ANSWER);
+}
+
+/** What the result says when a company fact was not stated. */
+export const INDUSTRY_DEFAULT_LINE = 'Industry not stated. Read as cross-industry.';
+export const INDUSTRY_UNQUOTED_LINE = 'Industry given without a quote, so counted as not stated. Read as cross-industry.';
+export const INDUSTRY_UNMATCHED_LINE = 'The quoted industry is not one the rules name. Read as cross-industry.';
+export const HEADCOUNT_DEFAULT_LINE = 'Headcount not stated. The questions use the wording for a larger organisation.';
+export const HEADCOUNT_UNQUOTED_LINE = 'Headcount given without a quote that shows it, so counted as not stated. The questions use the wording for a larger organisation.';
+
+/** True when the quote shows the number, with or without separators: 1,200 and 1200 and 1 200 are the same. */
+function numberShownIn(value: number, quote: string): boolean {
+  const digits = String(value);
+  return quote.split(/[^\d,. \u00a0']+/).some((run) => run.replace(/[,. \u00a0']/g, '') === digits);
 }
 
 /** Shown as the answer where two records disagree. */
@@ -382,10 +397,64 @@ export function assessInitiative(input: AssessInitiativeInput): AssessInitiative
   const then = link === undefined ? undefined : earlierFrom(link);
   // The funding record sits beside the verdict. At a return visit the results agreed earlier come back from the brief link.
   const funding = fundingRecord(input?.funding, input?.answered_by === 'evidence', then?.brief.funding, then?.brief.date);
+  const approvals = pendingApprovals(input?.pending_approvals, input?.answered_by === 'evidence');
   let result = assess(input, then?.verdict);
   if (result.status !== 'verdict' && result.status !== 'not_enough_to_judge') return result;
   if (then && result.review) result = { ...result, review: { ...result.review, since_last: sinceLast(input, result, then) } };
+  if (approvals.length) result = withApprovals(result, approvals);
   return funding ? { ...result, funding } : result;
+}
+
+/** At most this many pending approvals are kept. */
+export const PENDING_APPROVALS_MAX = 3;
+const APPROVAL_WHAT_MAX = 200;
+const APPROVAL_BY_MAX = 80;
+
+/**
+ * Approvals still to come before go-live. In evidence mode each one needs a quote, or it is
+ * not kept. A named approver is kept only when a quote names them, so no name is made up.
+ */
+export function pendingApprovals(given: unknown, byEvidence: boolean): AssessPendingApproval[] {
+  if (given === undefined) return [];
+  if (!Array.isArray(given)) throw new Error('pending_approvals must be a list of approvals still to come.');
+  const kept: AssessPendingApproval[] = [];
+  for (const [index, raw] of given.entries()) {
+    if (!raw || typeof raw !== 'object') throw new Error(`pending_approvals[${index}] must say what is pending.`);
+    const item = raw as Record<string, unknown>;
+    const what = typeof item.what === 'string' ? withoutClosingStop(item.what.replace(/\s+/g, ' ').trim()).slice(0, APPROVAL_WHAT_MAX) : '';
+    if (!what) throw new Error(`pending_approvals[${index}].what must say what is pending.`);
+    const evidence = cleanEvidenceList(item.evidence);
+    if (byEvidence && !evidence.length) continue;
+    const named = typeof item.by === 'string' ? item.by.replace(/\s+/g, ' ').trim().slice(0, APPROVAL_BY_MAX) : '';
+    const by = named && (!byEvidence || evidence.some((quote) => quote.quote.toLowerCase().includes(named.toLowerCase()))) ? named : undefined;
+    const line = `${what}.${by ? ` Sign-off: ${by}.` : ''}`;
+    kept.push({ what, ...(by ? { by } : {}), ...(evidence.length ? { evidence } : {}), line });
+    if (kept.length === PENDING_APPROVALS_MAX) break;
+  }
+  return kept;
+}
+
+/** The step an Accelerate gives while approvals are still to come. The verdict itself does not change. */
+export function pendingStep(approvals: AssessPendingApproval[]): string {
+  const lines = approvals.map((item) => item.line).join(' ');
+  const once = approvals.length === 1 ? 'once it is given' : 'once each is given';
+  return `${lines} Go ahead ${once}, and answer the same questions again at the first review.`;
+}
+
+function withApprovals(result: AssessInitiativeResult, approvals: AssessPendingApproval[]): AssessInitiativeResult {
+  const verdict = result.verdict;
+  if (!verdict || verdict.classification !== 'Accelerate') return { ...result, pending_approvals: approvals };
+  const waiting = approvals.length === 1 ? 'One approval is still to come.' : `${COUNT_WORDS[approvals.length]} approvals are still to come.`;
+  return {
+    ...result,
+    pending_approvals: approvals,
+    verdict: {
+      ...verdict,
+      summary: `${verdict.summary} ${waiting}`,
+      first_step: pendingStep(approvals),
+      audit: { ...verdict.audit, rules_fired: [...verdict.audit.rules_fired, `pending_approvals:${approvals.length}`] },
+    },
+  };
 }
 
 function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): AssessInitiativeResult {
@@ -408,8 +477,23 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
   let firstSuggestions: string[] | undefined;
   let industryPhrase: string | undefined;
 
+  // Company facts. 'unknown' stays unknown, with a disclosed default. In evidence mode the
+  // industry and the number of people count only with a quote, unless the owner stated them.
+  const defaults: AssessContextDefault[] = [];
+  const quoted = byEvidence && input.context_stated_by !== 'owner';
+  const contextQuote = (field: 'industry' | 'employees') => (quoted ? cleanEvidence(input.context_evidence?.[field]) : undefined);
+  const industryGiven = typeof input.industry === 'string' ? input.industry.trim() : undefined;
+  const industryUnknown = industryGiven?.toLowerCase() === 'unknown';
+  const industryQuote = contextQuote('industry');
+  if (industryUnknown || (quoted && !industryQuote)) {
+    resolved.industry = 'universal';
+    defaults.push({ field: 'industry', line: industryUnknown || !industryGiven ? INDUSTRY_DEFAULT_LINE : INDUSTRY_UNQUOTED_LINE });
+    resolutions.push('industry not stated, read as cross-industry.');
+  }
+
   for (const field of ['industry', 'function', 'ai_tier'] as const) {
-    const provided = input[field]?.trim();
+    if (field === 'industry' && resolved.industry) continue;
+    const provided = field === 'industry' ? industryGiven || (industryQuote?.quote) : input[field]?.trim();
     const source = provided || proposalFor(field, proposal, industryPhrase);
     const match = taxonomyMatch(field, source);
     if (field === 'industry' && !provided && match?.resolved && match.matched_on !== 'exact') industryPhrase = match.matched_on;
@@ -425,10 +509,36 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
     }
   }
 
-  if (input.employees !== undefined) {
-    if (!Number.isFinite(input.employees) || input.employees < 1) throw new Error('employees must be a number of people, 1 or more.');
-    resolved.employees = Math.round(input.employees);
-    resolutions.push(`employees resolved as ${resolved.employees} from provided value.`);
+  // A quoted industry that matches nothing in the taxonomy is read as cross-industry, and the result says so.
+  if (quoted && !resolved.industry) {
+    resolved.industry = 'universal';
+    defaults.push({ field: 'industry', line: INDUSTRY_UNMATCHED_LINE });
+    resolutions.push('industry quoted but not in the taxonomy, read as cross-industry.');
+  }
+
+  const employeesQuote = contextQuote('employees');
+  let employeesDefaulted = false;
+  const noHeadcount = (line: string) => {
+    employeesDefaulted = true;
+    defaults.push({ field: 'employees', line });
+    resolutions.push('employees not stated, questions worded for a larger organisation.');
+  };
+  if (typeof input.employees === 'string' && input.employees.trim().toLowerCase() === 'unknown') {
+    noHeadcount(HEADCOUNT_DEFAULT_LINE);
+  } else if (input.employees !== undefined) {
+    if (typeof input.employees !== 'number' || !Number.isFinite(input.employees) || input.employees < 1) throw new Error("employees must be a number of people, 1 or more, or 'unknown'.");
+    const value = Math.round(input.employees);
+    if (quoted && !(employeesQuote && numberShownIn(value, employeesQuote.quote))) noHeadcount(HEADCOUNT_UNQUOTED_LINE);
+    else {
+      resolved.employees = value;
+      resolutions.push(`employees resolved as ${value} from ${quoted ? 'the quoted record' : 'provided value'}.`);
+    }
+  } else if (quoted) {
+    const read = employeesQuote ? extractEmployees(employeesQuote.quote) : undefined;
+    if (read) {
+      resolved.employees = read.value;
+      resolutions.push(`employees resolved as ${read.value} from the quoted record, matched on "${read.matched_on}".`);
+    } else noHeadcount(HEADCOUNT_DEFAULT_LINE);
   } else {
     const read = extractEmployees(proposal);
     if (read) {
@@ -438,12 +548,14 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
     }
   }
   if (resolved.employees !== undefined) resolved.track = trackFor(resolved.employees);
+  else if (employeesDefaulted) resolved.track = 'enterprise';
 
-  const missing = CONTEXT_FIELDS.filter((field) => resolved[field] === undefined);
+  const missing = CONTEXT_FIELDS.filter((field) => resolved[field] === undefined && !(field === 'employees' && employeesDefaulted));
   const understood = understoodStatement(resolved, missing);
   const base = {
     proposal, resolved_inputs: resolved, resolutions, missing_fields: missing,
     inferred_fields: inferred, understood,
+    ...(defaults.length ? { context_defaults: defaults } : {}),
     ...(byEvidence ? { answered_by: 'evidence' as const } : {}),
     ...(review ? { review } : {}),
   };

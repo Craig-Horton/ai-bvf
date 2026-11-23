@@ -434,7 +434,7 @@ export interface AssessContext {
   industry?: Industry;
   function?: FunctionId;
   ai_tier?: AiTier;
-  /** Number of people in the organisation. */
+  /** Number of people in the organisation. Absent when the records do not state it. */
   employees?: number;
   /** Set once employees is known: under 250 is smaller_firm. */
   track?: AssessTrack;
@@ -472,10 +472,30 @@ export interface AssessReview {
 
 export interface AssessInitiativeInput {
   proposal: string;
+  /** The industry in plain words, or 'unknown' when the records do not say. Unknown is read as cross-industry, and the result says so. */
   industry?: string;
   function?: string;
   ai_tier?: string;
-  employees?: number;
+  /** Number of people, or 'unknown' when the records do not say. Unknown keeps the questions worded for a larger organisation, and the result says so. */
+  employees?: number | 'unknown';
+  /**
+   * Evidence mode: the quote that states the industry or the number of people.
+   * Without one, the value counts as not stated. A number of people counts only
+   * when the quote shows that number.
+   */
+  context_evidence?: { industry?: AssessEvidence; employees?: AssessEvidence };
+  /**
+   * Evidence mode: pass 'owner' when the person who runs the agent stated the
+   * industry and the number of people. They then need no quote.
+   */
+  context_stated_by?: 'owner';
+  /**
+   * Approvals that are still to come before the initiative may go live: a
+   * separate sign-off, a go-live decision. Each one is a sentence, the person
+   * named in the record where it names one, and in evidence mode the quote.
+   * They never change the verdict. On an Accelerate they become the first step.
+   */
+  pending_approvals?: AssessPendingApprovalInput[];
   /** True once the user has confirmed how the proposal was read. */
   confirmed?: boolean;
   /** The answers to the guided questions, by question id. */
@@ -694,6 +714,32 @@ export interface AssessInitiativeResult {
   review?: AssessReviewRecord;
   /** Present when a funding record was passed, or the earlier brief carried one. It never changes the verdict. */
   funding?: AssessFunding;
+  /** Approvals still to come before go-live. They never change the verdict. */
+  pending_approvals?: AssessPendingApproval[];
+  /** Company facts the records did not state, and the default the engine used in their place. */
+  context_defaults?: AssessContextDefault[];
+}
+
+export interface AssessPendingApprovalInput {
+  /** What is pending, in one sentence. For example: France activation is pending separate controls sign-off. */
+  what: string;
+  /** The person who signs it off. Kept only when the quote names them. */
+  by?: string;
+  evidence?: AssessEvidence | AssessEvidence[];
+}
+
+export interface AssessPendingApproval {
+  what: string;
+  by?: string;
+  evidence?: AssessEvidence[];
+  /** The sentence to show. */
+  line: string;
+}
+
+export interface AssessContextDefault {
+  field: 'industry' | 'employees';
+  /** For example: Headcount not stated. The questions use the wording for a larger organisation. */
+  line: string;
 }
 
 /** The stage the money is for. */

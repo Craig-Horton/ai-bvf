@@ -147,7 +147,7 @@ function classify(sa: number, fr: number, ce: number, gr: number): { label: Clas
     return { label: 'Stop', reason: gr >= 70 ? 'Governance risk above the safe threshold.' : 'Financial return too thin to justify scope.' };
   }
   if (sa >= 60 && fr >= 60 && ce >= 60 && gr <= 40) {
-    return { label: 'Accelerate', reason: 'All four pillars clear, governance contained. Fund it.' };
+    return { label: 'Accelerate', reason: 'All four pillars clear, governance contained.' };
   }
   const gaps: string[] = [];
   if (sa < 60) gaps.push('strategic alignment is weak');

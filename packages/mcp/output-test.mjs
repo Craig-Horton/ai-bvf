@@ -392,7 +392,7 @@ test('MCP offers the agent operating brief as a prompt and tells every assistant
     assert.deepEqual(listed.prompts.map((prompt) => prompt.name), ['aibvf_agent']);
     const brief = await client.getPrompt({ name: 'aibvf_agent' });
     const text = brief.messages[0].content.text;
-    assert.match(text, /Evidence or unknown\. Never choose an answer you cannot quote\./);
+    assert.match(text, /Evidence or unknown\. Never choose an answer or a company fact you cannot quote\./);
     assert.match(text, /May do: draft\. Send nothing, spend nothing, change no system\./);
     await assert.rejects(client.getPrompt({ name: 'nope' }));
     const tools = await client.listTools();
