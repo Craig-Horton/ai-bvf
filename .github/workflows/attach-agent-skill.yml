@@ -1,0 +1,43 @@
+name: Attach the agent skill to the latest release
+
+# The agent skill is downloaded from the latest GitHub release, so each download is counted.
+# Runs when the packed skill changes on main, after each package release, or by hand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aibvf-agent.zip'
+      - '.github/workflows/attach-agent-skill.yml'
+  workflow_run:
+    workflows: ['Publish to MCP Registry']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: attach-agent-skill
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - name: Upload aibvf-agent.zip to the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release view --json tagName --jq .tagName)
+          echo "Latest release: $tag"
+          # Replace the asset only when the packed skill differs, so its download count is kept.
+          if gh release download "$tag" --pattern aibvf-agent.zip --output /tmp/current.zip 2>/dev/null && cmp -s /tmp/current.zip aibvf-agent.zip; then
+            echo "The release already holds this skill."
+          else
+            gh release upload "$tag" aibvf-agent.zip --clobber
+          fi

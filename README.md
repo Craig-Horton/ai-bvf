@@ -70,7 +70,7 @@ Two more rules cover records that change. Where two records disagree on an answe
 
 For the person who holds the budget there is a funding record: what is asked for the next stage, the alternative, and up to three results agreed to release more money. Every figure is the organisation's own. At the return visit each agreed result comes back marked met or not met, and the engine never says whether to fund. See [`examples/funding-review`](examples/funding-review).
 
-- Claude, Claude Code and OpenClaw: install the skill in [`skills/aibvf-agent`](skills/aibvf-agent), packed as [`aibvf-agent.zip`](aibvf-agent.zip).
+- Claude, Claude Code and OpenClaw: install the skill in [`skills/aibvf-agent`](skills/aibvf-agent), packed as [`aibvf-agent.zip`](https://github.com/Craig-Horton/ai-bvf/releases/latest/download/aibvf-agent.zip).
 - Any other assistant with the connector: give it the operating brief, which the connector serves as the prompt `aibvf_agent`.
 
 ## How to read a result
