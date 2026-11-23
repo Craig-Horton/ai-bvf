@@ -296,12 +296,10 @@ export function briefUrlFor(
       ...(result.funding ? { funding: result.funding, funding_quotes: fundingQuotes } : {}),
       ...(options.base ? { base: options.base } : {}),
     });
-  try {
-    return build(true);
-  } catch {
-    // Too long with the quotes behind the funding figures. The figures still travel without them.
-    if (result.funding) { try { return build(false); } catch { /* still too long */ } }
-    // Too long to travel in a link. The verdict stands without one.
-    return undefined;
-  }
+  // A link that is too long cannot travel. The verdict then stands without one.
+  const attempt = (fundingQuotes: boolean): string | undefined => {
+    try { return build(fundingQuotes); } catch { return undefined; }
+  };
+  // Too long with the quotes behind the funding figures: the figures still travel without them.
+  return attempt(true) ?? (result.funding ? attempt(false) : undefined);
 }

@@ -128,13 +128,26 @@ test('a person is asked one question at a time and never sees the open list', ()
 
 test('evidence that says the opposite of its answer holds the verdict at Fix', () => {
   const all = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'd', change_enablement: 'd', work_architecture: 'd' } as const;
-  const clean = assessInitiative({ ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: all, evidence: QUOTES });
+  // The quote for the work redesign has to say what the answer claims: all four parts, the measures included.
+  const redesigned = { quote: 'The new workflow is drawn end to end. The roles are rewritten. Override rights and team measures are set.', source: 'Process design, 10 November 2026' };
+  const clean = assessInitiative({ ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: all, evidence: { ...QUOTES, work_architecture: redesigned } });
   assert.equal(clean.verdict!.classification, 'Accelerate');
   assert.equal(clean.verdict!.summary, 'Go ahead. The evidence clears the bar on every question.');
 
+  // A quote that says the measures stay as they are does not support an answer that says they were redesigned.
+  const measures = assessInitiative({ ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: all, evidence: QUOTES });
+  assert.equal(measures.verdict!.classification, 'Fix');
+  assert.equal(measures.verdict!.contradictions[0].rule, 'measures_unchanged');
+  assert.equal(measures.verdict!.contradictions[0].proposal_words, 'measures stay as they are');
+  assert.equal(measures.verdict!.first_step, 'The evidence says "measures stay as they are" and the answer says otherwise. Settle which one is true, then answer again.');
+  // The same quote agrees with the answer that says the measures are still to come.
+  const stillToCome = assessInitiative({ ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: { ...all, work_architecture: 'c' }, evidence: QUOTES });
+  assert.deepEqual(stillToCome.verdict!.contradictions, []);
+  assert.ok(stillToCome.verdict!.audit.rules_fired.includes('evidence_read:measures_unchanged'), 'the phrase is still recorded as read');
+
   const contradicted = assessInitiative({
     ...base, proposal: 'We are a 400-person online retailer. We want GenAI to draft replies to customer queries.', answers: all,
-    evidence: { ...QUOTES, governance_risk: { quote: 'Replies go out with no human review once the pilot ends.', source: 'Design note, 9 November 2026' } },
+    evidence: { ...QUOTES, work_architecture: redesigned, governance_risk: { quote: 'Replies go out with no human review once the pilot ends.', source: 'Design note, 9 November 2026' } },
   });
   assert.equal(contradicted.verdict!.classification, 'Fix');
   const found = contradicted.verdict!.contradictions[0];

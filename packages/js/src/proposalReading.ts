@@ -11,7 +11,7 @@
  * the words from the proposal beside the answer, and leaves the user to
  * settle which one is true.
  */
-import type { AssessQuestionId } from './types.js';
+import type { AssessQuestionId, WorkArchitectureInput } from './types.js';
 
 export interface ProposalRule {
   /** Stable name, recorded in the audit when the rule fires. */
@@ -20,12 +20,21 @@ export interface ProposalRule {
   question: AssessQuestionId;
   /** What the phrase says about the initiative, in plain words. */
   says: string;
+  /**
+   * For the question on how the work changes: the one part the phrase speaks
+   * about. The phrase then contradicts only an answer that claims that part,
+   * so "the measures stay as they are" agrees with an answer that says the
+   * measures are still to come.
+   */
+  part?: keyof WorkArchitectureInput;
   pattern: RegExp;
 }
 
 export interface ProposalFinding {
   rule: string;
   question: AssessQuestionId;
+  /** Set when the phrase speaks about one part of the work redesign only. */
+  part?: keyof WorkArchitectureInput;
   /** The words as written in the proposal. */
   proposal_words: string;
   says: string;
@@ -65,6 +74,11 @@ export const PROPOSAL_RULES: ProposalRule[] = [
     says: 'the work itself stays as it is today',
     pattern: /\b(?:no|without any|without) (?:changes?|change) to (?:the |our |how |existing |current )*(?:process|processes|workflow|workflows|roles|way we work|ways of working|we work|team|teams)\b|\bwithout (?:changing|redesigning|touching) (?:the |our |how |existing |current |any )*(?:process|processes|workflow|workflows|roles|way we work|ways of working|we work|anything)\b|\b(?:bolt(?:ed)?[- ]on|drop[- ]in|plug(?:ged)? (?:it )?(?:straight )?into)\b|\b(?:existing|current) (?:process|processes|workflow|workflows) (?:stay|stays|remain|remains|will stay|will remain) (?:the same|unchanged|as (?:it is|they are))\b/i,
   },
+  {
+    rule: 'measures_unchanged', question: 'work_architecture', part: 'measures_updated',
+    says: 'the people doing the work are still measured as they were before',
+    pattern: /\b(?:measures|targets|kpis|metrics|incentives) (?:stay|stays|remain|remains|will stay|will remain) (?:the same|unchanged|as (?:they are|it is|before))\b|\b(?:measures|targets|kpis|metrics|incentives) (?:are|is) (?:unchanged|not changed|left as (?:they are|it is))\b/i,
+  },
 ];
 
 /**
@@ -74,18 +88,18 @@ export const PROPOSAL_RULES: ProposalRule[] = [
 const NEGATED_BEFORE = /\b(?:not|never|no longer|cannot|can't|won't|nothing|n't)\b[^.,;:!?]{0,24}$/i;
 
 /**
- * Returns at most one finding per question, the first phrase found in the
- * proposal for that question. Input is capped before any matching.
+ * Returns at most one finding per rule, the first phrase found in the
+ * proposal for that rule. Input is capped before any matching.
  */
 export function readProposal(proposal: string): ProposalFinding[] {
   const text = String(proposal ?? '').slice(0, 4000).replace(/\s+/g, ' ');
   const findings: ProposalFinding[] = [];
-  for (const { rule, question, says, pattern } of PROPOSAL_RULES) {
+  for (const { rule, question, says, pattern, part } of PROPOSAL_RULES) {
     const global = new RegExp(pattern.source, 'gi');
     for (const match of text.matchAll(global)) {
       const before = text.slice(Math.max(0, match.index! - 32), match.index!);
       if (NEGATED_BEFORE.test(before)) continue;
-      findings.push({ rule, question, proposal_words: match[0].trim(), says });
+      findings.push({ rule, question, ...(part ? { part } : {}), proposal_words: match[0].trim(), says });
       break;
     }
   }

@@ -2,6 +2,16 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.21.1 (aibvf-mcp), 0.16.1 (@aibvf/core), 22 November 2026
+
+Changed: a quote that says the measures stay as they are no longer supports an answer that says they were redesigned. The engine has one more published phrase, `measures_unchanged`. It reads "the measures stay as they are", "targets remain unchanged", "the KPIs will stay the same" and "incentives are left as they are". Where such a quote is given for the answer that claims all four parts of the work redesign, the verdict is held at Fix and the words are quoted back.
+
+Why: two reviewers named the same gap. The tool checks that a quote is in the documents. It could not tell that a quote said the opposite of its answer, unless the words were on a short list. "The team's measures stay as they are for now", given as evidence that the measures were redesigned, returned Accelerate.
+
+The phrase speaks about one part of the redesign, so it counts only against an answer that claims that part. The same quote agrees with the answer that says the measures are still to come, and there it changes nothing. A phrase rule can now name the part it speaks about.
+
+Scope: one published phrase. An answer and a quote that agree give the verdict they gave before. The three rounds of the consistency test and the recorded Halden runs give the same results. A quote that does not support its answer in some other way still passes: the person who reads the brief is that check.
+
 ## 0.21.0 (aibvf-mcp), 0.16.0 (@aibvf/core), 22 November 2026
 
 Added: a funding record beside the verdict. `assess_ai_initiative` takes `funding`: the stage, a pilot or a rollout, what is asked for it, the alternative, and up to three results agreed to release more money. `funding` comes back with each agreed result in one sentence, what is still not known, and a note on whose figures these are.
