@@ -38,7 +38,7 @@ import {
 } from './guidedQuestions.js';
 import type {
   AiTier, AssessAnswer, AssessAnswerAt, AssessAnswerChange, AssessChoice, AssessConflict, AssessContradiction, AssessChoiceId, AssessContext,
-  AssessContextDefault, AssessDecider, AssessPendingApproval, AssessEvidence, AssessField, AssessOpenQuestion,
+  AssessContextDefault, AssessDecider, AssessPendingApproval, AssessSetAside, AssessEvidence, AssessField, AssessOpenQuestion,
   AssessInitiativeInput, AssessInitiativeResult, AssessProvenance, AssessQuestion, AssessQuestionId, AssessReviewRecord, AssessSinceLast, AssessTrack,
   AssessVerdict, Classification, FunctionId, Industry, PillarScores, TaxonomyMatch, WorkArchitectureInput,
 } from './types.js';
@@ -266,6 +266,32 @@ function numberShownIn(value: number, quote: string): boolean {
   return quote.split(/[^\d,. \u00a0']+/).some((run) => run.replace(/[,. \u00a0']/g, '') === digits);
 }
 
+/**
+ * Published phrases that mark a figure about other organisations: a supplier's claim about
+ * comparable sites or clients of your size, or a sector average. Such a figure is no
+ * evidence of this organisation's own return or result.
+ */
+export const OTHERS_RESULT_PATTERNS: readonly RegExp[] = [
+  /\b(?:at|in|across|for|from)\s+(?:comparable|similar|peer)\s+(?:[a-z-]+\s+)?(?:warehouses|sites|companies|firms|businesses|customers|clients|organi[sz]ations|operators|retailers|distributors|plants|stores|hospitals|banks|insurers|deployments)\b/i,
+  /\b(?:clients|customers|companies|firms|organi[sz]ations|businesses)\s+(?:of|like)\s+your\s+(?:size|kind|type)\b/i,
+  /\bcustomers\s+like\s+you\b/i,
+  /\b(?:industry|sector|market)\s+(?:average|benchmark)s?\b/i,
+];
+export const OTHERS_RESULT_LINE = 'A figure about other organisations. It is no evidence of this organisation\'s own return or result.';
+/** The two questions about this organisation's own return and result. */
+const OWN_RESULT_QUESTIONS: AssessQuestionId[] = ['financial_return', 'strategic_alignment'];
+
+/** True when the quote speaks of other organisations' results. */
+export function aboutOthers(quote: string): boolean {
+  return OTHERS_RESULT_PATTERNS.some((pattern) => pattern.test(quote.slice(0, QUOTE_MAX)));
+}
+
+/** The quotes an answer can rest on. On the return and the result, a figure about other organisations is set aside. */
+function ownEvidence(id: AssessQuestionId, evidence: AssessEvidence[]): { kept: AssessEvidence[]; setAside: AssessEvidence[] } {
+  if (!OWN_RESULT_QUESTIONS.includes(id)) return { kept: evidence, setAside: [] };
+  return { kept: evidence.filter((item) => !aboutOthers(item.quote)), setAside: evidence.filter((item) => aboutOthers(item.quote)) };
+}
+
 /** Shown as the answer where two records disagree. */
 export const CONFLICT_LABEL = 'Two records disagree. Counted as not known.';
 /** Shown as the earlier answer to a question that had not been put. */
@@ -323,7 +349,7 @@ function answerAt(input: AssessInitiativeInput, id: AssessQuestionId, track: Ass
   if (choice === 'unknown') return { choice, label: UNKNOWN_LABEL };
   const wording = id === 'work_architecture' ? wordingFor(track, id) : wordingFor(track, id, aiTier);
   if (input.answered_by !== 'evidence') return { choice, label: wording[choice] };
-  const evidence = cleanEvidenceList(input.evidence?.[id]);
+  const evidence = ownEvidence(id, cleanEvidenceList(input.evidence?.[id])).kept;
   if (!evidence.length) return { choice: 'unknown', label: UNKNOWN_LABEL };
   if (cleanEvidenceList(input.evidence_against?.[id]).length) return { choice: 'unknown', label: CONFLICT_LABEL };
   return { choice, label: wording[choice], evidence };
@@ -593,6 +619,7 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
   const unknown: AssessQuestionId[] = [];
   const rules: string[] = [`track:${track}`, ...(byEvidence ? ['answered_by:evidence'] : [])];
   const evidenceMissing: AssessQuestionId[] = [];
+  const setAside: AssessSetAside[] = [];
   const evidenceGiven: Partial<Record<AssessQuestionId, AssessEvidence[]>> = {};
   const held: { id: AssessQuestionId; choice: Exclude<AssessChoiceId, 'unknown'>; evidence: AssessEvidence[]; against: AssessEvidence[] }[] = [];
 
@@ -603,7 +630,10 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
     if (choice === undefined) return undefined;
     if (!['a', 'b', 'c', 'd', 'unknown'].includes(choice)) throw new Error(`answers.${id} must be one of a, b, c, d or unknown.`);
     if (!byEvidence || choice === 'unknown') return choice;
-    const evidence = cleanEvidenceList(input.evidence?.[id]);
+    const own = ownEvidence(id, cleanEvidenceList(input.evidence?.[id]));
+    for (const item of own.setAside) setAside.push({ id, ...item, line: OTHERS_RESULT_LINE });
+    if (own.setAside.length) rules.push(`set_aside:${id}`);
+    const evidence = own.kept;
     if (!evidence.length) {
       evidenceMissing.push(id);
       rules.push(`evidence_missing:${id}`);
@@ -687,6 +717,7 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
   const judged = {
     ...base, missing_fields: [] as AssessField[],
     ...(evidenceMissing.length ? { evidence_missing: evidenceMissing } : {}),
+    ...(setAside.length ? { evidence_set_aside: setAside } : {}),
     ...(conflicts.length ? { conflicts } : {}),
     ...(openQuestions.length ? { open_questions: openQuestions } : {}),
   };

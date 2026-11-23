@@ -14,10 +14,13 @@
  * budget.
  */
 import type {
-  AssessEvidence, AssessFunding, AssessFundingInput, AssessFundingThreshold, FundingDecision, FundingKind, FundingStage,
+  AssessEvidence, AssessFunding, AssessFundingInput, AssessFundingThreshold, FundingCurrency, FundingDecision, FundingKind, FundingStage,
 } from './types.js';
 
-export const FUNDING_STAGES: readonly FundingStage[] = ['pilot', 'rollout'];
+export const FUNDING_STAGES: readonly FundingStage[] = ['discovery', 'pilot', 'rollout'];
+export const FUNDING_CURRENCIES: readonly FundingCurrency[] = ['EUR', 'GBP', 'USD'];
+const CURRENCY_SIGN: Record<FundingCurrency, string> = { EUR: '€', GBP: '£', USD: '$' };
+const STAGE_WORDS: Record<FundingStage, string> = { discovery: 'discovery', pilot: 'a pilot', rollout: 'a rollout' };
 export const FUNDING_DECISIONS: readonly FundingDecision[] = ['released', 'deferred', 'withdrew'];
 /** The three decisions in everyday words, for a person or an agent to choose from at a review. */
 export const FUNDING_DECISION_LABEL: Record<FundingDecision, string> = {
@@ -58,17 +61,37 @@ export function plainNumber(value: number): string {
   const [whole, fraction = ''] = (Math.round(value * 100) / 100).toString().split('.');
   return `${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${fraction ? `.${fraction}` : ''}`;
 }
-/** Euros as written: whole euros bare, anything else to the cent. */
-const euros = (value: number): string => {
+/** Money as written, in its own currency: whole amounts bare, anything else to the cent. Never converted. */
+const money = (value: number, currency?: FundingCurrency): string => {
+  const sign = currency ? CURRENCY_SIGN[currency] : '';
   const rounded = Math.round(value * 100) / 100;
-  if (Number.isInteger(rounded)) return `€${plainNumber(rounded)}`;
-  const [whole, cents] = rounded.toFixed(2).split('.');
-  return `€${plainNumber(Number(whole))}.${cents}`;
+  const written = Number.isInteger(rounded) ? plainNumber(rounded) : `${plainNumber(Math.trunc(rounded))}.${rounded.toFixed(2).split('.')[1]}`;
+  return sign ? `${sign}${written}` : `${written}, currency not stated`;
 };
-/** A value with its unit: euros take the sign, anything else follows the number. */
+const euros = (value: number): string => money(value, 'EUR');
+
+/** An amount and its currency from an ask or an alternative. amount_eur means euros. */
+function moneyFrom(given: Record<string, unknown> | undefined, field: string): { amount: number; currency?: FundingCurrency } | undefined {
+  if (!given) return undefined;
+  if (given.currency !== undefined && !FUNDING_CURRENCIES.includes(given.currency as FundingCurrency)) {
+    throw new Error(`funding.${field}.currency must be one of ${FUNDING_CURRENCIES.join(', ')}.`);
+  }
+  const value = amount(given.amount, `${field}.amount`);
+  if (value !== undefined) return { amount: value, ...(given.currency ? { currency: given.currency as FundingCurrency } : {}) };
+  const inEuros = amount(given.amount_eur, `${field}.amount_eur`);
+  return inEuros !== undefined ? { amount: inEuros, currency: 'EUR' } : undefined;
+}
+const moneyFields = (found: { amount: number; currency?: FundingCurrency }) => ({
+  amount: found.amount, ...(found.currency ? { currency: found.currency } : {}),
+  ...(found.currency === 'EUR' ? { amount_eur: found.amount } : {}),
+});
+/** A value with its unit: money takes its sign, anything else follows the number. */
 export function withUnit(value: number, unit?: string): string {
   if (!unit) return plainNumber(value);
-  return /^(€|eur|euro|euros)$/i.test(unit) ? euros(value) : `${plainNumber(value)} ${unit}`;
+  if (/^(€|eur|euro|euros)$/i.test(unit)) return euros(value);
+  if (/^(£|gbp|pound|pounds)$/i.test(unit)) return money(value, 'GBP');
+  if (/^(\$|usd|dollar|dollars)$/i.test(unit)) return money(value, 'USD');
+  return `${plainNumber(value)} ${unit}`;
 }
 
 function thresholdFrom(given: unknown, index: number, byEvidence: boolean): AssessFundingThreshold | undefined {
@@ -114,22 +137,22 @@ export function fundingRecord(
   if (given !== undefined && (!given || typeof given !== 'object' || Array.isArray(given))) throw new Error('funding must be an object.');
   const input = (given ?? {}) as AssessFundingInput;
 
-  if (input.stage !== undefined && !FUNDING_STAGES.includes(input.stage)) throw new Error('funding.stage must be pilot or rollout.');
+  if (input.stage !== undefined && !FUNDING_STAGES.includes(input.stage)) throw new Error('funding.stage must be discovery, pilot or rollout.');
   if (input.decision !== undefined && !FUNDING_DECISIONS.includes(input.decision)) throw new Error(`funding.decision must be one of ${FUNDING_DECISIONS.join(', ')}.`);
   const stage = input.stage ?? earlier?.stage;
 
   // What is asked for the next stage. An agent keeps the amount only where it can quote it.
   const askEvidence = evidenceOf(input.ask?.evidence);
-  const askAmount = amount(input.ask?.amount_eur, 'ask.amount_eur');
-  const ask = askAmount !== undefined && (!byEvidence || askEvidence)
-    ? { amount_eur: askAmount, ...(askEvidence ? { evidence: askEvidence } : {}) }
+  const askMoney = moneyFrom(input.ask as Record<string, unknown> | undefined, 'ask');
+  const ask = askMoney && (!byEvidence || askEvidence)
+    ? { ...moneyFields(askMoney), ...(askEvidence ? { evidence: askEvidence } : {}) }
     : earlier?.ask;
 
   const altText = text(input.alternative?.description, 200);
   const altEvidence = evidenceOf(input.alternative?.evidence);
-  const altAmount = amount(input.alternative?.amount_eur, 'alternative.amount_eur');
+  const altMoney = moneyFrom(input.alternative as Record<string, unknown> | undefined, 'alternative');
   const alternative = altText && (!byEvidence || altEvidence)
-    ? { description: altText, ...(altAmount !== undefined ? { amount_eur: altAmount } : {}), ...(altEvidence ? { evidence: altEvidence } : {}) }
+    ? { description: altText, ...(altMoney ? moneyFields(altMoney) : {}), ...(altEvidence ? { evidence: altEvidence } : {}) }
     : earlier?.alternative;
 
   if (input.thresholds !== undefined && !Array.isArray(input.thresholds)) throw new Error('funding.thresholds must be a list.');
@@ -162,7 +185,7 @@ export function fundingRecord(
 
   // What the person who holds the budget still does not know, most important first.
   const gaps: string[] = [];
-  if (!stage) gaps.push('The stage is not known: a pilot or a rollout.');
+  if (!stage) gaps.push('The stage is not known: discovery, a pilot or a rollout.');
   if (!ask) gaps.push('The amount asked for the next stage is not known.');
   if (!alternative) gaps.push('No alternative is named, such as fixing the process as it is.');
   if (!thresholds.length) gaps.push('No result is agreed that would release more money.');
@@ -180,9 +203,9 @@ export function fundingRecord(
 
   const sentences: string[] = [];
   if (stage || ask) {
-    sentences.push(`${stage ? `The next stage is a ${stage}.` : 'The next stage is not named.'} ${ask ? `The ask is ${euros(ask.amount_eur)}.` : 'The amount asked is not known.'}`);
+    sentences.push(`${stage ? `The next stage is ${STAGE_WORDS[stage]}.` : 'The next stage is not named.'} ${ask ? `The ask is ${money(ask.amount, ask.currency)}.` : 'The amount asked is not known.'}`);
   }
-  if (alternative) sentences.push(`The alternative: ${withoutClosingStop(alternative.description)}${alternative.amount_eur !== undefined ? `, at ${euros(alternative.amount_eur)}` : ''}.`);
+  if (alternative) sentences.push(`The alternative: ${withoutClosingStop(alternative.description)}${alternative.amount !== undefined ? `, at ${money(alternative.amount, alternative.currency)}` : ''}.`);
   let review: AssessFunding['review'];
   if (reviewed.length) {
     const met = reviewed.filter((item) => item.met).length;

@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.22.0';
+export const VERSION = '0.23.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -368,14 +368,22 @@ const assessInitiativeInputSchema = {
       type: 'object',
       description: 'OPTIONAL. The funding record, for the person who holds the budget: what is asked for the next stage, the alternative, and up to three results agreed to release more money. It sits beside the verdict and never changes it. Pass only figures the organisation has stated, never one you worked out. In evidence mode each figure needs its quote and source, or it is not kept. At a return visit pass review.previous_brief and put what was measured in results: the agreed results come back from the earlier link. This tool never says whether to fund.',
       properties: {
-        stage: { type: 'string', enum: ['pilot', 'rollout'], description: 'What the money is for: a limited pilot, or a rollout.' },
+        stage: { type: 'string', enum: ['discovery', 'pilot', 'rollout'], description: 'What the money is for: discovery before anything is built, a limited pilot, or a rollout. Use the stage the record names.' },
         ask: {
           type: 'object', description: 'What is asked for the next stage.',
-          properties: { amount_eur: { type: 'number', minimum: 0, description: 'The amount asked, in euros, as the organisation states it.' }, evidence: evidenceSchema },
+          properties: {
+            amount: { type: 'number', minimum: 0, description: 'The amount asked, as the organisation states it, in its own currency. Write out 110k as 110000 and 1.2 million as 1200000. Never convert a currency.' },
+            currency: { type: 'string', enum: ['EUR', 'GBP', 'USD'], description: 'The currency the quote states. Leave it out when the quote states none.' },
+            amount_eur: { type: 'number', minimum: 0, description: 'Older form for an amount in euros. Prefer amount with currency EUR.' },
+            evidence: evidenceSchema,
+          },
         },
         alternative: {
           type: 'object', description: 'The cheapest credible other route, including fixing the process as it is.',
-          properties: { description: { type: 'string', maxLength: 500 }, amount_eur: { type: 'number', minimum: 0 }, evidence: evidenceSchema },
+          properties: {
+            description: { type: 'string', maxLength: 500 }, amount: { type: 'number', minimum: 0 },
+            currency: { type: 'string', enum: ['EUR', 'GBP', 'USD'] }, amount_eur: { type: 'number', minimum: 0 }, evidence: evidenceSchema,
+          },
         },
         thresholds: {
           type: 'array', maxItems: 3,
@@ -749,9 +757,9 @@ const assessInitiativeOutputSchema = {
       description: 'Present when a funding record was passed, or the earlier brief carried one. Say statement with the verdict, then each line in thresholds and each entry in gaps. Every figure is the organisation\'s own. Never add a figure, and never say whether to fund: say note.',
       required: ['thresholds', 'gaps', 'statement', 'note'],
       properties: {
-        stage: { type: 'string', enum: ['pilot', 'rollout'] },
-        ask: { type: 'object', properties: { amount_eur: { type: 'number' }, evidence: evidenceSchema } },
-        alternative: { type: 'object', properties: { description: { type: 'string' }, amount_eur: { type: 'number' }, evidence: evidenceSchema } },
+        stage: { type: 'string', enum: ['discovery', 'pilot', 'rollout'] },
+        ask: { type: 'object', properties: { amount: { type: 'number' }, currency: { type: 'string', enum: ['EUR', 'GBP', 'USD'] }, amount_eur: { type: 'number', description: 'Set only when the record states euros.' }, evidence: evidenceSchema } },
+        alternative: { type: 'object', properties: { description: { type: 'string' }, amount: { type: 'number' }, currency: { type: 'string', enum: ['EUR', 'GBP', 'USD'] }, amount_eur: { type: 'number' }, evidence: evidenceSchema } },
         thresholds: {
           type: 'array',
           items: {
@@ -783,6 +791,11 @@ const assessInitiativeOutputSchema = {
         type: 'object', required: ['what', 'line'],
         properties: { what: { type: 'string' }, by: { type: 'string' }, evidence: { type: 'array', items: evidenceSchema }, line: { type: 'string' } },
       },
+    },
+    evidence_set_aside: {
+      type: 'array',
+      description: 'Evidence mode: quotes set aside because they give a figure about other organisations, such as a supplier\'s claim about comparable sites or clients of your size. They do not count for this organisation\'s return or result. Say each line beside its quote.',
+      items: { type: 'object', required: ['id', 'quote', 'source', 'line'], properties: { id: { type: 'string' }, quote: { type: 'string' }, source: { type: 'string' }, line: { type: 'string' } } },
     },
     context_defaults: {
       type: 'array',

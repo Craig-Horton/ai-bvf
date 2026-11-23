@@ -8,9 +8,9 @@
  */
 import type {
   AssessAnsweredBy, AssessChoiceId, AssessEvidence, AssessFunding, AssessInitiativeInput, AssessInitiativeResult,
-  AssessPendingApproval, AssessQuestionId, Classification, PillarScores,
+  AssessPendingApproval, AssessQuestionId, Classification, FundingCurrency, PillarScores,
 } from './types.js';
-import { fundingRecord } from './funding.js';
+import { FUNDING_CURRENCIES, fundingRecord } from './funding.js';
 
 export const BRIEF_BASE = 'https://www.aibvf.com/verdict';
 const QUESTIONS: AssessQuestionId[] = ['financial_return', 'governance_risk', 'strategic_alignment', 'change_enablement', 'work_architecture'];
@@ -54,9 +54,10 @@ const unpair = (given: unknown): AssessEvidence | undefined =>
 /** The funding record in its short form for the link. A result is one row: what is measured, the agreement, today's figure and the result. */
 function packFunding(funding: AssessFunding, quotes: boolean): Record<string, unknown> {
   return {
-    ...(funding.stage ? { s: funding.stage === 'pilot' ? 'p' : 'r' } : {}),
-    ...(funding.ask ? { k: [funding.ask.amount_eur, pair(funding.ask.evidence, quotes)] } : {}),
-    ...(funding.alternative ? { l: [funding.alternative.description.slice(0, 200), funding.alternative.amount_eur ?? null, pair(funding.alternative.evidence, quotes)] } : {}),
+    ...(funding.stage ? { s: funding.stage === 'pilot' ? 'p' : funding.stage === 'discovery' ? 'd' : 'r' } : {}),
+    // The currency travels third. A link without it is in euros, as every link was before.
+    ...(funding.ask ? { k: [funding.ask.amount, pair(funding.ask.evidence, quotes), funding.ask.currency ?? '-'] } : {}),
+    ...(funding.alternative ? { l: [funding.alternative.description.slice(0, 200), funding.alternative.amount ?? null, pair(funding.alternative.evidence, quotes), funding.alternative.currency ?? '-'] } : {}),
     t: funding.thresholds.slice(0, 3).map((item) => [
       item.measure.slice(0, 80), item.unit ?? '', item.direction === 'at_most' ? 'm' : 'l', item.target,
       item.baseline ?? null, item.baseline_kind === 'measured' ? 'm' : 'e', pair(item.evidence, quotes),
@@ -66,6 +67,12 @@ function packFunding(funding: AssessFunding, quotes: boolean): Record<string, un
   };
 }
 
+/** An amount read back from a link with its currency. A link made before currencies is in euros; '-' means none was stated. */
+const linkMoney = (value: number, currency: unknown): { amount: number; currency?: FundingCurrency } =>
+  currency === undefined ? { amount: value, currency: 'EUR' }
+    : FUNDING_CURRENCIES.includes(currency as FundingCurrency) ? { amount: value, currency: currency as FundingCurrency }
+    : { amount: value };
+
 /** Reads the short form back and has the engine rebuild the record, so the brief says only what the engine would. */
 function unpackFunding(given: unknown, agreedOn?: string): AssessFunding | undefined {
   if (!given || typeof given !== 'object') return undefined;
@@ -74,9 +81,9 @@ function unpackFunding(given: unknown, agreedOn?: string): AssessFunding | undef
   const rows = (Array.isArray(u.t) ? u.t : []).filter((row): row is unknown[] => Array.isArray(row) && typeof row[0] === 'string' && num(row[3]) !== undefined).slice(0, 3);
   try {
     const agreed = fundingRecord({
-      ...(u.s === 'p' ? { stage: 'pilot' as const } : u.s === 'r' ? { stage: 'rollout' as const } : {}),
-      ...(Array.isArray(u.k) && num(u.k[0]) !== undefined ? { ask: { amount_eur: num(u.k[0]), evidence: unpair(u.k[1]) } } : {}),
-      ...(Array.isArray(u.l) && typeof u.l[0] === 'string' ? { alternative: { description: u.l[0], amount_eur: num(u.l[1]), evidence: unpair(u.l[2]) } } : {}),
+      ...(u.s === 'p' ? { stage: 'pilot' as const } : u.s === 'r' ? { stage: 'rollout' as const } : u.s === 'd' ? { stage: 'discovery' as const } : {}),
+      ...(Array.isArray(u.k) && num(u.k[0]) !== undefined ? { ask: { ...linkMoney(num(u.k[0])!, u.k[2]), evidence: unpair(u.k[1]) } } : {}),
+      ...(Array.isArray(u.l) && typeof u.l[0] === 'string' ? { alternative: { description: u.l[0], ...(num(u.l[1]) !== undefined ? linkMoney(num(u.l[1])!, u.l[3]) : {}), evidence: unpair(u.l[2]) } } : {}),
       thresholds: rows.map((row) => ({
         measure: row[0] as string, unit: typeof row[1] === 'string' ? row[1] : undefined, direction: row[2] === 'l' ? 'at_least' as const : 'at_most' as const,
         target: row[3] as number, baseline: num(row[4]), baseline_kind: row[5] === 'm' ? 'measured' as const : 'estimate' as const, evidence: unpair(row[6]),
