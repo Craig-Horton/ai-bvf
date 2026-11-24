@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diagnoseProcess } from './diagnose.js';
+import { diagnoseProcess, confidenceBand } from './diagnose.js';
 import type { ProcessSignals } from './types.js';
 
 // A heavy, mostly-manual finance process: high volume, low automation,
@@ -143,4 +143,68 @@ test('work that comes back → Quality controls, before any other rule but rare 
 
 test('every verdict says which rule chose the intervention', () => {
   assert.equal(diagnoseProcess(heavyFinance).assumptions[0], 'intervention chosen by largest drag factor: manual');
+});
+
+// The delivery complaint from the example log. Waiting is 33.4 percent of the drag and manual work is 33.2 percent:
+// both round to 0.33. The rule reads the shares as counted, so waiting decides.
+const deliveryComplaint: ProcessSignals = {
+  process_id: 'Delivery complaint',
+  function: 'cx',
+  instances_per_year: 1521,
+  fte_hours_per_instance: 0.49,
+  loaded_hourly_rate_eur: 38,
+  cycle_time_days: 0.61,
+  touch_ratio: 0.08,
+  handoffs: 2,
+  rework_rate: 0.19,
+  automation_level: 0.27,
+  direct_spend_eur: 0,
+  signal_completeness: 0.89,
+};
+
+test('two drag factors that round to the same figure: the larger one as counted decides', () => {
+  const v = diagnoseProcess(deliveryComplaint);
+  assert.equal(v.drag_decomposition.wait, v.drag_decomposition.manual, 'the rounded shares are equal');
+  assert.equal(v.assumptions[0], 'intervention chosen by largest drag factor: wait');
+  assert.equal(v.intervention, 'Consolidate & re-sequence');
+});
+
+test('a close call between two moves is said, with both shares and the other move', () => {
+  const v = diagnoseProcess(deliveryComplaint);
+  assert.equal(v.assumptions[1], 'close call: wait is 33.4 percent of the drag and manual is 33.2 percent. A small change in the counts would choose Automate');
+  // Clear of the margin, there is no such line. Two factors that point to the same move are no close call either.
+  assert.ok(!diagnoseProcess(heavyFinance).assumptions.some((line) => line.startsWith('close call')));
+  assert.ok(!diagnoseProcess({ ...desk, handoffs: 2 }).assumptions.some((line) => line.startsWith('close call')));
+});
+
+test('the assumptions rebuild the saving: yearly cost, reach, saving band, share kept', () => {
+  const v = diagnoseProcess(deliveryComplaint);
+  const lines = v.assumptions.join('\n');
+  assert.match(lines, /yearly cost today: €28,321\. That is 1,521 cases a year, 0\.49 hours of work each, at €38 an hour, plus €0 of spend on tools/);
+  assert.match(lines, /reach: 100 percent of the yearly cost, the share that is labour/);
+  assert.match(lines, /saving band for Consolidate & re-sequence: 20 to 40 percent of what the change reaches\. Evidence Medium\. The band is a draft/);
+  assert.match(lines, /share kept: 50 to 70 percent of that saving, the band for traditional readiness to change\. No readiness was given, so this is the default/);
+  assert.match(lines, /signals counted: 89 percent/);
+  assert.equal(v.net_saving_low_eur, Math.round(28321 * 1 * 0.20 * 0.5));
+  assert.equal(v.net_saving_high_eur, Math.round(28321 * 1 * 0.40 * 0.7));
+  // A readiness that was given is said as given.
+  assert.match(diagnoseProcess({ ...deliveryComplaint, readiness: 'agile' }).assumptions.join('\n'), /share kept: 85 to 100 percent of that saving, the band for agile readiness to change\. Readiness was given/);
+  // No line carries a dash that stands for a pause.
+  for (const line of v.assumptions) assert.ok(!/[—–]/.test(line), line);
+});
+
+test('the saving is also given as a share of what the process costs today', () => {
+  const v = diagnoseProcess(deliveryComplaint);
+  assert.equal(v.net_saving_low_pct, 10);
+  assert.equal(v.net_saving_high_pct, 28);
+  assert.equal(v.net_saving_low_pct, Math.round(100 * v.net_saving_low_eur / v.baseline_cost_eur));
+});
+
+test('confidence in words: one scale for every report', () => {
+  assert.equal(confidenceBand(0.75), 'high');
+  assert.equal(confidenceBand(0.74), 'medium');
+  assert.equal(confidenceBand(0.5), 'medium');
+  assert.equal(confidenceBand(0.49), 'low');
+  const v = diagnoseProcess(deliveryComplaint);
+  assert.equal(v.confidence_band, confidenceBand(v.decision_confidence));
 });

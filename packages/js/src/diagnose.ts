@@ -1,7 +1,7 @@
 import { READINESS_CAPTURE } from './score.js';
 import type {
   ProcessSignals, BrainVerdict, Intervention, DragDecomposition,
-  FunctionId, Classification, Readiness, EvidenceMaturity,
+  FunctionId, Classification, Readiness, EvidenceMaturity, ConfidenceBand,
 } from './types.js';
 
 /**
@@ -111,13 +111,45 @@ export const REWORK_FLOOR = 0.30;       // this share of cases comes back, or mo
 export const SHORT_WORK_HOURS = 0.25;   // this much work per case, or less
 export const REPEAT_VOLUME = 1000;      // this many a year, or more
 
+/**
+ * The confidence in words. One scale, written once, so that no report maps it
+ * its own way. The engine returns confidence from 0 to 1 and the connector
+ * returns the same figure from 0 to 100. Both carry `confidence_band`.
+ */
+export const CONFIDENCE_HIGH = 0.75;
+export const CONFIDENCE_MEDIUM = 0.5;
+export function confidenceBand(confidence: number): ConfidenceBand {
+  return confidence >= CONFIDENCE_HIGH ? 'high' : confidence >= CONFIDENCE_MEDIUM ? 'medium' : 'low';
+}
+
+/**
+ * The smallest log that supports a judgement. Below either floor a report
+ * counts the process and judges nothing: no yearly volume, no intervention,
+ * no saving. One case seen on one day is not 365 a year. The engine takes
+ * yearly signals and cannot see the log, so the code that counts a log
+ * applies the floors. They are judgement, not a benchmark.
+ */
+export const MIN_CASES_TO_JUDGE = 30;   // cases of one process in the log
+export const MIN_DAYS_TO_PROJECT = 28;  // days the log covers, first step to last
+
+/** Two drag factors this close, as shares of the drag, are a close call. The verdict says so. */
+export const CLOSE_CALL = 0.02;
+
+type Factor = keyof DragDecomposition;
+const FACTORS: Factor[] = ['manual', 'handoffs', 'wait', 'rework', 'cycle'];
+
 function bandFor(fn: FunctionId, iv: Intervention): Band {
   return EVIDENCE[fn]?.[iv] ?? CROSS_CUTTING[iv];
 }
 
-function dominantFactor(d: DragDecomposition): keyof DragDecomposition {
-  return (Object.keys(d) as (keyof DragDecomposition)[]).reduce((a, b) => (d[b] > d[a] ? b : a));
+/** The move each drag factor points to. */
+function moveFor(factor: Factor): Intervention {
+  return factor === 'manual' ? 'Automate' : factor === 'rework' ? 'Quality controls' : 'Consolidate & re-sequence';
 }
+
+const whole = (x: number) => Math.round(x).toLocaleString('en-GB');
+const pct = (x: number) => Math.round(x * 100);
+const tenth = (x: number) => (Math.round(x * 1000) / 10).toFixed(1);
 
 /**
  * Saturated signals (penalty near 0 or 1) mean we are extrapolating beyond the
@@ -162,13 +194,17 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
   const heavySum = weighted.manual + weighted.rework + weighted.handoffs + weighted.wait + weighted.cycle;
   const heaviness = Math.round(100 * heavySum); // weights sum to 1, penalties 0..1 → 0..100
 
-  const drag_decomposition: DragDecomposition = heavySum > 0 ? {
-    manual:   round2(weighted.manual   / heavySum),
-    handoffs: round2(weighted.handoffs / heavySum),
-    wait:     round2(weighted.wait     / heavySum),
-    rework:   round2(weighted.rework   / heavySum),
-    cycle:    round2(weighted.cycle    / heavySum),
-  } : { manual: 0, handoffs: 0, wait: 0, rework: 0, cycle: 0 };
+  // The shares as counted. The rule below reads these, never the rounded ones:
+  // two factors that round to the same figure are still told apart.
+  const share = (part: number) => (heavySum > 0 ? part / heavySum : 0);
+  const shares: Record<Factor, number> = {
+    manual: share(weighted.manual), handoffs: share(weighted.handoffs), wait: share(weighted.wait),
+    rework: share(weighted.rework), cycle: share(weighted.cycle),
+  };
+  const drag_decomposition: DragDecomposition = {
+    manual: round2(shares.manual), handoffs: round2(shares.handoffs), wait: round2(shares.wait),
+    rework: round2(shares.rework), cycle: round2(shares.cycle),
+  };
 
   // ── 3.3 intervention selector + addressable fraction ──
   const labour_fraction = clamp01(labour_cost / ((labour_cost + s.direct_spend_eur) || 1));
@@ -176,31 +212,36 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
   let addressable: number;
 
   let chosen_by: string;
+  let reach: string;
+  let close_call: string | undefined;
 
   if (s.instances_per_year < ELIMINATE_VOLUME && heaviness >= 50) {
     intervention = 'Eliminate / insource';
     addressable = 1.0;
+    reach = 'the whole process';
     chosen_by = `rare and heavy: under ${ELIMINATE_VOLUME} a year and heaviness of 50 or more`;
   } else if (s.rework_rate >= REWORK_FLOOR) {
     intervention = 'Quality controls';
     addressable = clamp01(s.rework_rate);
+    reach = 'the share of cases that come back';
     chosen_by = `comes back: ${Math.round(REWORK_FLOOR * 100)} percent of cases or more are reworked`;
   } else if (s.fte_hours_per_instance <= SHORT_WORK_HOURS && s.handoffs <= 1 && s.instances_per_year >= REPEAT_VOLUME) {
     intervention = 'Automate';
     addressable = labour_fraction;
+    reach = 'the share that is labour';
     chosen_by = `short and repeated: ${Math.round(SHORT_WORK_HOURS * 60)} minutes of work or less, one person at most, ${REPEAT_VOLUME} a year or more`;
   } else {
-    const dominant = dominantFactor(drag_decomposition);
+    // Largest first. Equal shares keep the order of FACTORS.
+    const ranked = [...FACTORS].sort((a, b) => shares[b] - shares[a]);
+    const dominant = ranked[0];
     chosen_by = `largest drag factor: ${dominant}`;
-    if (dominant === 'manual') {
-      intervention = 'Automate';
-      addressable = labour_fraction;
-    } else if (dominant === 'rework') {
-      intervention = 'Quality controls';
-      addressable = clamp01(s.rework_rate);
-    } else { // handoffs | wait | cycle
-      intervention = 'Consolidate & re-sequence';
-      addressable = labour_fraction;
+    intervention = moveFor(dominant);
+    addressable = dominant === 'rework' ? clamp01(s.rework_rate) : labour_fraction;
+    reach = dominant === 'rework' ? 'the share of cases that come back' : 'the share that is labour';
+    // The nearest factor that points to another move. Within the margin, a small change in the counts changes the move.
+    const rival = ranked.slice(1).find((factor) => moveFor(factor) !== intervention);
+    if (rival && shares[dominant] - shares[rival] <= CLOSE_CALL) {
+      close_call = `close call: ${dominant} is ${tenth(shares[dominant])} percent of the drag and ${rival} is ${tenth(shares[rival])} percent. A small change in the counts would choose ${moveFor(rival)}`;
     }
   }
 
@@ -212,7 +253,10 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
   const net_saving_low_eur  = Math.round(gross_low  * cap.low);
   const net_saving_high_eur = Math.round(gross_high * cap.high);
   const eff_mid = (band.lo + band.hi) / 2;
+  // Before the share kept. The euro range is after it: net_saving_*_pct says what share of today's cost that range is.
   const efficiency_gain_pct = Math.round(eff_mid * addressable * 100);
+  const net_saving_low_pct = Math.round(100 * net_saving_low_eur / baseline_cost_eur);
+  const net_saving_high_pct = Math.round(100 * net_saving_high_eur / baseline_cost_eur);
 
   // ── §4 decision confidence ──
   const signal_completeness = clamp01(s.signal_completeness ?? 0.7);
@@ -234,13 +278,18 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
     verdict = 'Fix';
   }
 
+  // Everything the figure rests on, in words a report can print as they are.
+  // The first line names the rule that chose. The rest rebuild the saving:
+  // yearly cost, times reach, times saving band, times share kept.
   const assumptions = [
     `intervention chosen by ${chosen_by}`,
-    `loaded rate €${s.loaded_hourly_rate_eur}/hr`,
-    `${readiness} capture band ${cap.low}–${cap.high}`,
-    `evidence ${band.maturity} (effectiveness ${band.lo}–${band.hi})`,
-    `signal completeness ${signal_completeness}`,
-    'heaviness bands DRAFT — pending APQC calibration',
+    ...(close_call ? [close_call] : []),
+    `yearly cost today: €${whole(baseline_cost_eur)}. That is ${whole(s.instances_per_year)} cases a year, ${s.fte_hours_per_instance} hours of work each, at €${s.loaded_hourly_rate_eur} an hour, plus €${whole(s.direct_spend_eur)} of spend on tools`,
+    `reach: ${pct(addressable)} percent of the yearly cost, ${reach}`,
+    `saving band for ${intervention}: ${pct(band.lo)} to ${pct(band.hi)} percent of what the change reaches. Evidence ${band.maturity}. The band is a draft, set from published vendor and analyst figures and cut back. It was not measured on these cases`,
+    `share kept: ${pct(cap.low)} to ${pct(cap.high)} percent of that saving, the band for ${readiness} readiness to change. ${s.readiness ? 'Readiness was given' : 'No readiness was given, so this is the default'}`,
+    `signals counted: ${pct(signal_completeness)} percent${s.signal_completeness === undefined ? ', the default when none is given' : ''}`,
+    'the weights and medians that set heaviness are a draft and not yet calibrated',
   ];
 
   return {
@@ -252,9 +301,12 @@ export function diagnoseProcess(s: ProcessSignals): BrainVerdict {
     intervention,
     net_saving_low_eur,
     net_saving_high_eur,
+    net_saving_low_pct,
+    net_saving_high_pct,
     efficiency_gain_pct,
     verdict,
     decision_confidence,
+    confidence_band: confidenceBand(decision_confidence),
     assumptions,
     offer_to_execute: verdict === 'Accelerate',
     evidence_maturity: band.maturity,

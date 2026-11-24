@@ -417,3 +417,28 @@ test('MCP publishes one working call per tool, and each one succeeds the first t
     }
   });
 });
+
+test('MCP diagnose_process gives the saving as a share of today\'s cost, the confidence in words, and what the figure rests on', { timeout: 10000 }, async () => {
+  await withMcp(async (call) => {
+    const verdict = await call('diagnose_process', {
+      process_id: 'Delivery complaint', function: 'cx', instances_per_year: 1521, fte_hours_per_instance: 0.49, loaded_hourly_rate_eur: 38,
+      cycle_time_days: 0.61, touch_ratio: 0.08, handoffs: 2, rework_rate: 0.19, automation_level: 0.27, direct_spend_eur: 0, signal_completeness: 0.89,
+    });
+    // Waiting and manual work both round to 0.33 of the drag. The larger one as counted decides, and the close call is said.
+    assert.equal(verdict.intervention, 'Consolidate & re-sequence');
+    assert.match(verdict.assumptions[1], /^close call: wait is 33\.4 percent of the drag and manual is 33\.2 percent/);
+    assert.deepEqual(verdict.net_saving_eur, { low: 2832, high: 7930 });
+    assert.deepEqual(verdict.net_saving_pct, { low: 10, high: 28 });
+    // One scale: the figure from 0 to 100, and the word the engine gives for it.
+    assert.equal(verdict.decision_confidence, 79);
+    assert.equal(verdict.confidence_band, 'high');
+    assert.ok(verdict.assumptions.some((line) => line.startsWith('saving band for Consolidate & re-sequence: 20 to 40 percent') && line.includes('The band is a draft')));
+    assert.ok(verdict.assumptions.some((line) => line.startsWith('share kept: 50 to 70 percent') && line.includes('this is the default')));
+    const low = await call('diagnose_process', {
+      process_id: 'thin', function: 'sales', instances_per_year: 2000, fte_hours_per_instance: 1, loaded_hourly_rate_eur: 50,
+      cycle_time_days: 20, touch_ratio: 0.2, handoffs: 4, rework_rate: 0.1, automation_level: 0.1, direct_spend_eur: 0, signal_completeness: 0.3,
+    });
+    assert.ok(low.decision_confidence < 50, String(low.decision_confidence));
+    assert.equal(low.confidence_band, 'low');
+  });
+});

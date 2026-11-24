@@ -9,9 +9,10 @@
 //   1. measure()  code counts the log. No model, no judgement.
 //   2. diagnoseProcess()  the published engine in @aibvf/core picks the intervention and sizes the saving.
 //   3. report()   the words. Every figure in it comes from 1 or 2.
+// A process with fewer than 30 cases in the log is counted and not judged. So is every process in a log shorter than 28 days.
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { diagnoseProcess } from '../../packages/js/dist/index.js';
+import { diagnoseProcess, MIN_CASES_TO_JUDGE, MIN_DAYS_TO_PROJECT } from '../../packages/js/dist/index.js';
 
 const here = (name) => new URL(name, import.meta.url);
 const args = process.argv.slice(2);
@@ -71,6 +72,11 @@ export function measure(csv) {
 export function judge(measured, { rate, fn = 'cx' } = {}) {
   const measuredCount = 7 + (rate ? 1 : 0);
   return measured.processes.map((item) => {
+    // Too few cases, or too few days: counted, and not judged. One case seen on one day is not 365 a year.
+    const tooSmall = measured.period_days < MIN_DAYS_TO_PROJECT
+      ? `the log covers ${measured.period_days} days, and it takes ${MIN_DAYS_TO_PROJECT} to project a year`
+      : item.cases_in_log < MIN_CASES_TO_JUDGE ? `${item.cases_in_log} cases in the log, and it takes ${MIN_CASES_TO_JUDGE} to judge a process` : undefined;
+    if (tooSmall) return { ...item, not_judged: tooSmall, sized: false };
     const verdict = diagnoseProcess({
       process_id: item.name, function: fn,
       instances_per_year: item.instances_per_year, fte_hours_per_instance: item.fte_hours_per_instance,
@@ -81,7 +87,7 @@ export function judge(measured, { rate, fn = 'cx' } = {}) {
       signal_completeness: round(measuredCount / 9),
     });
     return { ...item, verdict, sized: Boolean(rate) };
-  }).sort((a, b) => b.verdict.net_saving_high_eur - a.verdict.net_saving_high_eur);
+  }).sort((a, b) => (b.verdict?.net_saving_high_eur ?? -1) - (a.verdict?.net_saving_high_eur ?? -1));
 }
 
 const DRAG = { manual: 'manual work', handoffs: 'hand-offs', wait: 'waiting', rework: 'work that comes back', cycle: 'the time from open to close' };
@@ -105,29 +111,45 @@ export function report(measured, judged, { department, organisation, rate }) {
   ];
   judged.forEach((item, index) => {
     const { verdict } = item;
-    const heaviest = Object.entries(verdict.drag_decomposition).sort((a, b) => b[1] - a[1])[0];
-    const leave = verdict.verdict === 'Stop';
     lines.push('', `${index + 1}. ${item.name}`);
     const minutes = Math.round(item.fte_hours_per_instance * 60);
     const touched = item.handoffs === 0 ? 'Most cases are touched by nobody' : item.handoffs === 1 ? '1 person touches a case' : `${item.handoffs} people touch a case`;
-    lines.push(`   Found: ${item.instances_per_year.toLocaleString('en-GB')} a year. ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} of work each. ${item.cycle_time_days} days from open to close. ${touched}. ${percent(item.rework_rate)} come back. A system does ${percent(item.automation_level)} of the steps.`);
-    if (leave) {
+    const facts = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} of work each. ${item.cycle_time_days} days from open to close. ${touched}. ${percent(item.rework_rate)} come back. A system does ${percent(item.automation_level)} of the steps.`;
+    if (item.not_judged) {
+      // No yearly figure for a process that is not judged: the cases in the log are the count.
+      lines.push(`   Found: ${item.cases_in_log} cases in ${measured.period_days} days. ${facts}`);
+      lines.push(`   Not judged: ${item.not_judged}. No recommendation and no saving.`);
+      return;
+    }
+    lines.push(`   Found: ${item.instances_per_year.toLocaleString('en-GB')} a year, from ${item.cases_in_log} cases in ${measured.period_days} days. ${facts}`);
+    if (verdict.verdict === 'Stop') {
       lines.push('   Do: leave it. It is light already, and a change would save too little to matter.');
       return;
     }
     lines.push(`   Do: ${verdict.intervention}.`);
     // The engine names the rule that chose. Where the largest drag factor chose, say which one and how large.
     const rule = verdict.assumptions[0].replace('intervention chosen by ', '');
+    const factor = rule.split(': ')[1];
     lines.push(rule.startsWith('largest drag factor')
-      ? `   Why: ${DRAG[heaviest[0]]} is the largest part of what makes it heavy, at ${percent(heaviest[1])}.`
+      ? `   Why: ${DRAG[factor]} is the largest part of what makes it heavy, at ${percent(verdict.drag_decomposition[factor])}.`
       : `   Why: ${rule.replace(': ', '. The rule: ')}.`);
     lines.push(`   How: ${HOW[verdict.intervention]}`);
+    // One scale for confidence, and the saving as a share of what the process costs today. Both are the engine's.
+    const sure = `Confidence: ${verdict.confidence_band} (${Math.round(verdict.decision_confidence * 100)} of 100).`;
     lines.push(item.sized
-      ? `   Saves: ${euro(verdict.net_saving_low_eur)}–${Math.round(verdict.net_saving_high_eur).toLocaleString('en-GB')} a year of ${euro(verdict.baseline_cost_eur)}, about ${verdict.efficiency_gain_pct} percent of the effort. Confidence ${verdict.decision_confidence}.`
-      : `   Saves: about ${verdict.efficiency_gain_pct} percent of the effort. No euro figure yet: the hourly cost of this team is not in the log.`);
+      ? `   Saves: ${euro(verdict.net_saving_low_eur)}–${Math.round(verdict.net_saving_high_eur).toLocaleString('en-GB')} a year, ${verdict.net_saving_low_pct} to ${verdict.net_saving_high_pct} percent of the ${euro(verdict.baseline_cost_eur)} it costs today. ${sure}`
+      : `   Saves: ${verdict.net_saving_low_pct} to ${verdict.net_saving_high_pct} percent of what it costs today. No euro figure yet: the hourly cost of this team is not in the log. ${sure}`);
+    // Everything the figure rests on, in the engine's words. Without an hourly cost the line that costs the process is left out.
+    lines.push('   The figure rests on:');
+    for (const line of verdict.assumptions.slice(1)) {
+      if (!item.sized && line.startsWith('yearly cost today')) continue;
+      lines.push(`   - ${line[0].toUpperCase()}${line.slice(1)}.`);
+    }
     lines.push('   Would you like me to draft it?');
   });
   lines.push('', 'GenAI comes second. I recommend it for a process only after that process has been redesigned and judged again.');
+  lines.push('');
+  lines.push(`What the counts assume: a year of volume is the cases counted, times 365, divided by the ${measured.period_days} days the log covers, and seasons are not in it. A process is judged with ${MIN_CASES_TO_JUDGE} cases or more in the log, and a log that covers ${MIN_DAYS_TO_PROJECT} days or more. A case that runs past one working day is counted at eight working hours a day.`);
   lines.push('');
   lines.push(rate
     ? `Not in the log: the hourly cost, which you gave as ${euro(rate)}, and the yearly spend on tools for each process, which is counted as zero.`

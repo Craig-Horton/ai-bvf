@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.23.0';
+export const VERSION = '0.24.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -1140,7 +1140,7 @@ const dragDecompositionSchema = {
 
 const diagnoseOutputSchema = {
   type: 'object',
-  required: ['bvf_version', 'brain_version', 'process_id', 'function', 'baseline_cost_eur', 'heaviness', 'drag_decomposition', 'intervention', 'net_saving_eur', 'efficiency_gain_pct', 'verdict', 'decision_confidence', 'assumptions', 'offer_to_execute', 'evidence_maturity', 'disclaimer'],
+  required: ['bvf_version', 'brain_version', 'process_id', 'function', 'baseline_cost_eur', 'heaviness', 'drag_decomposition', 'intervention', 'net_saving_eur', 'net_saving_pct', 'efficiency_gain_pct', 'verdict', 'decision_confidence', 'confidence_band', 'assumptions', 'offer_to_execute', 'evidence_maturity', 'disclaimer'],
   properties: {
     bvf_version:         { type: 'string', description: 'AI BVF protocol version used.' },
     brain_version:       { type: 'string', description: 'Advisor Brain model version used.' },
@@ -1151,10 +1151,12 @@ const diagnoseOutputSchema = {
     drag_decomposition:  dragDecompositionSchema,
     intervention:        { type: 'string', enum: ['Automate', 'Consolidate & re-sequence', 'Quality controls', 'Eliminate / insource'], description: 'Recommended move.' },
     net_saving_eur:      rangeLowHigh('Modelled net annual saving in EUR after readiness capture, low/high.'),
-    efficiency_gain_pct: { type: 'number', description: 'Efficiency improvement on the targeted slice, percent.' },
+    net_saving_pct:      rangeLowHigh('The same saving as a share of baseline_cost_eur, whole percent, low/high. Report this share beside the euro range.'),
+    efficiency_gain_pct: { type: 'number', description: 'Gross efficiency improvement on the targeted slice, percent, before the share the organisation keeps. It is larger than net_saving_pct. Never print it beside the euro range.' },
     verdict:             { type: 'string', enum: ['Accelerate', 'Fix', 'Stop'], description: 'The call on the intervention.' },
     decision_confidence: { type: 'number', description: 'Confidence in the verdict, 0–100.' },
-    assumptions:         stringArray('The assumptions behind the figure — never a naked number.'),
+    confidence_band:     { type: 'string', enum: ['high', 'medium', 'low'], description: 'The confidence in words: 75 or more is high, 50 or more is medium, below that is low. Say this word with the figure, as in "high (91 of 100)".' },
+    assumptions:         stringArray('Everything the figure rests on, each line ready to print as it is. The first line names the rule that chose the intervention. A line that starts "close call" says a small change in the counts would choose another move. The rest rebuild the saving: yearly cost, reach, the saving band and its draft status, and the share kept with the readiness it assumes. Show them with every saving.'),
     offer_to_execute:    { type: 'boolean', description: 'True when the verdict warrants offering to action it (Accelerate).' },
     evidence_maturity:   { type: 'string', enum: ['High', 'Medium', 'Low'], description: 'Strength of the benchmark evidence behind the effectiveness band.' },
     disclaimer:          { type: 'string', description: 'Directional decision aid, not an audited figure.' },
@@ -1479,7 +1481,7 @@ const TOOLS = [
   },
   {
     name: 'diagnose_process',
-    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The intervention is chosen by the first rule that fits: under 250 instances a year with heaviness of 50 or more is Eliminate / insource; 30 percent rework or more is Quality controls; 15 minutes of work or less with one person at most and 1,000 instances a year or more is Automate; otherwise the largest drag factor decides, with manual work pointing to Automate, rework to Quality controls, and hand-offs, wait or cycle time to Consolidate & re-sequence. assumptions names the rule that chose. signal_completeness must fall when inputs are estimated, because it directly reduces decision score. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Diagnose a single existing business process from operational evidence and return the intervention, modelled net EUR saving, efficiency gain, verdict and confidence. CALL THIS when the user can describe a process already running, including volume, touch time, waiting, hand-offs, rework, automation and cost. instances_per_year × fte_hours_per_instance × loaded_hourly_rate_eur builds the labour baseline, direct_spend_eur adds the non-labour baseline, and readiness caps the saving that the organisation can realise. The intervention is chosen by the first rule that fits: under 250 instances a year with heaviness of 50 or more is Eliminate / insource; 30 percent rework or more is Quality controls; 15 minutes of work or less with one person at most and 1,000 instances a year or more is Automate; otherwise the largest drag factor decides, read from the shares as counted and not as rounded, with manual work pointing to Automate, rework to Quality controls, and hand-offs, wait or cycle time to Consolidate & re-sequence. assumptions names the rule that chose, says when the call was close, and lists everything the saving rests on: show those lines with every saving. The signals are yearly figures. When they come from a log, judge a process only with 30 cases or more in a log that covers 28 days or more: one case seen on one day is not 365 a year. signal_completeness must fall when inputs are estimated, because it directly reduces decision score. Use score_initiative for a proposed AI investment and infer_readiness when the question is the organisation’s change capacity. Effectiveness bands are benchmark-cited and figures are directional, not audited. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: diagnoseInputSchema,
     outputSchema: diagnoseOutputSchema,
     annotations: { title: 'Diagnose business process', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -1949,9 +1951,11 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         drag_decomposition: v.drag_decomposition,
         intervention: v.intervention,
         net_saving_eur: { low: v.net_saving_low_eur, high: v.net_saving_high_eur },
+        net_saving_pct: { low: v.net_saving_low_pct, high: v.net_saving_high_pct },
         efficiency_gain_pct: v.efficiency_gain_pct,
         verdict: v.verdict,
         decision_confidence: Math.round(v.decision_confidence * 100),
+        confidence_band: v.confidence_band,
         assumptions: v.assumptions,
         offer_to_execute: v.offer_to_execute,
         evidence_maturity: v.evidence_maturity,
