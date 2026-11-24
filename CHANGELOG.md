@@ -2,6 +2,26 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.24.0 (aibvf-mcp), 0.19.0 (@aibvf/core), 24 November 2026
+
+Five faults in the deep dive, found in a review of this repository on 23 November.
+
+Fixed: the rule that picks the largest drag factor compared the shares after rounding. Two shares that rounded to the same figure were settled by the order of a list. In the published example the delivery complaint has waiting at 33.4 percent of the drag and manual work at 33.2 percent, and the report said Automate where the rule says Consolidate and re-sequence. `diagnose_process` now compares the shares as counted. When the nearest factor that points to another move is within two points, `assumptions` carries a line that starts "close call" and names that move.
+
+Added: the smallest log that supports a judgement. The deep dive script counts a process with fewer than 30 cases in the log, or any process in a log that covers fewer than 28 days, and judges nothing for it: no yearly volume, no intervention, no saving. Before, one case seen on one day became 365 a year and a euro figure. `@aibvf/core` publishes the two floors as `MIN_CASES_TO_JUDGE` and `MIN_DAYS_TO_PROJECT`. In the example the supplier claim has 12 cases and is no longer judged.
+
+Fixed: a wrong column mapping passed without a word. A value named for the script that never appears in the log, for a case that came back or for a step a system did, was counted as zero and changed the recommendation. The script now says so, lists the values the column holds, and leaves that signal uncounted. A date written in figures that reads two ways, such as 03/04/2026, is no longer read month first: the script stops and asks for `--date-order`, unless a day above 12 in the log settles it. It reads a log saved with semicolons or tabs, warns when most cases have a single row or a case appears under two processes, and refuses an hourly cost that is no figure above zero. These lines come back under `not_in_log` and the new `warnings`.
+
+Changed: every saving shows what it rests on. `assumptions` from `diagnose_process` now rebuilds the figure in lines a report prints as they are: the yearly cost and what it is made of, the share of that cost the change reaches, the saving band with its evidence and its draft status, and the share of the saving the organisation keeps, with the readiness it assumes and whether that was given or a default. The first line still names the rule that chose. The script adds its own `assumptions`: how a year is projected, the two floors, the eight-hour working day and how dates were read. It takes `--readiness` when the owner states it.
+
+Changed: the saving as a share of today's cost. `diagnose_process` returns `net_saving_pct`, low and high, beside the euro range. Reports had printed `efficiency_gain_pct` there, which is the gain before the share kept: "€4,956 to €11,895 of €28,321, about 48 percent of the effort" was 17 to 42 percent. `efficiency_gain_pct` is still returned, and its description now says what it is.
+
+Fixed: the confidence scale in the deep dive skill. The connector returns confidence from 0 to 100 and the skill told the agent that 0.75 or more is high, so every result read as high. `diagnose_process` now returns `confidence_band`: high at 75 or more, medium at 50 or more, low below that. The skill, the example and the report page print that word with the figure, as in "high (79 of 100)".
+
+Scope: one rule changes a verdict, the comparison of drag shares, and only where two shares rounded to the same figure. The scoring of an initiative, the guided assessment and the brief are untouched. The assumption lines are new words: a client that matched the old lines other than the first needs the new ones. The report link keeps its nine figures for each process and adds fields beside them, so a page that does not know the new fields still opens the link. The 13-tool catalogue, `aibvf-check` 0.1.1 and the Python package 0.2.3 are unchanged.
+
+Not settled: the two floors and the two-point margin are judgement, set on 24 November 2026 for Craig Horton to confirm or change. The saving bands remain a draft.
+
 ## 0.23.0 (aibvf-mcp), 0.18.0 (@aibvf/core), 23 November 2026
 
 Changed: the funding record reads the ask as the organisation writes it. The stage can be discovery, as well as a pilot or a rollout. The ask and the alternative take `amount` with `currency` (EUR, GBP or USD), and the statement shows the sign of that currency: "The next stage is discovery. The ask is £60,000." No figure is converted. An amount with no stated currency is shown as written, with "currency not stated". `amount_eur` still works and means euros. The brief link carries the currency, and a link made before it reads as euros.

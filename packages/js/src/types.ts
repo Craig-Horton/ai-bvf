@@ -341,6 +341,9 @@ export interface DragDecomposition {
 }
 
 /** The Brain's verdict on one process — both the proposal and the one-pager. */
+/** Confidence in words: 0.75 or more is high, 0.5 or more is medium, below that is low. */
+export type ConfidenceBand = 'high' | 'medium' | 'low';
+
 export interface BrainVerdict {
   process_id: string;
   function: FunctionId;
@@ -350,10 +353,13 @@ export interface BrainVerdict {
   intervention: Intervention;
   net_saving_low_eur: number;
   net_saving_high_eur: number;
-  efficiency_gain_pct: number;
+  net_saving_low_pct: number;   // the low saving as a share of baseline_cost_eur, whole percent
+  net_saving_high_pct: number;  // the high saving as a share of baseline_cost_eur, whole percent
+  efficiency_gain_pct: number;  // before the share kept; the euro range is after it
   verdict: Classification;      // Accelerate | Fix | Stop (on the intervention)
   decision_confidence: number;  // 0..1
-  assumptions: string[];
+  confidence_band: ConfidenceBand;
+  assumptions: string[];        // everything the figure rests on, each line ready to print
   offer_to_execute: boolean;
   evidence_maturity: EvidenceMaturity;
   brain_version: string;

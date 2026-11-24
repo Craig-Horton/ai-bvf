@@ -109,9 +109,11 @@ Bands are ranges, not points — they produce the low/high savings spread.
 1. Rare and heavy: under 250 instances a year and heaviness of 50 or more. Eliminate / insource.
 2. Comes back: `rework_rate` of 0.30 or more. Quality controls.
 3. Short and repeated: `fte_hours_per_instance` of 0.25 or less, `handoffs` of 1 or less, 1,000 instances a year or more. Automate.
-4. Otherwise the dominant drag factor, as in the table above.
+4. Otherwise the dominant drag factor, as in the table above. From `@aibvf/core` 0.19.0 the rule compares the shares as counted, never the rounded ones. When the nearest factor that points to another move is within two points of the drag, `assumptions` carries a line that starts "close call" and names that move.
 
 Rules 2 and 3 exist because waiting is the dominant drag factor in almost every log of cases. Without them a six-minute task done three thousand times a year is sent to a flow redesign. The three thresholds are Craig Horton's judgement of 21 November 2026. They are not taken from a benchmark. The verdict's `assumptions` names the rule that chose.
+
+**The smallest log (from `@aibvf/core` 0.19.0).** The engine takes yearly signals and cannot see the log they came from. Code that counts a log judges a process only with 30 cases or more in the log, in a log that covers 28 days or more (`MIN_CASES_TO_JUDGE`, `MIN_DAYS_TO_PROJECT`). Below either floor the process is counted and not judged. The floors are judgement of 24 November 2026, not a benchmark.
 
 ### 3.4 Savings quantifier — the number, traceable
 

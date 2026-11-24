@@ -7,8 +7,9 @@ export {
   BASE_RATES, BENCHMARK_EVIDENCE_REGISTER, IND_MULT, TIER_ADJ, READINESS_CAPTURE, PACE_DRAG_RATE,
 } from './score.js';
 export {
-  diagnoseProcess,
+  diagnoseProcess, confidenceBand,
   BRAIN_VERSION, EVIDENCE, FUNCTION_MEDIANS,
+  CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, MIN_CASES_TO_JUDGE, MIN_DAYS_TO_PROJECT, CLOSE_CALL,
 } from './diagnose.js';
 export { buildChangePlan } from './changePlan.js';
 export { inferReadiness } from './inferReadiness.js';
