@@ -220,24 +220,48 @@ export function estimatePillars(
   return { strategic_alignment: 50, financial_return, change_enablement, governance_risk };
 }
 
-/** Resolve given + estimated pillars into a full set, with provenance. */
+const PILLAR_IDS = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
+
+/**
+ * Resolve given + estimated pillars into a full set, with provenance.
+ *
+ * A pillar arrives as a bare number or as { value, confidence, basis }.
+ * A pillar marked estimated, in the object or in pillar_basis, is never
+ * counted as given: the engine uses its own estimate and says so. That
+ * keeps an estimate an estimate when a document passes from tool to tool.
+ *
+ * `supported` is the signal the pillars themselves support: the default
+ * from how many were given, lowered by any confidence the caller reported.
+ */
 export function resolvePillars(input: ScoreInput): {
   scores: PillarScores;
   basis: PillarBasis;
   givenCount: number;
+  supported: number;
 } {
   const est = estimatePillars(input);
-  const given = input.scores ?? {};
-  const pillars = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
+  const given = (input.scores ?? {}) as Record<string, unknown>;
   const scores = {} as PillarScores;
   const basis = {} as PillarBasis;
+  const qualities: number[] = [];
   let givenCount = 0;
-  for (const p of pillars) {
-    const v = given[p];
-    if (typeof v === 'number') { scores[p] = v; basis[p] = 'given'; givenCount++; }
-    else { scores[p] = est[p]; basis[p] = 'estimated'; }
+  for (const p of PILLAR_IDS) {
+    const raw = given[p] as any;
+    const marked = input.pillar_basis?.[p] ?? (raw && typeof raw === 'object' ? raw.basis : undefined);
+    if (marked !== undefined && marked !== 'given' && marked !== 'estimated') throw new Error(`pillar basis for ${p} must be given or estimated.`);
+    const value = typeof raw === 'number' ? raw : raw && typeof raw === 'object' && typeof raw.value === 'number' ? raw.value : undefined;
+    if (value !== undefined && !(Number.isFinite(value) && value >= 0 && value <= 100)) throw new Error(`scores.${p} must be a number from 0 to 100.`);
+    const estimated = marked === 'estimated' || value === undefined;
+    if (estimated) { scores[p] = est[p]; basis[p] = 'estimated'; }
+    else { scores[p] = value as number; basis[p] = 'given'; givenCount++; }
+    const reported = raw && typeof raw === 'object' && typeof raw.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence / 100)) : undefined;
+    qualities.push(reported ?? (estimated ? 0.5 : 1));
   }
-  return { scores, basis, givenCount };
+  // All four given = 1, none = 0.5. Reported confidence can only lower it.
+  const defaultSignal = 0.5 + 0.125 * givenCount;
+  const reportedSignal = qualities.reduce((sum, quality) => sum + quality, 0) / PILLAR_IDS.length;
+  // Four places: an average of four qualities is otherwise 0.5499999999999999 where 0.55 is meant.
+  return { scores, basis, givenCount, supported: Math.round(Math.min(defaultSignal, reportedSignal) * 10000) / 10000 };
 }
 
 const NOTCH_DOWN: Record<string, string | null> = { agile: 'traditional', traditional: 'siloed', siloed: null };
@@ -288,7 +312,7 @@ export function score(input: ScoreInput): ScoreResult {
   const cap = READINESS_CAPTURE[readiness];
   if (!cap) throw new Error(`Unknown readiness: ${readiness}`);
 
-  const { scores: resolved, basis, givenCount } = resolvePillars(input);
+  const { scores: resolved, basis, givenCount, supported } = resolvePillars(input);
   const { strategic_alignment: sa, financial_return: fr, change_enablement: ce, governance_risk: gr } = resolved;
   const allEstimated = givenCount === 0;
   const anyEstimated = givenCount < 4;
@@ -320,17 +344,25 @@ export function score(input: ScoreInput): ScoreResult {
 
   // Base confidence from the pillar scores themselves.
   const baseConfidence = (sa + fr + ce + (100 - gr)) / 4;
-  // Input-quality haircut. When the caller does not supply
-  // signal_completeness it defaults from how many pillars were actually
-  // given: all four = 1 (identical to the pre-0.5.0 behaviour), none = 0.5.
-  const defaultSignal = 0.5 + 0.125 * givenCount;
-  const signal = Math.max(0, Math.min(1, input.signal_completeness ?? defaultSignal));
+  // Input-quality haircut. The pillars supplied support a signal: all four
+  // given = 1, none = 0.5, lowered by any confidence the caller reported.
+  // signal_completeness is an upper limit only. A caller can lower the
+  // signal, and can never raise it above what the pillars support: with no
+  // pillars at all, a signal of 1 used to lift the score from 38 to 51.
+  const explicit = input.signal_completeness;
+  if (explicit !== undefined && !(typeof explicit === 'number' && Number.isFinite(explicit))) throw new Error('signal_completeness must be a number from 0 to 1.');
+  const asked = explicit === undefined ? undefined : Math.max(0, Math.min(1, explicit));
+  const signal = Math.max(0, Math.min(1, asked === undefined ? supported : Math.min(asked, supported)));
+  const capped = asked !== undefined && asked > supported;
   const confidence = Math.round(baseConfidence * (0.5 + 0.5 * signal));
 
   const caveatParts: string[] = [];
   if (anyEstimated) {
     const estimated = (Object.keys(basis) as Array<keyof PillarBasis>).filter(k => basis[k] === 'estimated');
     caveatParts.push(`Estimated pillars: ${estimated.join(', ')} (deterministic AI BVF priors from readiness, tier and function, see pillar_basis). Confirm them with evidence before committing budget.`);
+  }
+  if (capped) {
+    caveatParts.push(`signal_completeness ${asked} was given. The pillars supplied support ${signal}, so ${signal} is used: a caller can lower the signal and cannot raise it.`);
   }
   if (signal < SIGNAL_CAVEAT_THRESHOLD) {
     caveatParts.push(`Verdict rests on soft inputs (signal_completeness ${signal}). Decision confidence has been reduced accordingly; treat this as directional.`);
@@ -365,7 +397,7 @@ export function score(input: ScoreInput): ScoreResult {
   const estimated = (Object.keys(basis) as Array<keyof PillarBasis>).filter(k => basis[k] === 'estimated');
   const rules = [
     ...(estimated.length ? [`estimate:${estimated.join(',')}`] : []),
-    `signal_completeness:${signal}${input.signal_completeness === undefined ? '(defaulted)' : '(given)'}`,
+    `signal_completeness:${signal}${asked === undefined ? '(defaulted)' : capped ? `(given ${asked}, capped at what the pillars support)` : '(given)'}`,
     `classify:${cls.label}`,
     `work_architecture:${workArchitecture.status}`,
     ...(workArchitecture.blocks_accelerate ? ['gate:work_architecture_gap'] : []),
@@ -389,7 +421,7 @@ export function score(input: ScoreInput): ScoreResult {
     pillar_basis: basis,
     sensitivity,
     work_architecture: workArchitecture,
-    audit: buildAudit(rules, { industry, revenue_eur, function: fn, ai_tier, readiness, scores: resolved, pillar_basis: basis, work_architecture: input.work_architecture ?? null }),
+    audit: buildAudit(rules, { industry, revenue_eur, function: fn, ai_tier, readiness, scores: resolved, pillar_basis: basis, signal_completeness: { used: signal, supported, ...(asked === undefined ? {} : { given: asked }) }, work_architecture: input.work_architecture ?? null }),
     ...(caveat ? { caveat } : {}),
   };
 }

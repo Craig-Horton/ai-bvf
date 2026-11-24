@@ -49,11 +49,19 @@ For `score()`, the calculation is:
 ```text
 base = (SA + FR + CE + (100 - GR)) / 4
 default_signal = 0.5 + 0.125 * number_of_given_pillars
-signal = clamp(explicit_signal_completeness ?? default_signal, 0, 1)
-confidence = round(base * (0.5 + 0.5 * signal))
+reported_signal = mean of each pillar's quality        // 1 given, 0.5 estimated, or its own confidence / 100
+supported = min(default_signal, reported_signal)        // rounded to four places
+signal = clamp(min(explicit_signal_completeness ?? 1, supported), 0, 1)
+confidence = round(base * (0.5 + 0.5 * signal))         // a half rounds up
 ```
 
-With four supplied pillars, the default signal is 1. With no supplied pillars, it is 0.5, giving a 0.75 multiplier on the base score. The output adds an input-quality caveat when signal is below 0.7 and identifies estimated pillars.
+With four supplied pillars, the supported signal is 1. With no supplied pillars, it is 0.5, giving a 0.75 multiplier on the base score. The output adds an input-quality caveat when signal is below 0.7 and identifies estimated pillars.
+
+From `@aibvf/core` 0.20.0, `signal_completeness` is an upper limit. A caller can lower the signal and cannot raise it above what the pillars support. Before, a caller who gave no pillar at all could set it to 1 and lift the score from 38 to 51. When a given value is above the supported one, the supported one is used, the caveat says so, and `audit.inputs_used.signal_completeness` records both.
+
+A pillar is a number, or `{ value, confidence, basis }`. A pillar marked `estimated`, in the object or in `pillar_basis`, is never counted as given: the engine uses its own estimate for the scoring context. `assemble_portfolio` marks its estimates this way in the document, so they stay estimates in `score_portfolio`, `sequence_portfolio` and `score_initiative`.
+
+Every engine that implements these rules reproduces `spec/parity-vectors.json`: 2,470 inputs with the verdict, the score and the euros the TypeScript engine gives. Scores and euros are whole numbers, and a half rounds up.
 
 A high pillar average can coexist with an unresolved work architecture gate. Read the verdict, evidence status and score together.
 

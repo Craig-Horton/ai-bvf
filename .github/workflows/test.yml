@@ -34,3 +34,9 @@ jobs:
 
       - name: Verify the deep dive script counts the example log
         run: node --test skills/aibvf-deep-dive/scripts/measure.test.mjs
+
+      - name: Verify the shared expected results match the TypeScript engine
+        run: node scripts/build-parity-vectors.mjs --check
+
+      - name: Verify the Python engine gives the same results
+        run: python3 -m unittest discover -s packages/py/tests -v

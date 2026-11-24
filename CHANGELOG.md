@@ -2,6 +2,30 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.25.0 (aibvf-mcp), 0.20.0 (@aibvf/core), 0.3.0 (aibvf), 24 November 2026
+
+From an outside audit of the connector on 24 November 2026. It found three high faults: the Python package had drifted from the engine, the last step of the portfolio chain refused the output of the step before it, and an estimate could come back as a given. This release fixes those three and the cheap contract faults beside them. Each claim was checked against the code before it was acted on.
+
+Fixed: `sequence_portfolio` reads what `score_portfolio` returns. Its description said to pass that result straight through `portfolio`, and doing so was refused. It now reads `scored_initiatives`, takes readiness from the result, and places each initiative on the verdict `score_portfolio` gave it: the work design, the mark on each estimate and the signal all travel with the initiative. `score_portfolio` returns the revenue with the organisation, so its result is complete. A test runs assemble, score and sequence end to end, each on what the one before returned.
+
+Fixed: an estimate stays an estimate. `assemble_portfolio` marks each pillar it estimated with `basis: estimated` in the document itself. `score_initiative` and `recommend_improvements` now take a pillar as a number or as `{ value, confidence, basis }`, the shape the assembler writes, and take `pillar_basis` beside bare numbers. A pillar marked estimated is never counted as given. Before, `score_initiative` refused the assembler's shape, and an agent that flattened it to numbers got four pillars labelled given.
+
+Changed: `signal_completeness` is an upper limit. A caller can lower the signal and cannot raise it above what the pillars supplied support. With no pillar given, a value of 1 used to lift the decision score from 38 to 51. The result now uses the supported value, says so in the caveat, and records both in the audit.
+
+Added: `warnings` on every tool. A field in the call that the tool does not read is named with the answer, with the nearest field it does read: `"socres" is not a field this tool reads, so it was ignored. Did you mean "scores"?` Before, a misspelt optional field gave a verdict on defaults with no word.
+
+Added: `assemble_portfolio` reports `duplicate_suspected` when two initiatives share a name, function and tier. Both are kept and the issue says so, because a portfolio total counts each entry.
+
+Changed: on the hosted connector, no call waits for its anonymous usage count. The answer is written first. The endpoint also refuses a web page on a site it does not know with 403, as MCP asks of a Streamable HTTP server. A call with no Origin header, which is every assistant's connector, is answered as before.
+
+Fixed: the Python package gives the same answers as the engine. `aibvf` 0.3.0 has the work-design check, rounds a half up, returns whole euros, estimates missing pillars and refuses an unknown industry. The audit found a different verdict in 630 of 14,646 cases, always Accelerate where the engine said Fix. Both engines are now held in CI to one file of 2,470 expected results, `spec/parity-vectors.json`, written from the TypeScript engine.
+
+Correction to earlier entries: versions 0.2.1 to 0.2.3 of the Python package were never published. PyPI has served 0.2.0 throughout, because the repository is not registered as a publisher for the project on pypi.org. The change that removed "Fund it." from the Python engine therefore reached nobody. 0.3.0 is published once that registration is in place.
+
+Scope: no threshold and no verdict rule changes in the TypeScript engine. A decision score falls only where a caller had raised `signal_completeness` above what the pillars support. In the Python package, results change as listed in its README. Every existing output field stays. The 13-tool catalogue and `aibvf-check` 0.1.1 are unchanged.
+
+Not in this release, by decision: the audit's proposed scoring outputs, which split the decision score in two and withhold the value range on a Stop. Those wait for real assessments. Nor the shared response envelope, shorter tool descriptions, structured errors, rate limiting and the 2026-07-28 protocol revision, which the audit places in later phases.
+
 ## 0.24.0 (aibvf-mcp), 0.19.0 (@aibvf/core), 24 November 2026
 
 Five faults in the deep dive, found in a review of this repository on 23 November.

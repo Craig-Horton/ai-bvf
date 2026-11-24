@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aibvf"
-version = "0.2.3"
+version = "0.3.0"
 description = "AI BVF — open protocol for scoring AI investments. Validator and scoring engine."
 readme = "README.md"
 license = { text = "MIT" }

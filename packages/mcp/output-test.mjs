@@ -442,3 +442,130 @@ test('MCP diagnose_process gives the saving as a share of today\'s cost, the con
     assert.equal(low.confidence_band, 'low');
   });
 });
+
+// From the audit of 24 November 2026. The portfolio tools pass one document along:
+// assemble it, score it, sequence it. Each takes what the one before returned.
+test('MCP portfolio chain runs from start to finish, and an estimate stays an estimate all the way', { timeout: 15000 }, async () => {
+  await withMcp(async (call) => {
+    const ready = { workflow_redesigned: true, roles_redesigned: true, decision_rights_defined: true, measures_updated: true };
+    const assembled = await call('assemble_portfolio', {
+      organization: { name: 'Halden & Co', industry: 'retail', revenue_eur: 400000000 },
+      readiness: 'traditional',
+      initiatives: [
+        { name: 'Invoice matching', function: 'finance', ai_tier: 'gen1', scores: { strategic_alignment: 80, financial_return: 75, change_enablement: 70, governance_risk: 20 } },
+        { name: 'Service assistant', function: 'cx', ai_tier: 'gen2', scores: { strategic_alignment: 65 } },
+        { name: 'Credit decisions', function: 'risk', ai_tier: 'gen3', scores: { strategic_alignment: 60, financial_return: 60, change_enablement: 60, governance_risk: 85 } },
+      ],
+    });
+    // The estimate is marked in the document itself.
+    const assistant = assembled.portfolio.initiatives.find((item) => item.name === 'Service assistant');
+    assert.deepEqual(assistant.scores.financial_return, { value: assistant.scores.financial_return.value, confidence: 40, basis: 'estimated' });
+    assembled.portfolio.initiatives[0].work_architecture = ready;
+
+    const scored = await call('score_portfolio', { portfolio: assembled.portfolio, readiness: assembled.readiness_used });
+    assert.equal(scored.organization.revenue_eur, 400000000);
+    const verdicts = Object.fromEntries(scored.scored_initiatives.map((item) => [item.name, item.classification]));
+    assert.deepEqual(verdicts, { 'Invoice matching': 'Accelerate', 'Service assistant': 'Fix', 'Credit decisions': 'Stop' });
+    assert.deepEqual(scored.scored_initiatives[1].pillar_basis, { strategic_alignment: 'given', financial_return: 'estimated', change_enablement: 'estimated', governance_risk: 'estimated' });
+
+    // The description of sequence_portfolio says: pass the portfolio returned by score_portfolio directly through portfolio.
+    const plan = await call('sequence_portfolio', { portfolio: scored });
+    const placed = Object.fromEntries(plan.waves.flatMap((wave) => wave.initiatives.map((item) => [item.name, item.classification])));
+    assert.deepEqual(placed, verdicts, 'the sequencer reaches the verdicts score_portfolio reached');
+    const sequencedAssistant = plan.waves.flatMap((wave) => wave.initiatives).find((item) => item.name === 'Service assistant');
+    assert.equal(sequencedAssistant.decision_confidence, scored.scored_initiatives[1].decision_confidence);
+    assert.equal(plan.warnings, undefined);
+
+    // An agent that flattens the estimated pillars to bare numbers and says which are estimated gets the same result.
+    const flat = Object.fromEntries(Object.entries(assistant.scores).map(([pillar, value]) => [pillar, typeof value === 'number' ? value : value.value]));
+    const context = { industry: 'retail', revenue_eur: 400000000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional' };
+    const single = await call('score_initiative', { ...context, scores: assistant.scores });
+    const marked = await call('score_initiative', { ...context, scores: flat, pillar_basis: scored.scored_initiatives[1].pillar_basis });
+    assert.deepEqual(single.pillar_basis, scored.scored_initiatives[1].pillar_basis);
+    assert.deepEqual(marked.pillar_basis, single.pillar_basis);
+    // Bare numbers with no word on where they came from are still read as given: the caller has said nothing else.
+    const unmarked = await call('score_initiative', { ...context, scores: flat });
+    assert.deepEqual(Object.values(unmarked.pillar_basis), ['given', 'given', 'given', 'given']);
+    // The document's own confidence of 40 on each estimate counts for a little less than the bare word "estimated".
+    assert.ok(single.decision_confidence <= marked.decision_confidence && marked.decision_confidence < unmarked.decision_confidence, `${single.decision_confidence} ${marked.decision_confidence} ${unmarked.decision_confidence}`);
+    assert.equal(scored.scored_initiatives[1].signal_completeness, 0.55);
+  });
+});
+
+test('MCP signal_completeness is an upper limit: a caller can lower the signal and cannot raise it', { timeout: 10000 }, async () => {
+  await withMcp(async (call) => {
+    const context = { industry: 'retail', revenue_eur: 500000000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional' };
+    const none = await call('score_initiative', context);
+    const raised = await call('score_initiative', { ...context, signal_completeness: 1 });
+    // With no pillar supplied, a signal of 1 used to lift the score from 38 to 51.
+    assert.equal(none.decision_confidence, 38);
+    assert.equal(raised.decision_confidence, 38);
+    assert.match(raised.caveat, /signal_completeness 1 was given\. The pillars supplied support 0\.5, so 0\.5 is used/);
+    assert.deepEqual(raised.audit.inputs_used.signal_completeness, { used: 0.5, supported: 0.5, given: 1 });
+    assert.ok(raised.audit.rules_fired.includes('signal_completeness:0.5(given 1, capped at what the pillars support)'));
+    // Lowering still works, and a signal within what the pillars support is used as given.
+    const all = { strategic_alignment: 70, financial_return: 70, change_enablement: 70, governance_risk: 30 };
+    const full = await call('score_initiative', { ...context, scores: all });
+    const lowered = await call('score_initiative', { ...context, scores: all, signal_completeness: 0.4 });
+    assert.ok(lowered.decision_confidence < full.decision_confidence);
+    assert.deepEqual(lowered.audit.inputs_used.signal_completeness, { used: 0.4, supported: 1, given: 0.4 });
+    // A pillar given with a low confidence lowers what the pillars support.
+    const doubted = await call('score_initiative', { ...context, scores: { ...all, financial_return: { value: 70, confidence: 20 } } });
+    assert.equal(doubted.pillar_basis.financial_return, 'given');
+    assert.ok(doubted.decision_confidence < full.decision_confidence);
+    // The verdict itself never moves with the signal.
+    assert.equal(lowered.classification, full.classification);
+  });
+});
+
+test('MCP says which fields of a call it did not read', { timeout: 20000 }, async () => {
+  await withMcp(async (call, client) => {
+    const context = { industry: 'retail', revenue_eur: 500000000, function: 'cx', ai_tier: 'gen2', readiness: 'traditional' };
+    // "socres" for "scores": the verdict rests on defaults, and the answer now says why.
+    const typo = await call('score_initiative', { ...context, socres: { strategic_alignment: 90, financial_return: 90, change_enablement: 90, governance_risk: 10 } });
+    assert.deepEqual(typo.warnings, [{ code: 'unknown_field', path: 'socres', message: '"socres" is not a field this tool reads, so it was ignored. Did you mean "scores"?' }]);
+    assert.equal(typo.pillar_basis.strategic_alignment, 'estimated');
+    // Inside an object the schema names, too.
+    const nested = await call('score_initiative', { ...context, scores: { strategic_alignment: 70, finacial_return: 80 } });
+    assert.equal(nested.warnings[0].path, 'scores.finacial_return');
+    assert.match(nested.warnings[0].message, /Did you mean "financial_return"\?/);
+    assert.equal((await call('calculate_pace_layer_drag', { revenue_eur: 1000000, ai_tier: 'gen2', readiness: 'siloed', foo: 1 })).warnings[0].path, 'foo');
+    // A call with nothing unknown carries no warnings field, and no published example sets one off.
+    assert.equal((await call('score_initiative', context)).warnings, undefined);
+    const { tools } = await client.listTools();
+    for (const tool of tools) {
+      const response = await client.callTool({ name: tool.name, arguments: tool.inputSchema.examples[0] });
+      assert.equal(response.structuredContent.warnings, undefined, `${tool.name}: ${JSON.stringify(response.structuredContent.warnings)}`);
+      assert.ok(tool.outputSchema.properties.warnings, `${tool.name} publishes no warnings field`);
+    }
+  });
+});
+
+test('MCP assemble_portfolio says when the same initiative seems to be entered twice', { timeout: 10000 }, async () => {
+  await withMcp(async (call) => {
+    const assembled = await call('assemble_portfolio', {
+      organization: { name: 'Halden & Co', industry: 'retail', revenue_eur: 400000000 },
+      initiatives: [
+        { name: 'Invoice matching', function: 'finance', ai_tier: 'gen1' },
+        { name: 'invoice matching ', function: 'finance', ai_tier: 'gen1' },
+        { name: 'Invoice matching', function: 'finance', ai_tier: 'gen2' },
+      ],
+    });
+    // Both are kept: the tool does not decide which one is real. The third differs in tier and is no duplicate.
+    assert.deepEqual(assembled.portfolio.initiatives.map((item) => item.id), ['invoice-matching', 'invoice-matching-2', 'invoice-matching-3']);
+    const issues = assembled.issues.filter((issue) => issue.code === 'duplicate_suspected');
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].path, 'initiatives[1]');
+    assert.match(issues[0].msg, /Same name, function and tier as initiatives\[0\] \("invoice-matching"\)\. Both are kept, this one as "invoice-matching-2"/);
+  });
+});
+
+test('the remote endpoint answers a call with no Origin and refuses a web page it does not know', async () => {
+  const { isAllowedOrigin } = await import('./dist/server.js');
+  for (const origin of [undefined, '', 'https://www.aibvf.com', 'https://aibvf.com', 'http://localhost:6274', 'http://127.0.0.1:3000', 'app://claude', 'vscode-webview://abc']) {
+    assert.equal(isAllowedOrigin(origin), true, String(origin));
+  }
+  for (const origin of ['https://evil.example', 'https://aibvf.com.evil.example', 'http://aibvf.com.evil.example:8080', 'null', 'not an origin']) {
+    assert.equal(isAllowedOrigin(origin), false, String(origin));
+  }
+});

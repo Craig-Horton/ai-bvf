@@ -54,6 +54,8 @@ export interface AssembleIssue {
   path: string;
   msg: string;
   suggestions?: string[];
+  /** Set where a client can act on the kind of issue: duplicate_suspected. */
+  code?: 'duplicate_suspected';
 }
 
 export interface AssembleResult {
@@ -135,6 +137,8 @@ export function assemblePortfolio(input: AssembleInput): AssembleResult {
 
   const usedIds = new Set<string>();
   const initiatives: Initiative[] = [];
+  // The same name, function and tier twice is most likely one initiative entered twice.
+  const seen = new Map<string, { index: number; id: string }>();
 
   (Array.isArray(list) ? list : []).forEach((raw, i) => {
     const base = `initiatives[${i}]`;
@@ -172,6 +176,17 @@ export function assemblePortfolio(input: AssembleInput): AssembleResult {
     usedIds.add(candidate);
     id = candidate;
 
+    // Both are kept: the assembler does not decide which one is real. It says so,
+    // because score_portfolio adds the value of every initiative it is given.
+    const twin = `${raw.name.trim().toLowerCase()}|${fn.resolved}|${tier.resolved}`;
+    const first = seen.get(twin);
+    if (first) {
+      issues.push({ path: base, code: 'duplicate_suspected', msg: `Same name, function and tier as initiatives[${first.index}] ("${first.id}"). Both are kept, this one as "${id}". If they are one initiative, remove one: a portfolio total counts each entry.` });
+      rules.push('duplicate_suspected');
+    } else {
+      seen.set(twin, { index: i, id });
+    }
+
     // Pillars: given values pass through as bare numbers; missing ones are
     // estimated from taxonomy and readiness, carry a low confidence in the
     // document, and are reported so downstream scoring can haircut honestly.
@@ -188,7 +203,8 @@ export function assemblePortfolio(input: AssembleInput): AssembleResult {
       if (typeof given === 'number') {
         (scores as unknown as Record<string, unknown>)[p] = given;
       } else {
-        (scores as unknown as Record<string, unknown>)[p] = { value: est[p], confidence: ESTIMATED_CONFIDENCE };
+        // Marked estimated in the document itself, so that no later tool can read it as given.
+        (scores as unknown as Record<string, unknown>)[p] = { value: est[p], confidence: ESTIMATED_CONFIDENCE, basis: 'estimated' };
         estHere.push(p);
       }
     }
