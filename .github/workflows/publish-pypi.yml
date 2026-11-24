@@ -46,6 +46,8 @@ jobs:
           assert result['classification'] in ('Accelerate', 'Fix', 'Stop'), result
           print('aibvf wheel OK:', result['classification'])
           PY
+      - name: Check the package against the shared expected results before it is published
+        run: python -m unittest discover -s packages/py/tests -v
       - uses: actions/upload-artifact@v4
         with:
           name: python-dist

@@ -115,10 +115,10 @@ For portfolios, use `assemble_portfolio`, `validate_portfolio`, `score_portfolio
 
 | Package | Version | Purpose |
 |---|---|---|
-| [`aibvf-mcp`](packages/mcp) | 0.24.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
+| [`aibvf-mcp`](packages/mcp) | 0.25.0 | MCP server, 13 tools, stdio plus hosted Streamable HTTP at mcp.aibvf.com. |
 | [`aibvf-check`](packages/cli) | 0.1.1 | Policy checks for a declared AI initiative manifest in CI. |
-| [`@aibvf/core`](packages/js) | 0.19.0 | TypeScript assessment and scoring engine. |
-| [`aibvf`](packages/py) | 0.2.3 | Python scoring engine and validator. Check its documented feature coverage before substituting it for the TypeScript implementation. |
+| [`@aibvf/core`](packages/js) | 0.20.0 | TypeScript assessment and scoring engine. |
+| [`aibvf`](packages/py) | 0.3.0 | Python scoring engine and validator. It gives the same verdict, score and euros as the TypeScript engine on 2,470 shared cases, tested in CI. It covers scoring, improvements, drag and validation; the guided assessment and the portfolio tools are in the TypeScript engine only. |
 
 The [public portfolio specification](spec/bvf-protocol.schema.json) is version 1.0. That document format has a separate version from the packages implementing it; the package version identifies the code and behaviour used for a particular assessment.
 

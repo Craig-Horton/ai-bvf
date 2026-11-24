@@ -5,6 +5,9 @@ from .score import (
     score,
     recommend_improvements,
     calculate_pace_layer_drag,
+    estimate_pillars,
+    resolve_pillars,
+    assess_work_architecture,
     BASE_RATES, BENCHMARK_EVIDENCE_REGISTER, IND_MULT, TIER_ADJ, READINESS_CAPTURE, PACE_DRAG_RATE,
 )
 from .taxonomy import INDUSTRIES, FUNCTIONS, AI_TIERS, READINESS
@@ -17,6 +20,9 @@ __all__ = [
     "score",
     "recommend_improvements",
     "calculate_pace_layer_drag",
+    "estimate_pillars",
+    "resolve_pillars",
+    "assess_work_architecture",
     "BASE_RATES",
     "BENCHMARK_EVIDENCE_REGISTER",
     "IND_MULT",

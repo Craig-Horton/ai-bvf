@@ -8,6 +8,10 @@ FUNCTIONS = ["finance", "hr", "sales", "supply", "cx", "risk", "it", "rd"]
 AI_TIERS = ["gen1", "gen2", "gen3"]
 READINESS = ["agile", "traditional", "siloed"]
 
+# Where a governance estimate starts higher. The same two sets as @aibvf/core.
+REGULATED_FUNCTIONS = frozenset({"risk", "finance", "hr"})
+REGULATED_INDUSTRIES = frozenset({"financial", "healthcare", "public_sector", "energy"})
+
 INDUSTRY_LABEL = {
     "universal": "Universal / Other",
     "creative": "Creative & Media",

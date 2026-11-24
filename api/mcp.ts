@@ -15,7 +15,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 // Relative import into the workspace build output: the function bundler traces
 // plain file imports reliably, where package-name imports through workspace
 // symlinks (with an ESM-only exports map) resolve as CJS and fail at runtime.
-import { createAibvfServer, flushTelemetry } from '../packages/mcp/dist/server.js';
+import { createAibvfServer, flushTelemetry, isAllowedOrigin } from '../packages/mcp/dist/server.js';
 
 export default async function handler(req: any, res: any) {
   // A human clicking the link in a browser sends GET without the MCP Accept
@@ -43,6 +43,20 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // A web page on a site this endpoint does not know is refused, as MCP asks of a
+  // Streamable HTTP server. A call with no Origin, which is every assistant's
+  // connector, is answered as before.
+  if (!isAllowedOrigin(req.headers?.origin)) {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 403;
+    res.end(JSON.stringify({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Origin not allowed. This endpoint answers assistants and servers, and web pages on aibvf.com.' },
+      id: null,
+    }));
+    return;
+  }
+
   // IDs are optional random connector identifiers, never IPs, emails or auth tokens.
   const query = new URL(req.url || '/', 'https://mcp.aibvf.com').searchParams;
   const server = createAibvfServer({ entryRoute: 'remote', telemetry: {
@@ -55,6 +69,8 @@ export default async function handler(req: any, res: any) {
   });
   res.on('close', () => { transport.close(); server.close(); });
   await server.connect(transport);
+  // The answer is written first. The anonymous count of the call is sent beside it and
+  // never waited for; the function then stays up a moment so that the count can land.
   await transport.handleRequest(req, res, req.body);
   await flushTelemetry();
 }

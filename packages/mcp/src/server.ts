@@ -23,7 +23,7 @@ import {
 import type { Classification, PillarScores, ScoreInput } from '@aibvf/core';
 
 /** Single source of truth for the server version, shared by both transports. */
-export const VERSION = '0.24.0';
+export const VERSION = '0.25.0';
 
 export type EntryRoute = 'stdio' | 'remote' | 'unknown';
 type TelemetryContext = { cohort?: string; clientId?: string };
@@ -263,6 +263,29 @@ const scoreInputSchema = {
   },
 };
 
+// A pillar is a number, or { value, confidence, basis }: the shape assemble_portfolio
+// writes. With one shape across the tools, an estimate stays an estimate when a
+// document passes from one tool to the next.
+const scoresWithProvenance = {
+  ...scoreInputSchema.properties.scores,
+  description: `${scoreInputSchema.properties.scores.description} Each pillar is a number, or { value, confidence, basis } as assemble_portfolio writes it. A pillar marked estimated stays estimated and is never counted as given.`,
+  properties: Object.fromEntries(Object.entries(scoreInputSchema.properties.scores.properties).map(([pillar, schema]) => [pillar, {
+    ...(schema as object),
+    type: ['number', 'object'],
+    required: ['value'],
+    properties: {
+      value: { type: 'number', minimum: 0, maximum: 100 },
+      confidence: { type: 'number', minimum: 0, maximum: 100 },
+      basis: { type: 'string', enum: ['given', 'estimated'] },
+    },
+  }])),
+};
+const pillarBasisInputSchema = {
+  type: 'object',
+  description: 'Optional. Marks a pillar passed as a bare number as estimated, so that it is not counted as given.',
+  properties: Object.fromEntries(['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'].map((pillar) => [pillar, { type: 'string', enum: ['given', 'estimated'] }])),
+};
+
 // score_initiative accepts everything scoreInputSchema does, plus an optional
 // signal_completeness so a caller can flag estimated-vs-measured pillar scores.
 // recommend_improvements uses recommendInputSchema (score inputs + optional diagnostics).
@@ -270,9 +293,11 @@ const scoreInitiativeInputSchema = {
   ...scoreInputSchema,
   properties: {
     ...scoreInputSchema.properties,
+    scores: scoresWithProvenance,
+    pillar_basis: pillarBasisInputSchema,
     signal_completeness: {
       type: 'number', minimum: 0, maximum: 1,
-      description: 'Optional 0 to 1 input-quality factor. The default ranges from 0.5 when all pillars are estimated to 1 when all are supplied. Supplied values still require evidence review. Lower this factor when the supplied pillars rest on weak evidence.',
+      description: 'Optional 0 to 1 input-quality factor, and an upper limit only. The pillars supplied support a signal: 0.5 when all are estimated, 1 when all are supplied, less where a pillar carries a low confidence. Lower it when the supplied pillars rest on weak evidence. A value above what the pillars support is not used, and the result says so.',
     },
   },
 };
@@ -442,6 +467,8 @@ const recommendInputSchema = {
   description: 'Inputs for a change plan after a Fix or Stop verdict. industry, revenue_eur, function, ai_tier and readiness must match the scoring call so the plan is built against the same case. scores and work_architecture may be copied from score_initiative; omitted pillars are estimated and make the plan provisional. resistance_type and risk_type are optional diagnostics that select the play, and omission triggers a named inference plus the next question to ask.',
   properties: {
     ...scoreInputSchema.properties,
+    scores: scoresWithProvenance,
+    pillar_basis: pillarBasisInputSchema,
     resistance_type: {
       type: 'string', enum: ['will', 'skill'],
       description: 'Optional. What sits behind a low change-enablement score: "will" = people do not want the change (power shifts, fear, no case for change), "skill" = people cannot yet do it (capability and capacity gap). Selects between a coalition-building play (Kotter 1-2 + ADKAR Awareness/Desire) and an owner-and-capability play (ADKAR Knowledge/Ability). If you do not know, omit it: the engine infers from readiness (agile infers skill, traditional/siloed infers will) and marks the play provisional. Ask the user "is the resistance about not wanting this, or not being able to do it yet?" and re-call to sharpen.',
@@ -478,10 +505,6 @@ const stringArray = (description: string) => ({ type: 'array', items: { type: 's
 const roundEur = (value: number) => Math.round(value);
 const eurRange = (low: number, high: number) => ({ low: roundEur(low), high: roundEur(high) });
 
-/** Pillar scores arrive as bare numbers or as { value }; accept both, same as validate() and the sequencer. */
-const pillarValue = (s: unknown): number | undefined =>
-  typeof s === 'number' ? s : (s && typeof (s as any).value === 'number' ? (s as any).value : undefined);
-
 const PILLARS = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
 
 // Compatibility field names stay stable; their interpretation is explicit on the wire.
@@ -501,40 +524,30 @@ const interpretationSchema = {
   description: 'Meaning and limits of compatibility fields. Present these labels when explaining the result.',
 };
 
+/**
+ * One initiative of a portfolio document, as the engine scores it. Nothing is
+ * flattened here: the engine reads a pillar as a number or as { value, confidence,
+ * basis }, keeps a pillar marked estimated as estimated, and treats
+ * signal_completeness as an upper limit. One reading, the same in every tool.
+ */
 function portfolioScoreInput(
   initiative: any,
   context: Pick<ScoreInput, 'industry' | 'revenue_eur' | 'function' | 'ai_tier' | 'readiness'>,
 ): ScoreInput {
-  const scores: Partial<PillarScores> = {};
-  const qualities: number[] = [];
-  let givenCount = 0;
   for (const pillar of PILLARS) {
-    const raw = initiative.scores[pillar];
     const basis = initiative.pillar_basis?.[pillar];
-    if (basis !== undefined && basis !== 'given' && basis !== 'estimated') {
-      throw new Error(`Invalid pillar_basis for ${pillar}.`);
-    }
-    const estimated = basis === 'estimated';
-    const value = pillarValue(raw);
-    if (!estimated && value !== undefined) {
-      scores[pillar] = value;
-      givenCount += 1;
-    }
-    const reported = typeof raw === 'object' && raw !== null ? raw.confidence : undefined;
-    qualities.push(typeof reported === 'number' ? Math.max(0, Math.min(1, reported / 100)) : estimated ? 0.5 : 1);
+    if (basis !== undefined && basis !== 'given' && basis !== 'estimated') throw new Error(`Invalid pillar_basis for ${pillar}.`);
   }
   const explicitSignal = initiative.signal_completeness;
   if (explicitSignal !== undefined && (typeof explicitSignal !== 'number' || !Number.isFinite(explicitSignal) || explicitSignal < 0 || explicitSignal > 1)) {
     throw new Error('signal_completeness must be a number from 0 to 1.');
   }
-  // A supplied quality value can lower the default, but cannot erase known estimates.
-  const defaultSignal = 0.5 + 0.125 * givenCount;
-  const reportedSignal = qualities.reduce((sum, quality) => sum + quality, 0) / PILLARS.length;
   return {
     ...context,
-    scores,
+    scores: initiative.scores,
+    ...(initiative.pillar_basis ? { pillar_basis: initiative.pillar_basis } : {}),
     work_architecture: initiative.work_architecture,
-    signal_completeness: Math.min(defaultSignal, reportedSignal, explicitSignal ?? 1),
+    ...(explicitSignal !== undefined ? { signal_completeness: explicitSignal } : {}),
   };
 }
 
@@ -1024,8 +1037,8 @@ const scorePortfolioOutputSchema = {
     },
     organization: {
       type: 'object', required: ['name', 'industry'],
-      properties: { name: { type: 'string' }, industry: { type: 'string' } },
-      description: 'Echo of the portfolio organisation fields applied to scoring.',
+      properties: { name: { type: 'string' }, industry: { type: 'string' }, revenue_eur: { type: 'number' } },
+      description: 'Echo of the portfolio organisation fields applied to scoring. With revenue_eur, this result passes to sequence_portfolio as it stands.',
     },
     readiness: { type: 'string', enum: ['agile', 'traditional', 'siloed'], description: 'Readiness value applied across all initiatives.' },
     total:     { type: 'number', description: 'Total initiatives in the portfolio (scored + skipped).' },
@@ -1206,8 +1219,7 @@ const inferReadinessOutputSchema = {
 
 const sequenceInputSchema = {
   type: 'object',
-  description: 'Sequence one scored portfolio by passing either portfolio, or organization plus initiatives, never both. readiness is always required because it sets pacing. constraints are optional and default to two concurrent initiatives per function across a 90-day horizon.',
-  required: ['readiness'],
+  description: 'Sequence one scored portfolio by passing either portfolio, or organization plus initiatives, never both. readiness sets pacing: pass it at the top level, or let it come from the score_portfolio result passed through portfolio. constraints are optional and default to two concurrent initiatives per function across a 90-day horizon.',
   properties: {
     organization: {
       type: 'object', description: 'Organisation context used when initiatives are passed at the top level. Required with top-level initiatives and ignored when portfolio is supplied.', required: ['industry', 'revenue_eur'],
@@ -1221,25 +1233,24 @@ const sequenceInputSchema = {
       type: 'array', minItems: 1,
       description: 'The portfolio to sequence. Each initiative carries flat 0-100 pillar numbers (not the nested value objects of the portfolio wire format).',
       items: {
-        type: 'object', required: ['id', 'name', 'function', 'ai_tier', 'scores'],
+        type: 'object', required: ['id', 'name', 'function', 'ai_tier'],
         properties: {
           id: { type: 'string', description: 'Stable initiative identifier used in waves, conflicts and deferrals.' },
           name: { type: 'string', description: 'Initiative name shown in the sequenced plan.' },
           function: { type: 'string', enum: FUNCTIONS, description: 'Business function absorbing the change. Capacity limits are enforced against this field.' },
           ai_tier: { type: 'string', enum: AI_TIERS, description: 'AI ambition, gen1, gen2 or gen3. Higher tiers are treated as more complex when wave placement is decided.' },
           scores: {
-            type: 'object', description: 'The four flat 0-100 pillar values used to classify and place the initiative. Pass the score_initiative scores_used values, not nested score objects.', required: ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'],
-            properties: {
-              strategic_alignment: { type: 'number', minimum: 0, maximum: 100, description: 'Strategic-alignment score from score_initiative, 0-100.' },
-              financial_return: { type: 'number', minimum: 0, maximum: 100, description: 'Financial-return score from score_initiative, 0-100.' },
-              change_enablement: { type: 'number', minimum: 0, maximum: 100, description: 'Change-enablement score from score_initiative, 0-100.' },
-              governance_risk: { type: 'number', minimum: 0, maximum: 100, description: 'Governance-risk score from score_initiative, 0-100, where higher means more risk.' },
-            },
+            type: 'object',
+            description: 'The pillar values used to classify and place the initiative: strategic_alignment, financial_return, change_enablement and governance_risk, each a number from 0 to 100 or { value, confidence, basis }. A missing pillar is estimated.',
+            properties: Object.fromEntries(['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'].map((pillar) => [pillar, { type: ['number', 'object'], minimum: 0, maximum: 100 }])),
           },
+          pillar_basis: { type: 'object', description: 'Optional. given or estimated for each pillar, as score_portfolio returns it.' },
+          signal_completeness: { type: 'number', minimum: 0, maximum: 1, description: 'Optional upper limit on the input-quality factor, as in score_initiative.' },
+          work_architecture: { type: 'object', description: 'Optional. The four work-design checks as booleans, or the work_architecture score_portfolio returns.' },
         },
       },
     },
-    portfolio: { type: 'object', description: 'Alternative input: the same AI BVF v1.0 portfolio document score_portfolio accepts (organization + initiatives with nested {value} pillar scores). Pass either this OR the top-level organization + initiatives; nested score values are flattened automatically, and missing pillars are estimated honestly.' },
+    portfolio: { type: 'object', description: 'Alternative input: the whole result of score_portfolio, as it came back, or the same AI BVF v1.0 portfolio document score_portfolio accepts (organization + initiatives with nested {value} pillar scores). A score_portfolio result is read from its scored_initiatives, with its readiness, and each initiative is placed on the verdict score_portfolio gave it. Pass either this OR the top-level organization + initiatives; nested score values are flattened automatically, and missing pillars are estimated honestly.' },
     readiness: { type: 'string', enum: READINESS, description: 'Organisational readiness applied across the portfolio; sets capture rates and pacing. Measure it with infer_readiness when process numbers exist.' },
     constraints: {
       type: 'object',
@@ -1495,7 +1506,7 @@ const TOOLS = [
   },
   {
     name: 'sequence_portfolio',
-    description: 'Turn a scored AI portfolio into three waves with gates over a configurable horizon, so the roadmap respects the change capacity of each business function. CALL THIS after score_portfolio when the user asks what to stop, fund first, defer or fit into the next 90 days. It does not change any verdict or re-score the business case. Stops enter wave 1 to reclaim budget and attention, quicker Accelerates enter wave 2, complex Accelerates and Fixes enter wave 3 behind their re-score gates. Pass the portfolio returned by score_portfolio directly through portfolio, or pass organization plus initiatives; both score shapes are accepted and nested values are flattened. readiness sets capture rates and pacing, max_parallel_per_function caps simultaneous change in one function per wave, and horizon_days divides the plan into three equal windows. Capacity overflow is reported as a conflict or a deferral beyond the horizon, never hidden. Run recommend_improvements for a Fix before treating its wave placement as permission to proceed. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
+    description: 'Turn a scored AI portfolio into three waves with gates over a configurable horizon, so the roadmap respects the change capacity of each business function. CALL THIS after score_portfolio when the user asks what to stop, fund first, defer or fit into the next 90 days. It does not change any verdict or re-score the business case. Stops enter wave 1 to reclaim budget and attention, quicker Accelerates enter wave 2, complex Accelerates and Fixes enter wave 3 behind their re-score gates. Pass the whole result of score_portfolio through portfolio, as it came back, or pass organization plus initiatives. Pillars are read as numbers or as { value, confidence, basis }, and a pillar marked estimated stays estimated. readiness sets capture rates and pacing, max_parallel_per_function caps simultaneous change in one function per wave, and horizon_days divides the plan into three equal windows. Capacity overflow is reported as a conflict or a deferral beyond the horizon, never hidden. Run recommend_improvements for a Fix before treating its wave placement as permission to proceed. Deterministic calculation with no authentication. Anonymous usage telemetry may be sent; set AIBVF_TELEMETRY_DISABLE=1 to opt out.',
     inputSchema: sequenceInputSchema,
     outputSchema: sequenceOutputSchema,
     annotations: { title: 'Sequence a portfolio into waves', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -1526,6 +1537,55 @@ const TOOLS = [
 
 const LIST_TOOLS_HANDLER = async () => ({ tools: TOOLS });
 
+// Every tool that answers says which fields of the call it did not read. A misspelt
+// optional field used to pass in silence: "socres" for "scores" returned a verdict
+// on defaults that looked like a verdict on the caller's figures.
+// Kept short: it is published once for each of the thirteen tools.
+const warningsSchema = {
+  type: 'array',
+  description: 'Fields of the call this tool did not read. Each was ignored.',
+  items: { type: 'object', properties: { code: { type: 'string' }, path: { type: 'string' }, message: { type: 'string' } } },
+};
+for (const tool of TOOLS) {
+  const out = (tool as any).outputSchema;
+  if (out?.properties) out.properties.warnings = warningsSchema;
+}
+
+/** How many single-letter edits turn one word into the other, counted up to a small limit. */
+function editDistance(a: string, b: string, limit = 3): number {
+  if (Math.abs(a.length - b.length) >= limit) return limit;
+  let row = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j += 1) next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return Math.min(row[b.length], limit);
+}
+
+/**
+ * The fields of a call that the tool's published schema does not name. Only objects
+ * whose schema lists their fields are checked: a free-form object, such as a
+ * portfolio document, is left alone.
+ */
+export function unknownFields(schema: any, value: unknown, path = ''): Array<{ code: 'unknown_field'; path: string; message: string }> {
+  if (!schema || typeof schema !== 'object') return [];
+  if (Array.isArray(value)) {
+    return schema.items ? value.slice(0, 50).flatMap((item, index) => unknownFields(schema.items, item, `${path}[${index}]`)) : [];
+  }
+  if (!value || typeof value !== 'object' || !schema.properties || schema.additionalProperties) return [];
+  const known = Object.keys(schema.properties);
+  const found: Array<{ code: 'unknown_field'; path: string; message: string }> = [];
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const at = path ? `${path}.${key}` : key;
+    if (known.includes(key)) { found.push(...unknownFields(schema.properties[key], child, at)); continue; }
+    const sorted = (word: string) => [...word.toLowerCase()].sort().join('');
+    const near = known.find((name) => sorted(name) === sorted(key)) ?? known.find((name) => editDistance(name.toLowerCase(), key.toLowerCase()) <= 2);
+    found.push({ code: 'unknown_field', path: at, message: `"${at}" is not a field this tool reads, so it was ignored.${near ? ` Did you mean "${near}"?` : ''}` });
+  }
+  return found.slice(0, 10);
+}
+
 // Every tool checks its arguments against the schema it publishes before any
 // calculation runs. A score of 900, revenue written as text or an unknown
 // industry is declined with the field named, never scored.
@@ -1538,7 +1598,10 @@ function describeInputError(error: ErrorObject): string {
   if (error.keyword === 'required') return `${path ? `${path}.` : ''}${String(params.missingProperty)} is required`;
   const field = path || 'input';
   if (error.keyword === 'enum') return `${field} must be one of ${(params.allowedValues as unknown[]).join(', ')}`;
-  if (error.keyword === 'type') return `${field} must be ${/^[aeio]/.test(String(params.type)) ? 'an' : 'a'} ${String(params.type)}`;
+  if (error.keyword === 'type') {
+    const types = Array.isArray(params.type) ? params.type.map(String) : [String(params.type)];
+    return `${field} must be ${types.map((type) => `${/^[aeio]/.test(type) ? 'an' : 'a'} ${type}`).join(' or ')}`;
+  }
   if (error.keyword === 'minimum' || error.keyword === 'maximum') return `${field} must be ${String(params.comparison)} ${String(params.limit)}`;
   return `${field} ${error.message ?? 'is invalid'}`;
 }
@@ -1575,12 +1638,27 @@ export const AGENT_PROMPT = {
 };
 const PROMPTS = [AGENT_PROMPT];
 
-const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {}) => async (req: any) => {
+const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {}) => {
+  const run = runTool(entryRoute, context);
+  return async (req: any) => {
+    const result: any = await run(req);
+    if (result.isError || !result.structuredContent) return result;
+    const tool = TOOLS.find((candidate) => candidate.name === req.params.name);
+    const warnings = tool ? unknownFields(tool.inputSchema, req.params.arguments ?? {}) : [];
+    if (!warnings.length) return result;
+    // The fields the tool did not read, said with the answer and in both forms of it.
+    const payload = { ...result.structuredContent, warnings };
+    return { ...result, content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], structuredContent: payload };
+  };
+};
+
+const runTool = (entryRoute: EntryRoute, context: TelemetryContext = {}) => async (req: any) => {
   const { name, arguments: args } = req.params;
   const assessmentId = name === 'assess_ai_initiative' ? opaqueId(args?.assessment_id) || randomUUID() : null;
   const recordCall = async (toolName: string, meta: Record<string, unknown> = {}) => {
-    const request = logCall(toolName, { ...context, ...meta, assessmentId, entry_route: entryRoute });
-    if (entryRoute === 'remote') await request;
+    // Never awaited: no caller waits for a count before it gets its answer. The remote
+    // function writes the response first and then gives pending counts a moment (flushTelemetry).
+    logCall(toolName, { ...context, ...meta, assessmentId, entry_route: entryRoute });
   };
 
   try {
@@ -1748,7 +1826,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
             applied_modules: r.applied_modules,
             scores_used: r.scores_used,
             pillar_basis: r.pillar_basis,
-            signal_completeness: scoringInput.signal_completeness,
+            signal_completeness: (r.audit.inputs_used as any).signal_completeness.used,
             work_architecture: r.work_architecture,
             audit: r.audit,
             sensitivity: r.sensitivity,
@@ -1796,7 +1874,7 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
         bvf_version: BVF_VERSION,
         valid: true,
         validation_errors: [],
-        organization: { name: org.name, industry: org.industry },
+        organization: { name: org.name, industry: org.industry, ...(typeof revenue_eur === 'number' ? { revenue_eur } : {}) },
         readiness,
         total: portfolio.initiatives.length,
         summary,
@@ -2053,6 +2131,30 @@ const callToolHandler = (entryRoute: EntryRoute, context: TelemetryContext = {})
     return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
   }
 };
+
+/**
+ * Which Origin header the remote endpoint answers. MCP asks a Streamable HTTP
+ * server to refuse an Origin it does not know with 403.
+ *
+ * - No Origin: a server calling a server. Every assistant's connector does this. Answered.
+ * - A web page on aibvf.com, or on this computer (the MCP inspector): answered.
+ * - A desktop app's own scheme, such as app:// or vscode-webview://: answered.
+ * - Any other web page, and the opaque origin "null": refused.
+ *
+ * The endpoint sends no cross-origin headers, so a browser on another site could
+ * never read an answer from it. Refusing such a call changes nothing for a real client.
+ */
+const WEB_ORIGINS = new Set(['aibvf.com', 'www.aibvf.com', 'mcp.aibvf.com', 'localhost', '127.0.0.1', '[::1]']);
+export function isAllowedOrigin(origin: unknown): boolean {
+  if (origin === undefined || origin === null || origin === '') return true;
+  try {
+    const url = new URL(String(origin));
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return true;
+    return WEB_ORIGINS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 /** True when telemetry will actually fire; used by the stdio banner. */
 export const telemetryEnabled = !TELEMETRY_DISABLED && !!TELEMETRY_DEFAULT_URL && !!TELEMETRY_DEFAULT_KEY;

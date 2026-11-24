@@ -13,6 +13,8 @@ export type ComplianceFramework = 'eu_ai_act' | 'dora' | 'csrd' | 'gdpr_ai';
 export interface PillarScore {
   value: number;
   confidence?: number;
+  /** Where the value came from. A pillar marked estimated is never counted as given. */
+  basis?: 'given' | 'estimated';
   evidence?: string[];
 }
 
@@ -59,6 +61,16 @@ export interface PillarScores {
 /** Where each resolved pillar value came from. */
 export type PillarBasis = Record<keyof PillarScores, 'given' | 'estimated'>;
 
+/**
+ * One pillar as a caller may pass it: a bare number, or an object that
+ * carries where the number came from. A pillar marked estimated stays
+ * estimated: the engine uses its own estimate for the scoring context and
+ * reports it as estimated. `confidence` is 0 to 100 and lowers the signal.
+ * This is the shape assemble_portfolio writes, so a document passes from
+ * tool to tool without an estimate turning into a given.
+ */
+export type PillarInput = number | { value: number; confidence?: number; basis?: 'given' | 'estimated' };
+
 export interface ScoreInput {
   industry: Industry;
   revenue_eur: number;
@@ -72,13 +84,16 @@ export interface ScoreInput {
    * reports which were estimated via pillar_basis, and a fully-estimated
    * pass can never return Accelerate.
    */
-  scores?: Partial<PillarScores>;
+  scores?: Partial<Record<keyof PillarScores, PillarInput>>;
+  /** Optional. Marks a pillar as estimated when its value is passed as a bare number. A pillar marked estimated is never counted as given. */
+  pillar_basis?: Partial<PillarBasis>;
   /**
    * Optional 0–1. How grounded the four pillar scores are in real evidence
    * versus estimated from context. When omitted it defaults from the count
    * of pillars actually given (all four = 1, none = 0.5), which haircuts
-   * decision confidence and attaches a caveat on soft inputs. Mirrors
-   * diagnose_process's signal_completeness.
+   * decision confidence and attaches a caveat on soft inputs. An upper
+   * limit only: a caller can lower it, and can never raise it above what
+   * the pillars supplied support.
    */
   signal_completeness?: number;
   /** Evidence that the work around the AI has been redesigned, not only the technology. */
@@ -372,7 +387,10 @@ export interface SequenceInitiative {
   name: string;
   function: FunctionId;
   ai_tier: AiTier;
-  scores: PillarScores;
+  scores: Partial<Record<keyof PillarScores, PillarInput>>;
+  pillar_basis?: Partial<PillarBasis>;
+  signal_completeness?: number;
+  work_architecture?: WorkArchitectureInput;
 }
 
 export interface SequenceConstraints {

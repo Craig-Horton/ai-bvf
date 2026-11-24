@@ -29,43 +29,77 @@ function complexity(item: SequencedItem): number {
   return (TIER_COMPLEXITY[item.ai_tier] ?? 2) + (item.decision_confidence < 50 ? 2 : 0);
 }
 
+const PILLARS = ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk'] as const;
+const WORK_CHECKS = ['workflow_redesigned', 'roles_redesigned', 'decision_rights_defined', 'measures_updated'] as const;
+
 /**
- * Accept both input shapes: the flat SequenceInput, and the score_portfolio
- * wire document ({ portfolio: { organization, initiatives } }) with nested
- * { value } pillar scores. Agents naturally reuse the portfolio document
- * across the two tools; refusing it was a field-reported failure.
+ * The work design of one initiative, as an input. It arrives as the four
+ * booleans a caller passes, or as the assessment score_portfolio returns,
+ * which lists each check as met, gap or unknown.
+ */
+function workInput(raw: any): Record<string, boolean> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, boolean> = {};
+  if (Array.isArray(raw.checks)) {
+    for (const check of raw.checks) {
+      if ((WORK_CHECKS as readonly string[]).includes(check?.id) && (check.status === 'met' || check.status === 'gap')) out[check.id] = check.status === 'met';
+    }
+  } else {
+    for (const id of WORK_CHECKS) if (typeof raw[id] === 'boolean') out[id] = raw[id];
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/**
+ * Accept three input shapes: the flat SequenceInput, the portfolio wire
+ * document ({ portfolio: { organization, initiatives } }), and the result
+ * of score_portfolio passed through portfolio, which lists its entries
+ * under scored_initiatives. Agents reuse one document across the portfolio
+ * tools; refusing it was a field-reported failure, twice.
+ *
+ * Nothing is dropped on the way in. A pillar marked estimated stays
+ * estimated, a reported confidence still lowers the signal, and the work
+ * design travels with the initiative, so the sequencer reaches the verdict
+ * score_portfolio reached.
  */
 function normalizeSequenceInput(raw: any): SequenceInput {
   const src = raw?.portfolio && !raw?.initiatives ? raw.portfolio : raw;
   const organization = src?.organization ?? raw?.organization;
-  const rawInits = src?.initiatives;
+  const rawInits = Array.isArray(src?.initiatives) && src.initiatives.length ? src.initiatives : src?.scored_initiatives;
   if (!organization || typeof organization.industry !== 'string') {
     throw new Error('sequence_portfolio needs organization.industry and organization.revenue_eur, either top-level or inside a portfolio document.');
   }
   if (!Array.isArray(rawInits) || rawInits.length === 0) {
-    throw new Error('sequence_portfolio needs a non-empty initiatives array, either top-level or inside a portfolio document.');
+    throw new Error('sequence_portfolio needs a non-empty initiatives array, either top-level or inside a portfolio document. The result of score_portfolio is read from its scored_initiatives.');
   }
-  const flat = (v: any): number | undefined =>
-    typeof v === 'number' ? v : (v && typeof v.value === 'number' ? v.value : undefined);
+  const readiness = raw?.readiness ?? src?.readiness;
+  if (typeof readiness !== 'string') {
+    throw new Error('sequence_portfolio needs readiness, either top-level or inside the portfolio it is given.');
+  }
   const initiatives = rawInits.map((i: any, idx: number) => {
-    const sc = i?.scores ?? {};
+    // A scored entry carries scores_used and pillar_basis. An unscored one carries scores.
+    const sc = i?.scores ?? i?.scores_used ?? {};
     const scores: any = {};
-    for (const k of ['strategic_alignment', 'financial_return', 'change_enablement', 'governance_risk']) {
-      const n = flat(sc[k]);
-      if (n !== undefined) scores[k] = n;
+    for (const k of PILLARS) {
+      const v = sc[k];
+      if (typeof v === 'number' || (v && typeof v === 'object' && typeof v.value === 'number')) scores[k] = v;
     }
+    const work = workInput(i?.work_architecture);
     return {
       id: String(i?.id ?? `initiative-${idx + 1}`),
       name: String(i?.name ?? i?.id ?? `Initiative ${idx + 1}`),
       function: i?.function,
       ai_tier: i?.ai_tier,
       scores, // partial is fine: score() estimates missing pillars honestly
+      ...(i?.pillar_basis && typeof i.pillar_basis === 'object' ? { pillar_basis: i.pillar_basis } : {}),
+      ...(typeof i?.signal_completeness === 'number' ? { signal_completeness: i.signal_completeness } : {}),
+      ...(work ? { work_architecture: work } : {}),
     };
   });
   return {
     organization,
     initiatives,
-    readiness: raw?.readiness ?? src?.readiness,
+    readiness,
     constraints: raw?.constraints,
   } as SequenceInput;
 }
@@ -89,6 +123,9 @@ export function sequencePortfolio(rawInput: SequenceInput | Record<string, unkno
         ai_tier: init.ai_tier,
         readiness,
         scores: init.scores,
+        pillar_basis: init.pillar_basis,
+        signal_completeness: init.signal_completeness,
+        work_architecture: init.work_architecture,
       });
       scored.push({
         id: init.id, name: init.name, function: init.function, ai_tier: init.ai_tier,
