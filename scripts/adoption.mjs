@@ -16,7 +16,7 @@ const requestedAt = new Date().toISOString();
 
 async function json(url) {
   const headers = {};
-  if (process.env.GITHUB_TOKEN && url.includes('api.github.com')) {
+  if (process.env.GITHUB_TOKEN && new URL(url).hostname === 'api.github.com') {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   }
   try {

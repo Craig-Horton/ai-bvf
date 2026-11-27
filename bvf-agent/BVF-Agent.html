@@ -412,6 +412,13 @@ Tailor ALL recommendations to the client context provided. Regulated industries 
 
 Respond ONLY with valid JSON array, no markdown. Do not use apostrophes in string values - rephrase to avoid them.`;
 
+// Escapes a value for safe interpolation into an HTML template (text or attribute).
+const ESC_MAP={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+function esc(value){
+  if(value===null||value===undefined) return '';
+  return String(value).replace(/[&<>"']/g,ch=>ESC_MAP[ch]);
+}
+
 const BUCKET_CONFIG={
   'AGENT-PROOF':      {hexColor:'#22C55E',bg:'rgba(34,197,94,0.1)',   border:'rgba(34,197,94,0.4)',   label:'Agent-Proof',      tagline:'Protect & Enhance',        emoji:'🟢'},
   'AGENT-AUGMENTED':  {hexColor:'#F59E0B',bg:'rgba(245,158,11,0.1)',  border:'rgba(245,158,11,0.4)',  label:'Agent-Augmented',  tagline:'Renegotiate & Restructure', emoji:'🟡'},
@@ -584,22 +591,22 @@ function buildResults(client){
         ${items.length===0?'<div class="empty-bucket">No tools in this bucket</div>':items.map(item=>`
           <div class="item-card" onclick="this.classList.toggle('expanded')">
             <div class="item-top">
-              <div class="item-name">${item.name}</div>
+              <div class="item-name">${esc(item.name)}</div>
               <div class="item-meta">
-                <span class="risk-badge" style="color:${RISK_COLOR[item.annualRisk]||'#B8A88A'};border-color:${RISK_COLOR[item.annualRisk]||'#B8A88A'}55">${item.annualRisk}</span>
-                <span class="confidence-badge" style="color:${cfg.hexColor}">${item.confidence}%</span>
+                <span class="risk-badge" style="color:${RISK_COLOR[item.annualRisk]||'#B8A88A'};border-color:${RISK_COLOR[item.annualRisk]||'#B8A88A'}55">${esc(item.annualRisk)}</span>
+                <span class="confidence-badge" style="color:${cfg.hexColor}">${esc(item.confidence)}%</span>
               </div>
             </div>
-            <div class="confidence-bar"><div class="confidence-fill" style="width:${item.confidence}%;background:${cfg.hexColor}"></div></div>
+            <div class="confidence-bar"><div class="confidence-fill" style="width:${esc(item.confidence)}%;background:${cfg.hexColor}"></div></div>
             <div class="item-expanded">
-              <p class="rationale">${item.rationale}</p>
-              ${item.riskRationale?`<p class="risk-note">⚡ Risk note: ${item.riskRationale}</p>`:''}
-              ${item.benchmarks&&item.benchmarks.length?`<div class="benchmark-section"><span class="benchmark-label">Industry benchmarks</span>${item.benchmarks.map(b=>`<div class="benchmark-item">${b}</div>`).join('')}</div>`:''}
+              <p class="rationale">${esc(item.rationale)}</p>
+              ${item.riskRationale?`<p class="risk-note">⚡ Risk note: ${esc(item.riskRationale)}</p>`:''}
+              ${item.benchmarks&&item.benchmarks.length?`<div class="benchmark-section"><span class="benchmark-label">Industry benchmarks</span>${item.benchmarks.map(b=>`<div class="benchmark-item">${esc(b)}</div>`).join('')}</div>`:''}
               <div class="action-box" style="border-color:${cfg.hexColor}44;background:${cfg.bg}">
                 <span class="action-label">Recommended action</span>
-                <div class="action-text" style="color:${cfg.hexColor}">${item.action}</div>
+                <div class="action-text" style="color:${cfg.hexColor}">${esc(item.action)}</div>
               </div>
-              ${item.savingsOpportunity>0?`<div class="savings-chip">💰 ${item.savingsOpportunity}% cost reduction opportunity</div>`:''}
+              ${item.savingsOpportunity>0?`<div class="savings-chip">💰 ${esc(item.savingsOpportunity)}% cost reduction opportunity</div>`:''}
             </div>
           </div>`).join('')}
       </div>
@@ -615,13 +622,13 @@ function buildControlPanel(){
     return `<div class="llm-card">
       <div class="llm-card-header">
         <div>
-          <div class="llm-tool-name">${item.toolName}</div>
-          <div style="font-size:11px;color:var(--text-muted);font-family:'Trebuchet MS',sans-serif;margin-top:3px">${item.processType||''}</div>
+          <div class="llm-tool-name">${esc(item.toolName)}</div>
+          <div style="font-size:11px;color:var(--text-muted);font-family:'Trebuchet MS',sans-serif;margin-top:3px">${esc(item.processType||'')}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <span class="llm-tool-bucket" style="color:${bucketCfg.hexColor};border-color:${bucketCfg.hexColor}55;background:${bucketCfg.bg}">${item.bucket}</span>
-          <span style="font-size:11px;color:${complexityColor[item.implementationComplexity]||'#E8A020'};font-family:'Trebuchet MS',sans-serif;font-weight:700;border:1px solid ${complexityColor[item.implementationComplexity]||'#E8A020'}55;padding:3px 8px;border-radius:2px">${item.implementationComplexity||'Medium'} complexity</span>
-          <span style="font-size:11px;color:var(--text-muted);font-family:'Trebuchet MS',sans-serif">ROI ~${item.roiTimeframe||'6-12'} months</span>
+          <span class="llm-tool-bucket" style="color:${bucketCfg.hexColor};border-color:${bucketCfg.hexColor}55;background:${bucketCfg.bg}">${esc(item.bucket)}</span>
+          <span style="font-size:11px;color:${complexityColor[item.implementationComplexity]||'#E8A020'};font-family:'Trebuchet MS',sans-serif;font-weight:700;border:1px solid ${complexityColor[item.implementationComplexity]||'#E8A020'}55;padding:3px 8px;border-radius:2px">${esc(item.implementationComplexity||'Medium')} complexity</span>
+          <span style="font-size:11px;color:var(--text-muted);font-family:'Trebuchet MS',sans-serif">ROI ~${esc(item.roiTimeframe||'6-12')} months</span>
         </div>
       </div>
       <div class="llm-card-body">
@@ -630,22 +637,22 @@ function buildControlPanel(){
           <div class="llm-options">
             <div class="llm-option primary" style="border-color:${primColor};background:${primColor}11">
               <span class="llm-option-badge" style="background:${primColor};color:#fff">Primary</span>
-              <div class="llm-name">${item.primaryLLM?.name||'—'}</div>
-              <div class="llm-use-case">${item.primaryLLM?.model||''}</div>
-              <div class="llm-score" style="color:${primColor}">Fit: ${item.primaryLLM?.fitScore||'—'}/100</div>
+              <div class="llm-name">${esc(item.primaryLLM?.name||'—')}</div>
+              <div class="llm-use-case">${esc(item.primaryLLM?.model||'')}</div>
+              <div class="llm-score" style="color:${primColor}">Fit: ${esc(item.primaryLLM?.fitScore||'—')}/100</div>
             </div>
             ${(item.alternativeLLMs||[]).map(alt=>{const ac=getLLMColor(alt.name||'');return `<div class="llm-option" style="border-color:${ac}55;background:${ac}08">
               <span class="llm-option-badge" style="background:rgba(255,255,255,0.1);color:var(--text-muted)">Alt</span>
-              <div class="llm-name">${alt.name||'—'}</div>
-              <div class="llm-use-case">${alt.model||''}</div>
-              <div class="llm-score" style="color:${ac}">Fit: ${alt.fitScore||'—'}/100</div>
+              <div class="llm-name">${esc(alt.name||'—')}</div>
+              <div class="llm-use-case">${esc(alt.model||'')}</div>
+              <div class="llm-score" style="color:${ac}">Fit: ${esc(alt.fitScore||'—')}/100</div>
             </div>`}).join('')}
           </div>
         </div>
-        <p class="llm-rationale">${item.primaryLLM?.rationale||''}</p>
-        <div class="llm-deploy">🏗 Deployment: ${item.primaryLLM?.deploymentModel||'—'} &nbsp;·&nbsp; 📦 Approach: ${item.buildApproach||'—'} &nbsp;·&nbsp; 💰 ${item.primaryLLM?.estimatedCostModel||'—'}</div>
-        ${item.complianceFlags&&item.complianceFlags.length?`<div class="llm-flags">${item.complianceFlags.map(f=>`<span class="llm-flag amber">⚠ ${f}</span>`).join('')}</div>`:''}
-        <p class="llm-rationale" style="color:var(--white);font-weight:600">${item.overallRecommendation||''}</p>
+        <p class="llm-rationale">${esc(item.primaryLLM?.rationale||'')}</p>
+        <div class="llm-deploy">🏗 Deployment: ${esc(item.primaryLLM?.deploymentModel||'—')} &nbsp;·&nbsp; 📦 Approach: ${esc(item.buildApproach||'—')} &nbsp;·&nbsp; 💰 ${esc(item.primaryLLM?.estimatedCostModel||'—')}</div>
+        ${item.complianceFlags&&item.complianceFlags.length?`<div class="llm-flags">${item.complianceFlags.map(f=>`<span class="llm-flag amber">⚠ ${esc(f)}</span>`).join('')}</div>`:''}
+        <p class="llm-rationale" style="color:var(--white);font-weight:600">${esc(item.overallRecommendation||'')}</p>
       </div>
     </div>`;
   }).join('');
@@ -667,16 +674,16 @@ function buildReport(){
         const pc=getLLMColor(item.primaryLLM?.name||'');
         return `<div class="report-item">
           <div class="report-item-header">
-            <span class="report-item-name">${item.toolName}</span>
-            <span class="risk-badge" style="color:${bc.hexColor};border-color:${bc.hexColor}55">${item.bucket}</span>
+            <span class="report-item-name">${esc(item.toolName)}</span>
+            <span class="risk-badge" style="color:${bc.hexColor};border-color:${bc.hexColor}55">${esc(item.bucket)}</span>
           </div>
           <div class="report-llm-box">
             <span class="report-llm-label">Primary recommendation</span>
-            <p class="report-llm-rec"><strong style="color:${pc}">${item.primaryLLM?.name||'—'} (${item.primaryLLM?.model||''})</strong> — Fit score: ${item.primaryLLM?.fitScore||'—'}/100 · ${item.primaryLLM?.deploymentModel||''} · ${item.buildApproach||''} approach</p>
-            <p class="report-llm-rec" style="margin-top:8px">${item.primaryLLM?.rationale||''}</p>
-            ${item.complianceFlags&&item.complianceFlags.length?`<p class="report-llm-rec" style="margin-top:8px;color:var(--amber)">⚠ ${item.complianceFlags.join(' · ')}</p>`:''}
+            <p class="report-llm-rec"><strong style="color:${pc}">${esc(item.primaryLLM?.name||'—')} (${esc(item.primaryLLM?.model||'')})</strong> — Fit score: ${esc(item.primaryLLM?.fitScore||'—')}/100 · ${esc(item.primaryLLM?.deploymentModel||'')} · ${esc(item.buildApproach||'')} approach</p>
+            <p class="report-llm-rec" style="margin-top:8px">${esc(item.primaryLLM?.rationale||'')}</p>
+            ${item.complianceFlags&&item.complianceFlags.length?`<p class="report-llm-rec" style="margin-top:8px;color:var(--amber)">⚠ ${esc(item.complianceFlags.join(' · '))}</p>`:''}
           </div>
-          <p class="report-item-action" style="color:var(--indigo);margin-top:10px">→ ${item.overallRecommendation||''}</p>
+          <p class="report-item-action" style="color:var(--indigo);margin-top:10px">→ ${esc(item.overallRecommendation||'')}</p>
         </div>`;
       }).join('')}
     </div>`:
@@ -685,7 +692,7 @@ function buildReport(){
   document.getElementById('report-content').innerHTML=`
     <div class="report-meta">Confidential — Board Briefing</div>
     <h2 class="report-title">AI Portfolio Risk Assessment</h2>
-    <div class="report-client">${client||'Client'} &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; Prepared by Craig Horton, BVF</div>
+    <div class="report-client">${esc(client||'Client')} &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; Prepared by Craig Horton, BVF</div>
     <div class="report-divider"></div>
     <div class="report-section">
       <h3 class="report-section-title">Executive summary</h3>
@@ -703,11 +710,11 @@ function buildReport(){
       return `<div class="report-section">
         <h3 class="report-section-title" style="color:${cfg.hexColor}">${cfg.emoji} ${cfg.label} — ${cfg.tagline}</h3>
         ${items.map(item=>`<div class="report-item">
-          <div class="report-item-header"><span class="report-item-name">${item.name}</span><span class="risk-badge" style="color:${RISK_COLOR[item.annualRisk]};border-color:${RISK_COLOR[item.annualRisk]}66">${item.annualRisk} annual risk</span></div>
-          <p class="report-item-rationale">${item.rationale}</p>
-          ${item.riskRationale?`<p class="report-item-rationale" style="color:#B8A88A;font-style:italic;font-size:12px">⚡ ${item.riskRationale}</p>`:''}
-          ${item.benchmarks&&item.benchmarks.length?`<div class="report-benchmarks"><span class="report-benchmark-label">Supporting benchmarks</span>${item.benchmarks.map(b=>`<div class="report-benchmark-item">${b}</div>`).join('')}</div>`:''}
-          <p class="report-item-action" style="color:${cfg.hexColor}">→ ${item.action}</p>
+          <div class="report-item-header"><span class="report-item-name">${esc(item.name)}</span><span class="risk-badge" style="color:${RISK_COLOR[item.annualRisk]};border-color:${RISK_COLOR[item.annualRisk]}66">${esc(item.annualRisk)} annual risk</span></div>
+          <p class="report-item-rationale">${esc(item.rationale)}</p>
+          ${item.riskRationale?`<p class="report-item-rationale" style="color:#B8A88A;font-style:italic;font-size:12px">⚡ ${esc(item.riskRationale)}</p>`:''}
+          ${item.benchmarks&&item.benchmarks.length?`<div class="report-benchmarks"><span class="report-benchmark-label">Supporting benchmarks</span>${item.benchmarks.map(b=>`<div class="report-benchmark-item">${esc(b)}</div>`).join('')}</div>`:''}
+          <p class="report-item-action" style="color:${cfg.hexColor}">→ ${esc(item.action)}</p>
         </div>`).join('')}
       </div>`;
     }).join('')}
