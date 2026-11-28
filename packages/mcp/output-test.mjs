@@ -283,6 +283,21 @@ test('MCP evidence mode lets an agent answer alone, only from what it can quote'
     };
     const alone = { proposal, confirmed: true, answered_by: 'evidence', answers };
 
+    // A contradiction after character 400 must survive the connector and its brief.
+    const fullDesign = 'The workflow, roles and decision rights are rewritten. ' + 'The team has reviewed the new process. '.repeat(12) + 'The team measures stay as they are.';
+    const best = { financial_return: 'd', governance_risk: 'd', strategic_alignment: 'd', change_enablement: 'd', work_architecture: 'd' };
+    const longInput = { ...alone, answers: best, evidence: { ...evidence, governance_risk: { quote: 'The controls have been tested, Dana can stop the agent and every action is logged and reversible.', source: 'Controls report' }, work_architecture: { quote: fullDesign, source: 'Process design' } } };
+    const longResult = await call('assess_ai_initiative', longInput);
+    assert.equal(longResult.verdict.classification, 'Fix');
+    assert.equal(longResult.verdict.answers_given.work_architecture.evidence[0].quote, fullDesign);
+    const carriedDesign = JSON.parse(Buffer.from(longResult.verdict.brief_url.split('#')[1], 'base64url').toString('utf8'));
+    assert.equal(carriedDesign.q.work_architecture[0][0], fullDesign);
+    for (const quote of ['The workflow is rewritten. The team measures s', 'The workflow is rewritten. The team measures s…']) {
+      const cutResult = await call('assess_ai_initiative', { ...longInput, evidence: { ...longInput.evidence, work_architecture: { quote, source: 'Process design' } } });
+      assert.notEqual(cutResult.verdict?.classification, 'Accelerate');
+      assert.deepEqual(cutResult.evidence_missing, ['work_architecture']);
+    }
+
     const judged = await call('assess_ai_initiative', { ...alone, evidence });
     assert.equal(judged.status, 'verdict');
     assert.equal(judged.answered_by, 'evidence');

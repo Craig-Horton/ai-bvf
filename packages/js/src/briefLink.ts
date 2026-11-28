@@ -47,9 +47,9 @@ export interface BriefLinkInput {
 }
 
 const pair = (evidence: AssessEvidence | undefined, keep: boolean): [string, string] | 0 =>
-  (evidence && keep ? [evidence.quote.slice(0, 200), evidence.source.slice(0, 120)] : 0);
+  (evidence && keep ? [evidence.quote, evidence.source.slice(0, 120)] : 0);
 const unpair = (given: unknown): AssessEvidence | undefined =>
-  (Array.isArray(given) && typeof given[0] === 'string' && typeof given[1] === 'string' ? { quote: given[0].slice(0, 400), source: given[1].slice(0, 160) } : undefined);
+  (Array.isArray(given) && typeof given[0] === 'string' && typeof given[1] === 'string' ? { quote: given[0], source: given[1].slice(0, 160) } : undefined);
 
 /** The funding record in its short form for the link. A result is one row: what is measured, the agreement, today's figure and the result. */
 function packFunding(funding: AssessFunding, quotes: boolean): Record<string, unknown> {
@@ -118,7 +118,7 @@ const CHOICES = ['a', 'b', 'c', 'd', 'unknown'];
 const VERDICTS = ['Accelerate', 'Fix', 'Stop'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const pairs = (items: AssessEvidence[], most: number): [string, string][] =>
-  items.slice(0, most).map((item) => [item.quote.slice(0, 400), item.source.slice(0, 160)]);
+  items.slice(0, most).map((item) => [item.quote, item.source.slice(0, 160)]);
 
 export function briefUrl(input: BriefLinkInput): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error('date must be written as YYYY-MM-DD.');
@@ -140,7 +140,7 @@ export function briefUrl(input: BriefLinkInput): string {
     for (const id of QUESTIONS) {
       const items = input.evidence?.[id];
       if (items?.length && answers[id] && answers[id] !== 'unknown') {
-        quotes[id] = items.slice(0, 3).map((item) => [item.quote.slice(0, 400), item.source.slice(0, 160)]);
+        quotes[id] = items.slice(0, 3).map((item) => [item.quote, item.source.slice(0, 160)]);
       }
     }
     payload.b = 'e';
@@ -201,7 +201,7 @@ export function readBriefLink(link: string): BriefLinkInput | undefined {
   }
   const quoted = (given: unknown): AssessEvidence[] => (Array.isArray(given) ? given : [])
     .filter((pair): pair is [string, string] => Array.isArray(pair) && typeof pair[0] === 'string' && typeof pair[1] === 'string')
-    .slice(0, 3).map(([quote, source]) => ({ quote: quote.slice(0, 400), source: source.slice(0, 160) }));
+    .slice(0, 3).map(([quote, source]) => ({ quote: quote, source: source.slice(0, 160) }));
 
   const brief: BriefLinkInput = {
     context: { industry: c.i, function: c.f, ai_tier: c.t, ...(typeof c.e === 'number' ? { employees: Math.round(c.e) } : {}) },
@@ -310,7 +310,7 @@ export function briefUrlFor(
       date,
       ...(options.include_proposal ? { proposal: result.proposal } : {}),
       contradiction_words: verdict.contradictions.filter((item) => item.found_in !== 'evidence').map((item) => item.proposal_words),
-      // The quotes as the engine kept them: trimmed, capped, and only for answers that counted.
+      // The quotes as the engine kept them: kept whole, and only for answers that counted.
       ...(input.answered_by === 'evidence' ? {
         answered_by: 'evidence' as const,
         evidence: Object.fromEntries(Object.entries(verdict.answers_given).flatMap(([id, answer]) => (answer?.evidence ? [[id, answer.evidence]] : []))),

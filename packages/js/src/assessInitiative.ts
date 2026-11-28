@@ -230,27 +230,30 @@ export const REVIEW_OUTCOME_LABEL: Record<typeof REVIEW_OUTCOMES[number], string
   no_decision: 'No decision has been made.',
 };
 const QUOTE_MIN = 8;
-const QUOTE_MAX = 400;
+const QUOTE_MAX = 2000;
 const SOURCE_MIN = 3;
 const SOURCE_MAX = 160;
 /** An answer may rest on more than one document. Each quote keeps its own source. */
 const QUOTES_PER_ANSWER = 3;
 
-/** A quote and a source, trimmed and capped. Anything shorter than a few words is no evidence. */
+/** Keep the whole quote or reject it. A shortened quote can conceal a contradiction. */
 function cleanEvidence(given: unknown): AssessEvidence | undefined {
   if (!given || typeof given !== 'object') return undefined;
   const { quote, source } = given as Record<string, unknown>;
   if (typeof quote !== 'string' || typeof source !== 'string') return undefined;
   const words = quote.replace(/\s+/g, ' ').trim();
   const where = source.replace(/\s+/g, ' ').trim();
-  if (words.length < QUOTE_MIN || where.length < SOURCE_MIN) return undefined;
-  return { quote: words.slice(0, QUOTE_MAX), source: where.slice(0, SOURCE_MAX) };
+  if (words.length < QUOTE_MIN || words.length > QUOTE_MAX || where.length < SOURCE_MIN) return undefined;
+  return { quote: words, source: where.slice(0, SOURCE_MAX) };
 }
 
-/** One quote or a list of them. Entries that are no evidence are dropped, and the list is capped. */
+/** Incomplete excerpts cannot support an answer. Reject the entire list rather than dropping a qualification. */
 function cleanEvidenceList(given: unknown): AssessEvidence[] {
   const items = Array.isArray(given) ? given : [given];
-  return items.map(cleanEvidence).filter((item): item is AssessEvidence => item !== undefined).slice(0, QUOTES_PER_ANSWER);
+  if (items.length > QUOTES_PER_ANSWER) return [];
+  const cleaned = items.map(cleanEvidence);
+  if (cleaned.some((item) => !item || !/[.!?]["'”’)]*$/.test(item.quote) || /\.{2,}|…/.test(item.quote))) return [];
+  return cleaned as AssessEvidence[];
 }
 
 /** What the result says when a company fact was not stated. */
@@ -283,7 +286,7 @@ const OWN_RESULT_QUESTIONS: AssessQuestionId[] = ['financial_return', 'strategic
 
 /** True when the quote speaks of other organisations' results. */
 export function aboutOthers(quote: string): boolean {
-  return OTHERS_RESULT_PATTERNS.some((pattern) => pattern.test(quote.slice(0, QUOTE_MAX)));
+  return OTHERS_RESULT_PATTERNS.some((pattern) => pattern.test(quote));
 }
 
 /** The quotes an answer can rest on. On the return and the result, a figure about other organisations is set aside. */
@@ -450,9 +453,14 @@ export function pendingApprovals(given: unknown, byEvidence: boolean): AssessPen
     const what = typeof item.what === 'string' ? withoutClosingStop(item.what.replace(/\s+/g, ' ').trim()).slice(0, APPROVAL_WHAT_MAX) : '';
     if (!what) throw new Error(`pending_approvals[${index}].what must say what is pending.`);
     const evidence = cleanEvidenceList(item.evidence);
-    if (byEvidence && !evidence.length) continue;
+    if (byEvidence && !evidence.length) {
+      if (item.evidence !== undefined) throw new Error(`pending_approvals[${index}].evidence must contain complete quoted sentences and a source, with at most 2,000 characters per quote.`);
+      continue;
+    }
     const named = typeof item.by === 'string' ? item.by.replace(/\s+/g, ' ').trim().slice(0, APPROVAL_BY_MAX) : '';
-    const by = named && (!byEvidence || evidence.some((quote) => quote.quote.toLowerCase().includes(named.toLowerCase()))) ? named : undefined;
+    const escapedName = named.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const namedInRecord = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapedName}(?=$|[^\\p{L}\\p{N}_])`, 'iu');
+    const by = named && (!byEvidence || evidence.some((quote) => namedInRecord.test(quote.quote))) ? named : undefined;
     const line = `${what}.${by ? ` Sign-off: ${by}.` : ''}`;
     kept.push({ what, ...(by ? { by } : {}), ...(evidence.length ? { evidence } : {}), line });
     if (kept.length === PENDING_APPROVALS_MAX) break;
@@ -639,9 +647,28 @@ function assess(input: AssessInitiativeInput, earlierVerdict?: Classification): 
       rules.push(`evidence_missing:${id}`);
       return 'unknown';
     }
+    // All four parts must at least be named in the supplied passages. Quoting
+    // three complete sentences about workflow, roles and rights cannot support
+    // an answer that also claims the measures changed. This is a coverage check,
+    // not a claim that fixed word patterns establish semantic support.
+    if (id === 'work_architecture' && choice === 'd') {
+      const text = evidence.map((item) => item.quote).join(' ');
+      const parts = [/\b(?:workflow|workflows|process|processes|steps)\b/i, /\b(?:roles|role|who does what|who drafts)\b/i,
+        /\b(?:decision|decisions|override|overrides|who decides)\b/i, /\b(?:measures|measured|metrics|targets|kpis|incentives|judge good work|quality measures)\b/i];
+      if (!parts.every((part) => part.test(text))) {
+        evidenceMissing.push(id);
+        rules.push('evidence_work_design_incomplete:work_architecture');
+        return 'unknown';
+      }
+    }
     // Two records that disagree. No rule here picks which one applies today, so
     // the answer is counted as not known and both come back for the owner.
     const against = cleanEvidenceList(input.evidence_against?.[id]);
+    if (input.evidence_against?.[id] !== undefined && !against.length) {
+      evidenceMissing.push(id);
+      rules.push(`evidence_against_incomplete:${id}`);
+      return 'unknown';
+    }
     if (against.length) {
       held.push({ id, choice: choice as Exclude<AssessChoiceId, 'unknown'>, evidence, against });
       rules.push(`conflict:${id}`);

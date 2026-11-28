@@ -4,6 +4,12 @@ This folder holds one complete run of the agent, kept so that anyone can check i
 
 The company is made up. Halden & Co is a 400-person online retailer invented for this test. The run is real: a fresh assistant with the skill in [`skills/aibvf-agent`](../../skills/aibvf-agent) installed, the engine as built in this repository, and nobody answering a question.
 
+## Historical results and current rules
+
+The calls, registers and reports below are the original recorded run. They have not been rewritten as if a new run took place. Their dates were supplied to the assistant; six weeks did not elapse and no scheduler fired.
+
+The recorded customer-service review returned Accelerate. Replaying its full quoted process-design passage with the current rules returns Fix: the passage says the team measures stay as they are, while the answer claims all four parts were redesigned. Operating brief 7 requires complete quoted sentences; core 0.20.1 preserves the whole passage and rejects cut-short quotes. This check does not prove that a model supplied every relevant record or that a quotation supports every part of its chosen answer.
+
 ## What the agent was given
 
 - The skill, and a register holding only the mandate: read the folder `halden`, draft and never send, check every week, report to the owner.

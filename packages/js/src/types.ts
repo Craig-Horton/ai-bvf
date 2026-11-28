@@ -467,7 +467,7 @@ export interface AssessContext {
 /** Plain-English front door for one proposed AI investment. */
 /** Words an agent found, and where it found them. */
 export interface AssessEvidence {
-  /** The words as written in the source, quoted exactly. */
+  /** Complete sentences as written in the source, quoted exactly, at most 2,000 characters. */
   quote: string;
   /** Where the words were found: the document, message or record, with its date where known. */
   source: string;
