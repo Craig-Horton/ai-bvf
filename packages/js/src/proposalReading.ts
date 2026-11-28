@@ -77,7 +77,7 @@ export const PROPOSAL_RULES: ProposalRule[] = [
   {
     rule: 'measures_unchanged', question: 'work_architecture', part: 'measures_updated',
     says: 'the people doing the work are still measured as they were before',
-    pattern: /\b(?:measures|targets|kpis|metrics|incentives) (?:stay|stays|remain|remains|will stay|will remain) (?:the same|unchanged|as (?:they are|it is|before))\b|\b(?:measures|targets|kpis|metrics|incentives) (?:are|is) (?:unchanged|not changed|left as (?:they are|it is))\b/i,
+    pattern: /\b(?:measures|targets|kpis|metrics|incentives) (?:stay|stays|remain|remains|will stay|will remain) (?:the same|unchanged|as (?:they are|it is|before))\b|\b(?:measures|targets|kpis|metrics|incentives) (?:are|is) (?:unchanged|not changed|left as (?:they are|it is))\b|\b(?:keep|keeping|retain|retaining|stick with|sticking with) (?:the |our |their )?(?:existing|current|same|old) (?:measures|targets|kpis|metrics|incentives)\b|\b(?:measures|targets|kpis|metrics|incentives) (?:have|has|will) not (?:been )?(?:change|changed|be changed)\b|\b(?:leave|leaving) (?:the |our |their )?(?:existing|current|same|old) (?:measures|targets|kpis|metrics|incentives) in place\b|\b(?:measures|targets|kpis|metrics|incentives) (?:will )?continue unchanged\b|\b(?:existing|current|same|old) (?:measures|targets|kpis|metrics|incentives) are (?:being )?retained\b/i,
   },
 ];
 

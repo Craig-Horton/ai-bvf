@@ -177,14 +177,15 @@ test('an answer that rests on two documents carries a quote from each, with its 
   const carried = JSON.parse(Buffer.from(briefUrlFor(input, result, '2026-11-21')!.split('#')[1], 'base64url').toString('utf8'));
   assert.deepEqual(carried.q.work_architecture, [[design.quote, design.source], [measures.quote, measures.source]]);
 
-  // No more than three quotes are kept, and an entry that is no evidence is dropped.
+  // An invalid or overfull list cannot be silently reduced to its favourable entries.
   const many = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [design, { quote: 'ok', source: 'x' }, measures, design, measures] } });
-  assert.equal(many.verdict!.answers_given.work_architecture?.evidence?.length, 3);
+  assert.notEqual(many.verdict?.classification, 'Accelerate');
+  assert.deepEqual(many.evidence_missing, ['work_architecture']);
   const none = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [{ quote: 'ok', source: 'x' }] } });
   assert.deepEqual(none.evidence_missing, ['work_architecture']);
 
   // The second quote is read as closely as the first.
-  const second = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [design, { quote: 'It is a bolt-on to the existing process for now.', source: 'Vendor note, 2 December 2026' }] } });
+  const second = assessInitiative({ ...input, evidence: { ...QUOTES, work_architecture: [design, measures, { quote: 'It is a bolt-on to the existing process for now.', source: 'Vendor note, 2 December 2026' }] } });
   assert.equal(second.verdict!.classification, 'Fix');
   assert.equal(second.verdict!.contradictions[0].found_in, 'evidence');
   assert.equal(second.verdict!.contradictions[0].proposal_words, 'bolt-on');

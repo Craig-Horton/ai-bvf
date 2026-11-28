@@ -2,6 +2,20 @@
 
 All notable changes to `aibvf-mcp`, `@aibvf/core`, `aibvf-check`, and `aibvf`, in reverse chronological order.
 
+## 0.25.1 (aibvf-mcp), 0.20.1 (@aibvf/core), 28 November 2026
+
+Fixed: quoted passages are kept whole up to 2,000 characters. The engine previously cut them at 400 characters before reading them, which could remove a qualification and allow Accelerate. The brief link now carries the same complete passages. Overlong quotes count as not known; the engine never chooses which part to discard.
+
+Changed: an answer from quoted records needs complete sentences, including their closing punctuation. Cut-short words, omission ellipses and incomplete quote lists count as not known. A malformed counter-record also prevents a go-ahead.
+
+A claim that all four parts of the work changed also needs passages that name the workflow, roles, decision rights and measures. These are sentence-boundary and coverage checks: they cannot establish that a quotation supports every part of an answer or that the agent supplied all relevant records.
+
+Fixed: the work-design check recognises keeping current targets, retaining existing measures and measures that have not been changed. The numeric thresholds are unchanged; a guided verdict can change where a quote was previously cut or these phrases were missed. The audit records core 0.20.1 so that this change is visible.
+
+Clarified: an approval owner is returned only when the quoted record names them. A role absent from its quote remains unverified. Name matching now uses whole words, so Ann cannot be inferred from Annual. Operating brief 7 explains this and the complete-quote requirement.
+
+Tested: the full Halden process passage, the cut-short probe, incomplete counter-records, common wording variants, approval ownership and brief round trips. The connector contract tests exercise whole and cut-short quotes through MCP. This release does not establish real-world adoption, independent multi-model performance or unattended scheduling.
+
 ## 0.25.0 (aibvf-mcp), 0.20.0 (@aibvf/core), 0.3.0 (aibvf), 24 November 2026
 
 From an outside audit of the connector on 24 November 2026. It found three high faults: the Python package had drifted from the engine, the last step of the portfolio chain refused the output of the step before it, and an estimate could come back as a given. This release fixes those three and the cheap contract faults beside them. Each claim was checked against the code before it was acted on.

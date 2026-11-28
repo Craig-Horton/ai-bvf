@@ -22,7 +22,7 @@ const PENDING = {
   by: 'Priya Shah',
   evidence: { quote: 'France activation still needs separate controls sign-off from Priya Shah.', source: 'B04 Controls retest' },
 };
-const QUOTES = Object.fromEntries(Object.keys(ALL_D).map((id) => [id, { quote: `Quoted support for ${id} in the record.`, source: 'A05 Business case' }]));
+const QUOTES = Object.fromEntries(Object.keys(ALL_D).map((id) => [id, { quote: id === 'work_architecture' ? 'The workflow, roles, decision rights and performance measures are redesigned.' : `Quoted support for ${id} in the record.`, source: 'A05 Business case' }]));
 const owner: AssessInitiativeInput = { proposal: PROPOSAL, ...COMPANY, confirmed: true, answers: ALL_D };
 const agent: AssessInitiativeInput = {
   proposal: PROPOSAL, ...COMPANY, confirmed: true, answered_by: 'evidence', answers: ALL_D, evidence: QUOTES,

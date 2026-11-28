@@ -71,7 +71,8 @@ test('words against an answer count only with a source, and only in evidence mod
     evidence: { ...QUOTES, governance_risk: MINUTES }, evidence_against: { governance_risk: { quote: POLICY.quote, source: '' } },
   });
   assert.equal(noSource.conflicts, undefined);
-  assert.equal(noSource.verdict!.classification, 'Accelerate');
+  assert.notEqual(noSource.verdict?.classification, 'Accelerate');
+  assert.deepEqual(noSource.evidence_missing, ['governance_risk']);
   const byOwner = assessInitiative({ proposal: PROPOSAL, confirmed: true, answers: { ...FIX, governance_risk: 'd' }, evidence_against: { governance_risk: POLICY } });
   assert.equal(byOwner.conflicts, undefined, 'a person who answers has already said which record applies');
 });

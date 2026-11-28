@@ -153,7 +153,7 @@ try {
 const check = process.argv.includes('--check');
 const skillPath = new URL('SKILL.md', skillDir);
 if (check) {
-  assert.equal(await readFile(skillPath, 'utf8'), SKILL, 'skills/aibvf-agent/SKILL.md is out of date. Run: node scripts/build-agent-skill.mjs');
+  assert.equal((await readFile(skillPath, 'utf8')).replace(/\r\n/g, '\n'), SKILL, 'skills/aibvf-agent/SKILL.md is out of date. Run: node scripts/build-agent-skill.mjs');
 } else {
   await writeFile(skillPath, SKILL);
 }
@@ -164,8 +164,12 @@ const names = (await readdir(skillDir, { recursive: true, withFileTypes: true })
   .sort();
 const files = [];
 for (const name of names) {
-  const data = await readFile(new URL(name, skillDir));
-  if (/\.(md|json|txt)$/.test(name)) checkVoice(`skills/aibvf-agent/${name}`, data.toString('utf8'));
+  let data = await readFile(new URL(name, skillDir));
+  if (/\.(md|json|txt)$/.test(name)) {
+    const text = data.toString('utf8').replace(/\r\n/g, '\n');
+    checkVoice(`skills/aibvf-agent/${name}`, text);
+    data = Buffer.from(text, 'utf8');
+  }
   files.push({ name: `${NAME}/${name}`, data, mode: 0o100644 });
 }
 assert.ok(names.includes('SKILL.md') && names.includes('README.md') && names.includes('register-template.md'), 'The skill folder needs SKILL.md, README.md and register-template.md.');

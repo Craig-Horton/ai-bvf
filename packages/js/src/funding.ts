@@ -44,7 +44,9 @@ const amount = (given: unknown, field: string): number | undefined => {
 };
 function evidenceOf(given: unknown): AssessEvidence | undefined {
   if (!given || typeof given !== 'object') return undefined;
-  const quote = text((given as Record<string, unknown>).quote, 400);
+  const raw = (given as Record<string, unknown>).quote;
+  const quote = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  if (quote.length > 2000 || !/[.!?]["'”’)]*$/.test(quote) || /\.{2,}|…/.test(quote)) return undefined;
   const source = text((given as Record<string, unknown>).source, 160);
   return quote.length >= 8 && source.length >= 3 ? { quote, source } : undefined;
 }
